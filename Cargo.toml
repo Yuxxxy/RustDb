@@ -1,0 +1,105 @@
+[workspace]
+resolver = "2"
+members = [
+    "app",
+    "shell",
+    "ui",
+    "cli",
+    "core",
+    "platform",
+    "bootstrap",
+    "db-api",
+    "db-sqlite",
+    "db-mysql",
+    "db-postgres",
+    "db-mssql",
+    "db-oracle",
+    "db-oracle-rust",
+    "db-tunnel",
+    "sql-lang",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["于新宇"]
+
+[workspace.dependencies]
+# --- GPUI 生态（与 RustShell 同一版本线：gpui-kit v0.8.0）---
+gpui = { package = "gpui-pre", version = "=0.3.9" }
+gpui-platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["x11", "wayland"] }
+gpui-component = "=0.8.0"
+gpui-kit-assets = "=0.8.0"
+gpui-base = "=0.8.0"
+
+# --- 异步 / 驱动 ---
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+async-trait = "0.1"
+futures-core = "0.3"
+futures-util = "0.3"
+rusqlite = { version = "0.40", features = ["bundled"] }
+tokio-postgres = { version = "0.7", default-features = false, features = ["runtime"] }
+# MySQL：TLS 走 rustls（与 SQL Server / Oracle 共用 aws-lc-rs provider，避免双 provider panic）。
+mysql_async = { version = "0.37", default-features = false, features = ["minimal-rust", "rustls-tls", "aws-lc-rs", "tls12"] }
+# PostgreSQL 的 TLS 由 db-postgres 自行实现 `MakeTlsConnect`（无现成 crate 依赖）。
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["aws_lc_rs", "tls12"] }
+rustls-native-certs = "0.8"
+# TDS（SQL Server）：默认特性带 winauth/native-tls，这里只要 tds80 + rustls + chrono。
+tiberius = { version = "0.13", default-features = false, features = ["tds80", "rustls", "chrono"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+# ODPI-C（Oracle）：odpic-sys 构建期自带源码编译；运行期需 Oracle Instant Client。
+oracle = { version = "0.6", default-features = false, features = ["chrono"] }
+
+# --- HTTP（AI Provider）---
+ureq = { version = "2", features = ["json", "tls"] }
+
+# --- 通用 ---
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+flume = "0.12"
+parking_lot = "0.12"
+log = "0.4"
+
+# --- 导出（F-72）---
+# 默认特性关掉：只用最小写入能力，避免拖入 zip/图片等额外依赖。
+rust_xlsxwriter = { version = "0.99", default-features = false }
+
+# --- 导入（F-74）---
+# 只做解码：UTF-8 / GBK / UTF-16 / Big5；表格解析在 rustdb-core 内实现。
+encoding_rs = "0.8"
+
+# --- 逻辑导出（F-76）---
+flate2 = "1"
+
+# --- 加密配置交换（F-90）---
+# 口令派生用 Argon2id，负载用 AES-256-GCM，编码用 Base64。
+aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc"] }
+argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
+base64 = "0.22"
+getrandom = "0.3"
+
+# --- 内部 crate ---
+rustdb-core = { path = "core" }
+rustdb-platform = { path = "platform" }
+rustdb-bootstrap = { path = "bootstrap" }
+rustdb-ui = { path = "ui" }
+rustdb-shell = { path = "shell" }
+rustdb-db-api = { path = "db-api" }
+rustdb-db-sqlite = { path = "db-sqlite" }
+rustdb-db-mysql = { path = "db-mysql" }
+rustdb-db-postgres = { path = "db-postgres" }
+rustdb-db-mssql = { path = "db-mssql" }
+rustdb-db-oracle = { path = "db-oracle" }
+rustdb-db-tunnel = { path = "db-tunnel" }
+rustdb-sql-lang = { path = "sql-lang" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+opt-level = 2

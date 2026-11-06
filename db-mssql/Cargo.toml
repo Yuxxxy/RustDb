@@ -1,0 +1,16 @@
+[package]
+name = "rustdb-db-mssql"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rustdb-db-api.workspace = true
+async-trait.workspace = true
+tokio = { workspace = true, features = ["net"] }
+tokio-util.workspace = true
+futures-util.workspace = true
+parking_lot.workspace = true
+chrono.workspace = true
+tiberius.workspace = true
+log.workspace = true

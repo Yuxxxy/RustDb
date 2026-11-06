@@ -1,0 +1,16 @@
+[package]
+name = "rustdb"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "rustdb"
+path = "src/main.rs"
+
+[dependencies]
+rustdb-shell.workspace = true
+rustdb-bootstrap.workspace = true
+rustdb-core.workspace = true
+rustdb-platform.workspace = true
+log.workspace = true

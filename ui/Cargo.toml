@@ -1,0 +1,24 @@
+[package]
+name = "rustdb-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rustdb-core.workspace = true
+rustdb-platform.workspace = true
+rustdb-db-api.workspace = true
+rustdb-sql-lang.workspace = true
+gpui.workspace = true
+gpui-component = { workspace = true, features = ["tree-sitter-sql"] }
+gpui-kit-assets.workspace = true
+log.workspace = true
+# SQL 补全：CompletionProvider 的签名直接用 ropey / lsp-types。
+lsp-types = "0.97"
+ropey = { version = "2.0.0-beta.1", features = ["metric_chars", "metric_lines_lf", "metric_utf16"] }
+anyhow.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }

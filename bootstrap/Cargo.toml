@@ -1,0 +1,16 @@
+[package]
+name = "rustdb-bootstrap"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rustdb-core.workspace = true
+rustdb-platform.workspace = true
+rustdb-db-api.workspace = true
+rustdb-db-sqlite.workspace = true
+rustdb-db-mysql.workspace = true
+rustdb-db-postgres.workspace = true
+rustdb-db-mssql.workspace = true
+rustdb-db-oracle.workspace = true
+log.workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "rustdb-db-oracle-rust"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "RustDb Oracle 驱动（X-01 spike）：纯 Rust oracledb，专用线程包装"
+publish = false
+
+[dependencies]
+rustdb-db-api.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+futures-util.workspace = true
+chrono.workspace = true
+oracledb = { version = "=26.0.0-beta.4", default-features = false }

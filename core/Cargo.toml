@@ -1,0 +1,30 @@
+[package]
+name = "rustdb-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ureq.workspace = true
+rustdb-db-api.workspace = true
+rustdb-db-tunnel.workspace = true
+rustdb-sql-lang.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+parking_lot.workspace = true
+futures-util.workspace = true
+log.workspace = true
+rust_xlsxwriter.workspace = true
+encoding_rs.workspace = true
+flate2.workspace = true
+aes-gcm.workspace = true
+argon2.workspace = true
+base64.workspace = true
+getrandom.workspace = true
+
+[dev-dependencies]
+rustdb-db-sqlite.workspace = true
+rustdb-db-postgres.workspace = true
+rustdb-db-mysql.workspace = true

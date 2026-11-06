@@ -1,0 +1,14 @@
+[package]
+name = "rustdb-db-sqlite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rustdb-db-api.workspace = true
+rusqlite.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+futures-util.workspace = true
+chrono.workspace = true
+parking_lot.workspace = true
