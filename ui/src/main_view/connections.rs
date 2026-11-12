@@ -399,7 +399,7 @@ impl MainView {
                     .h(px(20.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .cursor_pointer()
                     .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                     .when(!active, |d| {
@@ -430,7 +430,7 @@ impl MainView {
                         .h(px(18.))
                         .px_2()
                         .rounded(px(4.))
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .cursor_pointer()
                         .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                         .when(!active, |d| {
@@ -466,7 +466,7 @@ impl MainView {
                             .justify_between()
                             .child(
                                 div()
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .font_weight(gpui::FontWeight::SEMIBOLD)
                                     .text_color(hex(t.fg_secondary))
                                     .child(SharedString::from(format!("第 {} 层", index + 1))),
@@ -475,7 +475,7 @@ impl MainView {
                                 div()
                                     .id(SharedString::from(format!("conn-hop-remove-{index}")))
                                     .debug_selector(move || format!("conn-hop-remove-{index}"))
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.danger))
                                     .cursor_pointer()
                                     .on_click(cx.listener(move |view, _, _, cx| {
@@ -520,7 +520,7 @@ impl MainView {
                     .h(px(18.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .cursor_pointer()
                     .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                     .when(!active, |d| {
@@ -551,7 +551,7 @@ impl MainView {
                     .h(px(18.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .cursor_pointer()
                     .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                     .when(!active, |d| {
@@ -581,7 +581,7 @@ impl MainView {
                     .gap_1()
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child("驱动"),
                     )
@@ -628,7 +628,7 @@ impl MainView {
                             .child(toggle_box(&t, read_only))
                             .child(
                                 div()
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_secondary))
                                     .child("只读连接"),
                             ),
@@ -649,7 +649,7 @@ impl MainView {
                             .child(toggle_box(&t, production))
                             .child(
                                 div()
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_secondary))
                                     .child("生产连接（写操作需临时解锁）"),
                             ),
@@ -678,7 +678,7 @@ impl MainView {
                             .child(toggle_box(&t, tunnel_on))
                             .child(
                                 div()
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_secondary))
                                     .child("走 SSH 隧道"),
                             ),
@@ -687,7 +687,7 @@ impl MainView {
                         section
                             .child(
                                 div()
-                                    .text_size(px(9.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_muted))
                                     .child("跳板按从上到下顺序建链"),
                             )
@@ -696,7 +696,7 @@ impl MainView {
                                 div()
                                     .id("conn-hop-add")
                                     .debug_selector(|| "conn-hop-add".to_string())
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.accent))
                                     .cursor_pointer()
                                     .on_click(cx.listener(|view, _, window, cx| {
@@ -749,7 +749,7 @@ impl MainView {
                             .child(toggle_box(&t, proxy_on))
                             .child(
                                 div()
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_secondary))
                                     .child("走代理（SOCKS5 / HTTP CONNECT）"),
                             ),
@@ -764,7 +764,7 @@ impl MainView {
                                         .items_center()
                                         .child(
                                             div()
-                                                .text_size(px(10.))
+                                                .text_size(px(crate::design::TS_CAPTION))
                                                 .text_color(hex(t.fg_muted))
                                                 .child("顺序"),
                                         )
@@ -807,7 +807,7 @@ impl MainView {
                                         .child(toggle_box(&t, proxy_remote_dns))
                                         .child(
                                             div()
-                                                .text_size(px(10.))
+                                                .text_size(px(crate::design::TS_CAPTION))
                                                 .text_color(hex(t.fg_secondary))
                                                 .child("域名交给代理解析"),
                                         ),
@@ -815,7 +815,7 @@ impl MainView {
                             })
                             .child(
                                 div()
-                                    .text_size(px(9.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_muted))
                                     .child("驱动仍连本地转发端口"),
                             )
@@ -845,16 +845,19 @@ impl MainView {
                                 .child(toggle_box(&t, lan_on))
                                 .child(
                                     div()
-                                        .text_size(px(10.))
+                                        .text_size(px(crate::design::TS_CAPTION))
                                         .text_color(hex(t.fg_secondary))
                                         .child("本地转发对局域网开放（监听 0.0.0.0）"),
                                 ),
                         )
                         .when(lan_on, |section| {
                             section.child(
-                                div().text_size(px(9.5)).text_color(hex(t.danger)).child(
-                                    "同网段任何人都能借这条链路访问目标库，确需共享才打开。",
-                                ),
+                                div()
+                                    .text_size(px(crate::design::TS_CAPTION))
+                                    .text_color(hex(t.danger))
+                                    .child(
+                                        "同网段任何人都能借这条链路访问目标库，确需共享才打开。",
+                                    ),
                             )
                         }),
                 )
@@ -874,7 +877,7 @@ impl MainView {
             .occlude()
             .child(
                 div()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child(title),
@@ -890,7 +893,7 @@ impl MainView {
             .when(error.is_some(), |card| {
                 card.child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.danger))
                         .child(SharedString::from(error.unwrap_or_default())),
                 )

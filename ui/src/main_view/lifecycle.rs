@@ -292,6 +292,7 @@ impl MainView {
             danger: None,
             danger_input: None,
             col_resize: None,
+            editor_resize: None,
             grid_h: 0.,
             grid_viewport: gpui::ScrollHandle::new(),
             tabs,
@@ -331,9 +332,25 @@ impl MainView {
         }
         // F-71：Esc 先关浮层、再回退当前单元格、最后撤销未填写的新增行。
         // 用全局按键观察者：焦点落在菜单按钮等非输入控件时也能收到 Esc。
-        let escape_key = cx.observe_keystrokes(|view, event, _window, cx| {
+        let escape_key = cx.observe_keystrokes(|view, event, window, cx| {
             if event.keystroke.key == "escape" {
                 view.handle_escape(cx);
+                return;
+            }
+            // P1-①：分隔条键盘可达。全局观察者与 Esc 同口径，不要求焦点落在分隔条上，
+            // 在 SQL 编辑器里也能用；Ctrl+Alt+0 复位到默认高度。
+            if event.keystroke.modifiers.control && event.keystroke.modifiers.alt {
+                let available = view.available_workspace_height(window);
+                match event.keystroke.key.as_str() {
+                    "up" => {
+                        view.nudge_editor_height(-rustdb_core::EDITOR_RESIZE_STEP, available, cx)
+                    }
+                    "down" => {
+                        view.nudge_editor_height(rustdb_core::EDITOR_RESIZE_STEP, available, cx)
+                    }
+                    "0" => view.reset_editor_height(available, cx),
+                    _ => {}
+                }
             }
         });
         view.escape_key = Some(escape_key);

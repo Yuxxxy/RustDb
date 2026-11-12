@@ -22,18 +22,18 @@ impl MainView {
             .items_center()
             .gap_2()
             .border_t_1()
-            .border_color(hex(t.border_subtle))
+            .border_color(hex(t.border_strong))
             .bg(hex(t.bg_elevated))
             .child(div().w(px(6.)).h(px(6.)).rounded_full().bg(hex(dot)))
             .child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_secondary))
                     .child(SharedString::from(label)),
             )
             .child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(SharedString::from(self.status.clone())),
             )
@@ -51,9 +51,9 @@ impl MainView {
                     .px_1()
                     .rounded(px(3.))
                     .bg(hex(t.danger))
-                    .text_size(px(9.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .text_color(hex(t.on_danger))
+                    .text_color(hex(t.on_danger_resolved))
                     .child("生产"),
             );
             if let Some(left) = self.core.write_unlock_remaining(&profile_id) {
@@ -61,7 +61,7 @@ impl MainView {
                 bar = bar.child(
                     div()
                         .debug_selector(|| "status-unlock".to_string())
-                        .text_size(px(9.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.success))
                         .child(SharedString::from(format!(
                             "写已解锁 {:02}:{:02}",
@@ -124,7 +124,7 @@ impl MainView {
             .border_b_0()
             // 外框（标题栏 + 竖栏）比内容卡片亮一档，与 RustShell 的壳 / 内容层次一致。
             .bg(hex(t.bg_elevated))
-            .text_size(px(15.))
+            .text_size(px(crate::design::TS_BASE))
             .child(
                 h_flex()
                     .w_full()
@@ -137,14 +137,20 @@ impl MainView {
                             .gap_2()
                             .child(
                                 div()
-                                    .text_size(px(13.))
+                                    .text_size(px(crate::design::TS_BASE))
                                     .font_weight(gpui::FontWeight::BOLD)
                                     .text_color(hex(t.accent))
                                     .child("RustDb"),
                             )
-                            .child(div().text_size(px(10.)).text_color(hex(t.fg_muted)).child(
-                                SharedString::from(format!("v{}", rustdb_core::APP_VERSION)),
-                            )),
+                            .child(
+                                div()
+                                    .text_size(px(crate::design::TS_CAPTION))
+                                    .text_color(hex(t.fg_muted))
+                                    .child(SharedString::from(format!(
+                                        "v{}",
+                                        rustdb_core::APP_VERSION
+                                    ))),
+                            ),
                     )
                     .child(div().flex_1()),
             )

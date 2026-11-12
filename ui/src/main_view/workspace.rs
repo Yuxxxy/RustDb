@@ -3,7 +3,11 @@
 use super::*;
 
 impl MainView {
-    pub(crate) fn render_workspace(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(crate) fn render_workspace(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let t = current(cx);
         let has_tab = self.active().is_some();
         let tab_bar = self.render_tab_bar(cx);
@@ -15,7 +19,7 @@ impl MainView {
                 .items_center()
                 .gap_1()
                 .border_b_1()
-                .border_color(hex(t.border_subtle))
+                .border_color(hex(t.border_strong))
                 .child(
                     Button::new("run-query")
                         .small()
@@ -105,12 +109,12 @@ impl MainView {
                             div()
                                 .id("export-format")
                                 .debug_selector(|| "export-format".to_string())
-                                .h(px(24.))
-                                .w(px(20.))
+                                .h(px(28.))
+                                .w(px(28.))
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .rounded(px(4.))
+                                .rounded(px(6.))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(hex(t.bg_overlay)))
                                 .on_mouse_down(
@@ -129,37 +133,82 @@ impl MainView {
                 );
 
         let import_panel = self.render_import_panel(cx);
+        let available_h = self.available_workspace_height(window);
+        let editor_h = self.layout.clamped_editor_height(available_h);
         let body: gpui::AnyElement = if has_tab {
             let params_panel = self.render_params_panel(cx);
-            let editor = div()
-                .h(px(176.))
+            let editor = v_flex()
+                .id("sql-editor")
+                .debug_selector(|| "sql-editor".to_string())
+                .h(px(editor_h))
+                .flex_none()
                 .p_2()
-                .border_b_1()
-                .border_color(hex(t.border_subtle))
-                .child(Editor::new(&self.sql_input).h(px(156.)));
+                .overflow_hidden()
+                .child(Editor::new(&self.sql_input).flex_1().min_h_0());
+            let splitter = self.render_editor_splitter(cx);
             let result_area = self.render_result(cx);
             v_flex()
+                .id("workspace-body")
+                .debug_selector(|| "workspace-body".to_string())
+                .relative()
                 .flex_1()
                 .min_h_0()
                 .when_some(params_panel, |layout, panel| layout.child(panel))
                 .child(editor)
+                .child(splitter)
                 .child(result_area)
-                .into_any_element()
-        } else {
-            v_flex()
-                .flex_1()
-                .min_h_0()
-                .items_center()
-                .justify_center()
-                .gap_2()
-                .child(Icon::new(IconName::Database).text_color(hex(t.fg_muted)))
-                .child(
-                    div()
-                        .text_size(px(11.5))
-                        .text_color(hex(t.fg_muted))
-                        .child("从左侧连接打开查询"),
+                // 拖拽全程由 body 收 mouse 事件：指针移出 9px 分隔条也能继续改高度。
+                .on_mouse_move(
+                    cx.listener(|view, event: &gpui::MouseMoveEvent, window, cx| {
+                        view.drag_editor_resize(event, window, cx);
+                    }),
+                )
+                .on_mouse_up(
+                    gpui::MouseButton::Left,
+                    cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
+                )
+                .on_mouse_up_out(
+                    gpui::MouseButton::Left,
+                    cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
+                )
+                // 真拖起来之后盖一层透明遮罩，吃掉编辑器选字 / 网格列拖拽等下层交互。
+                .when(
+                    self.editor_resize.is_some_and(|resize| resize.active),
+                    |layout| {
+                        layout.child(
+                            div()
+                                .id("editor-resize-shield")
+                                .debug_selector(|| "editor-resize-shield".to_string())
+                                .absolute()
+                                .inset_0()
+                                .occlude()
+                                .cursor(gpui::CursorStyle::ResizeUpDown)
+                                // 遮罩是最上层 hitbox，会截断 body 的 mouse_move：
+                                // 必须自己转发同一套 handler，否则拖拽只会生效第一帧（实测回归）。
+                                .on_mouse_move(cx.listener(
+                                    |view, event: &gpui::MouseMoveEvent, window, cx| {
+                                        view.drag_editor_resize(event, window, cx);
+                                    },
+                                ))
+                                .on_mouse_up(
+                                    gpui::MouseButton::Left,
+                                    cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
+                                )
+                                .on_mouse_up_out(
+                                    gpui::MouseButton::Left,
+                                    cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
+                                ),
+                        )
+                    },
                 )
                 .into_any_element()
+        } else {
+            crate::design::empty_state(
+                cx,
+                IconName::Database,
+                "从左侧连接打开查询",
+                "Ctrl+T 新建查询 · Ctrl+O 打开 .sql",
+            )
         };
 
         v_flex()
@@ -171,6 +220,145 @@ impl MainView {
             .child(toolbar)
             .when_some(import_panel, |layout, panel| layout.child(panel))
             .child(body)
+    }
+
+    /// 工作区 body 的可用总高（编辑器 + 分隔条 + 结果区）。
+    /// 用视口高度扣掉固定外壳与可选面板；只用于夹取编辑器上限，属保守估算。
+    pub(crate) fn available_workspace_height(&self, window: &Window) -> f32 {
+        let viewport_h = f32::from(window.viewport_size().height);
+        if viewport_h <= 0. {
+            return 0.;
+        }
+        let mut available = viewport_h - WORKSPACE_CHROME_H;
+        if self.params_panel.is_some() {
+            available -= PARAMS_PANEL_H;
+        }
+        if self.import_panel.is_some() {
+            available -= IMPORT_PANEL_H;
+        }
+        available.max(0.)
+    }
+
+    /// 编辑器 / 结果区分隔条：静置 1px 结构线；hover 给 9px 命中带淡底；
+    /// 拖拽中把线换成 accent 并叠 44×3 指示条。命中带 9px 与 gpui-base ResizeHandle 同口径。
+    pub(crate) fn render_editor_splitter(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let t = current(cx);
+        let dragging = self.editor_resize.is_some_and(|resize| resize.active);
+        div()
+            .id("editor-splitter")
+            .debug_selector(|| "editor-splitter".to_string())
+            .relative()
+            .h(px(rustdb_core::EDITOR_SPLITTER_H))
+            .w_full()
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            .cursor(gpui::CursorStyle::ResizeUpDown)
+            .hover(|s| s.bg(hex(t.bg_overlay)))
+            .when(dragging, |s| s.bg(hex(t.bg_overlay)))
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(|view, event: &gpui::MouseDownEvent, window, cx| {
+                    let available = view.available_workspace_height(window);
+                    if event.click_count >= 2 {
+                        view.reset_editor_height(available, cx);
+                    } else {
+                        view.begin_editor_resize(f32::from(event.position.y), available);
+                    }
+                }),
+            )
+            .on_mouse_up(
+                gpui::MouseButton::Left,
+                cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
+            )
+            .child(div().h(px(1.)).w_full().bg(hex(if dragging {
+                t.accent
+            } else {
+                t.border_strong
+            })))
+            .when(dragging, |handle| {
+                handle.child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(div().w(px(44.)).h(px(3.)).rounded(px(2.)).bg(hex(t.accent))),
+                )
+            })
+    }
+
+    /// 起手：只记起点与起手高度，不盖遮罩（否则会吃掉双击的第二下）。
+    pub(crate) fn begin_editor_resize(&mut self, start_y: f32, available_h: f32) {
+        self.editor_resize = Some(EditorResize {
+            start_y,
+            start_h: self.layout.clamped_editor_height(available_h),
+            active: false,
+        });
+    }
+
+    /// 拖拽中：按绝对位移改高度，不写盘；松手时由 `end_editor_resize` 统一落盘一次。
+    pub(crate) fn drag_editor_resize(
+        &mut self,
+        event: &gpui::MouseMoveEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(resize) = self.editor_resize else {
+            return;
+        };
+        if !event.dragging() {
+            self.end_editor_resize(cx);
+            return;
+        }
+        if let Some(active) = self.editor_resize.as_mut() {
+            active.active = true;
+        }
+        let available = self.available_workspace_height(window);
+        let want = resize.start_h + f32::from(event.position.y) - resize.start_y;
+        self.set_editor_height(want, available, cx);
+    }
+
+    /// 所有改高度的入口（拖拽 / 键盘 / 双击 / 设置页）都走这里，保证单一数据源。
+    pub(crate) fn set_editor_height(
+        &mut self,
+        want: f32,
+        available_h: f32,
+        cx: &mut Context<Self>,
+    ) {
+        let next = rustdb_core::clamp_editor_height(want, available_h);
+        if (self.layout.editor_height - next).abs() < 0.5 {
+            return;
+        }
+        self.layout.editor_height = next;
+        cx.notify();
+    }
+
+    pub(crate) fn end_editor_resize(&mut self, cx: &mut Context<Self>) {
+        if self.editor_resize.take().is_some() {
+            self.persist_layout();
+            cx.notify();
+        }
+    }
+
+    pub(crate) fn nudge_editor_height(
+        &mut self,
+        delta: f32,
+        available_h: f32,
+        cx: &mut Context<Self>,
+    ) {
+        let current = self.layout.clamped_editor_height(available_h);
+        self.set_editor_height(current + delta, available_h, cx);
+        self.persist_layout();
+    }
+
+    pub(crate) fn reset_editor_height(&mut self, available_h: f32, cx: &mut Context<Self>) {
+        self.editor_resize = None;
+        self.set_editor_height(rustdb_core::EDITOR_HEIGHT_DEFAULT, available_h, cx);
+        self.persist_layout();
+        cx.notify();
     }
 
     /// 顶部标签栏：每个标签页绑定一个库。
@@ -195,7 +383,7 @@ impl MainView {
             row = row.child(
                 div()
                     .px_1()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("未打开查询"),
             );
@@ -228,7 +416,7 @@ impl MainView {
                         .child(
                             div()
                                 .max_w(px(120.))
-                                .text_size(px(11.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(if active { t.fg_primary } else { t.fg_secondary }))
                                 .text_ellipsis()
                                 .child(SharedString::from(title)),
@@ -259,15 +447,14 @@ impl MainView {
                         ),
                 );
         }
-        row.child(div().flex_1())
-            .child(
-                div()
-                    .text_size(px(10.))
-                    .text_color(hex(t.fg_muted))
-                    .child(SharedString::from(
-                        self.server_label.clone().unwrap_or_else(|| "未连接".into()),
-                    )),
-            )
+        row.child(div().flex_1()).child(
+            div()
+                .text_size(px(crate::design::TS_CAPTION))
+                .text_color(hex(t.fg_muted))
+                .child(SharedString::from(
+                    self.server_label.clone().unwrap_or_else(|| "未连接".into()),
+                )),
+        )
     }
 
     /// 查询页的库下拉框（切库）。
@@ -315,7 +502,7 @@ impl MainView {
                 .child(
                     div()
                         .max_w(px(150.))
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(if enabled { t.fg_primary } else { t.fg_muted }))
                         .text_ellipsis()
                         .child(SharedString::from(label)),
@@ -378,7 +565,7 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(11.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(if active { t.accent } else { t.fg_primary }))
                             .text_ellipsis()
                             .child(SharedString::from(ns_label(&ns))),
@@ -449,7 +636,7 @@ impl MainView {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                .text_size(px(11.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(if danger { t.danger } else { t.fg_primary }))
                                 .text_ellipsis()
                                 .child(SharedString::from(label)),
@@ -457,7 +644,7 @@ impl MainView {
                         .when_some(hint, |row, hint| {
                             row.child(
                                 div()
-                                    .text_size(px(9.))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_muted))
                                     .child(SharedString::from(hint)),
                             )
@@ -878,7 +1065,7 @@ impl MainView {
             .occlude()
             .child(
                 div()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(if prompt.changed {
                         t.danger
@@ -889,33 +1076,42 @@ impl MainView {
             )
             .child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_secondary))
                     .child(SharedString::from(detail)),
             )
             .child(
                 v_flex()
                     .gap_1()
-                    .child(div().text_size(px(10.)).text_color(hex(t.fg_muted)).child(
-                        SharedString::from(format!("第 {} 层 · {}", prompt.layer, endpoint)),
-                    ))
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.fg_muted))
+                            .child(SharedString::from(format!(
+                                "第 {} 层 · {}",
+                                prompt.layer, endpoint
+                            ))),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_primary))
                             .child(SharedString::from(format!("指纹：{}", prompt.fingerprint))),
                     )
                     .when(prompt.recorded.is_some(), |column| {
-                        column.child(div().text_size(px(10.)).text_color(hex(t.warning)).child(
-                            SharedString::from(format!(
-                                "原记录：{}",
-                                prompt.recorded.clone().unwrap_or_default()
-                            )),
-                        ))
+                        column.child(
+                            div()
+                                .text_size(px(crate::design::TS_CAPTION))
+                                .text_color(hex(t.warning))
+                                .child(SharedString::from(format!(
+                                    "原记录：{}",
+                                    prompt.recorded.clone().unwrap_or_default()
+                                ))),
+                        )
                     })
                     .child(
                         div()
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .whitespace_normal()
                             .child(SharedString::from(prompt.public_key.clone())),
@@ -1275,14 +1471,14 @@ impl MainView {
             .bg(hex(t.bg_elevated))
             .child(
                 div()
-                    .text_size(px(12.))
+                    .text_size(px(crate::design::TS_BODY))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child(SharedString::from(title)),
             )
             .child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_secondary))
                     .child(SharedString::from(format!("{detail}（{target}）"))),
             );
@@ -1347,6 +1543,12 @@ impl MainView {
         // F-91：主机密钥确认只能显式接受或拒绝；Esc 等同于拒绝（绝不等于接受）。
         if self.host_key_prompt.is_some() {
             self.resolve_host_key(false, cx);
+            return;
+        }
+        // 设置弹层也是浮层：Esc 应能关闭，不必去找右上角 ✕。
+        if self.settings_open {
+            self.settings_open = false;
+            cx.notify();
             return;
         }
         if self.conn_editor.is_some() {

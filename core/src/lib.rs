@@ -99,9 +99,11 @@ pub use history::{
     HISTORY_LIMIT_CHOICES,
 };
 pub use layout::{
-    clamp_ai_width, clamp_sidebar_width, layout_path, load_layout, save_layout, LayoutSettings,
-    AI_WIDTH_DEFAULT, AI_WIDTH_MAX, AI_WIDTH_MIN, NARROW_WINDOW, SIDEBAR_WIDTH_DEFAULT,
-    SIDEBAR_WIDTH_MAX, SIDEBAR_WIDTH_MIN,
+    clamp_ai_width, clamp_editor_height, clamp_sidebar_width, layout_path, load_layout,
+    save_layout, GridDensity, LayoutSettings, AI_WIDTH_DEFAULT, AI_WIDTH_MAX, AI_WIDTH_MIN,
+    EDITOR_HEIGHT_DEFAULT, EDITOR_HEIGHT_MAX, EDITOR_HEIGHT_MIN, EDITOR_RESIZE_STEP,
+    EDITOR_SPLITTER_H, NARROW_WINDOW, RESULT_HEIGHT_MIN, SIDEBAR_WIDTH_DEFAULT, SIDEBAR_WIDTH_MAX,
+    SIDEBAR_WIDTH_MIN,
 };
 pub use lineage::{
     filter_edges as filter_lineage_edges, report as lineage_report, Confidence, EvidenceKind,

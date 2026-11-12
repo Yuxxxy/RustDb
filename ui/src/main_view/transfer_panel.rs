@@ -218,7 +218,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
@@ -251,7 +251,7 @@ impl MainView {
             );
         let label = |text: &str| {
             div()
-                .text_size(px(9.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child(SharedString::from(text.to_string()))
         };
@@ -268,7 +268,7 @@ impl MainView {
                 .border_1()
                 .border_color(hex(if on { t.accent } else { t.border_subtle }))
                 .when(on, |chip| chip.bg(hex(t.bg_overlay)))
-                .text_size(px(9.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(if on { t.accent } else { t.fg_muted }))
                 .child(SharedString::from(text))
         };
@@ -289,7 +289,7 @@ impl MainView {
                     .border_1()
                     .border_color(hex(if on { t.accent } else { t.border_subtle }))
                     .when(on, |chip| chip.bg(hex(t.bg_overlay)))
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(if on { t.accent } else { t.fg_muted }))
                     .on_click(cx.listener(move |view, _, _, cx| {
                         if let Some(panel) = view.transfer.as_mut() {
@@ -311,7 +311,7 @@ impl MainView {
                     .when_some(target_ns, |row, ns| {
                         row.child(
                             div()
-                                .text_size(px(9.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_secondary))
                                 .child(SharedString::from(format!("· {ns}"))),
                         )
@@ -422,7 +422,7 @@ impl MainView {
                 div()
                     .id("transfer-toggle-all")
                     .debug_selector(|| "transfer-toggle-all".to_string())
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.accent))
                     .cursor_pointer()
                     .on_click(cx.listener(|view, _, _, cx| {
@@ -474,7 +474,7 @@ impl MainView {
                     .child(
                         div()
                             .w(px(12.))
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(if on { t.accent } else { t.border_subtle }))
                             .child(if on { "✓" } else { "·" }),
                     )
@@ -482,7 +482,7 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_ellipsis()
                             .child(SharedString::from(table.clone())),
                     ),
@@ -494,19 +494,22 @@ impl MainView {
             .overflow_y_scrollbar()
             .scroll_bounce(false);
         if panel.lines.is_empty() {
-            preview = preview.child(div().text_size(px(9.5)).text_color(hex(t.fg_muted)).child(
-                if panel.previewing {
-                    "正在读取目标结构并生成计划…"
-                } else {
-                    "先生成计划（只读），确认后再执行。"
-                },
-            ));
+            preview = preview.child(
+                div()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .text_color(hex(t.fg_muted))
+                    .child(if panel.previewing {
+                        "正在读取目标结构并生成计划…"
+                    } else {
+                        "先生成计划（只读），确认后再执行。"
+                    }),
+            );
         } else {
             for (index, line) in panel.lines.iter().enumerate() {
                 preview = preview.child(
                     div()
                         .id(("transfer-preview-line", index))
-                        .text_size(px(9.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_secondary))
                         .whitespace_normal()
                         .child(SharedString::from(line.clone())),
@@ -517,7 +520,7 @@ impl MainView {
             preview = preview.child(
                 div()
                     .id(("transfer-warning", index))
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.warning))
                     .whitespace_normal()
                     .child(SharedString::from(format!("警告：{warning}"))),
@@ -525,7 +528,7 @@ impl MainView {
         }
         let progress = div()
             .flex_shrink_0()
-            .text_size(px(9.5))
+            .text_size(px(crate::design::TS_CAPTION))
             .text_color(hex(if panel.error.is_some() {
                 t.warning
             } else {
@@ -601,7 +604,7 @@ impl MainView {
                     div()
                         .id(("transfer-failure", index))
                         .debug_selector(move || format!("transfer-failure-{index}"))
-                        .text_size(px(9.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .whitespace_normal()
                         .child(SharedString::from(failure.clone())),

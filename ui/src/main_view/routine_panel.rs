@@ -323,7 +323,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
@@ -352,54 +352,56 @@ impl MainView {
                     ),
             );
 
-        let search_row =
-            h_flex()
-                .h(px(30.))
-                .px_2()
-                .gap_2()
-                .items_center()
-                .border_b_1()
-                .border_color(hex(t.border_subtle))
-                .child(div().w(px(220.)).child(Input::new(&panel.search).small()))
-                .child(div().text_size(px(10.5)).text_color(hex(t.fg_muted)).child(
-                    SharedString::from(if query.is_empty() {
+        let search_row = h_flex()
+            .h(px(30.))
+            .px_2()
+            .gap_2()
+            .items_center()
+            .border_b_1()
+            .border_color(hex(t.border_subtle))
+            .child(div().w(px(220.)).child(Input::new(&panel.search).small()))
+            .child(
+                div()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .text_color(hex(t.fg_muted))
+                    .child(SharedString::from(if query.is_empty() {
                         "支持在源码内搜索".to_string()
                     } else {
                         format!("匹配 {matches}")
-                    }),
-                ))
-                .child(
-                    div()
-                        .id("routine-search-prev")
-                        .debug_selector(|| "routine-search-prev".to_string())
-                        .cursor_pointer()
-                        .hover(|s| s.bg(hex(t.bg_overlay)))
-                        .on_click(cx.listener(|view, _, _, cx| {
-                            view.routine_search_step(false, cx);
-                        }))
-                        .child(
-                            div()
-                                .text_size(px(10.5))
-                                .text_color(hex(t.fg_secondary))
-                                .child("上一处"),
-                        ),
-                )
-                .child(
-                    div()
-                        .id("routine-search-next")
-                        .debug_selector(|| "routine-search-next".to_string())
-                        .cursor_pointer()
-                        .hover(|s| s.bg(hex(t.bg_overlay)))
-                        .on_click(cx.listener(|view, _, _, cx| {
-                            view.routine_search_step(true, cx);
-                        }))
-                        .child(
-                            div()
-                                .text_size(px(10.5))
-                                .text_color(hex(t.fg_secondary))
-                                .child("下一处"),
-                        ),
-                );
+                    })),
+            )
+            .child(
+                div()
+                    .id("routine-search-prev")
+                    .debug_selector(|| "routine-search-prev".to_string())
+                    .cursor_pointer()
+                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .on_click(cx.listener(|view, _, _, cx| {
+                        view.routine_search_step(false, cx);
+                    }))
+                    .child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.fg_secondary))
+                            .child("上一处"),
+                    ),
+            )
+            .child(
+                div()
+                    .id("routine-search-next")
+                    .debug_selector(|| "routine-search-next".to_string())
+                    .cursor_pointer()
+                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .on_click(cx.listener(|view, _, _, cx| {
+                        view.routine_search_step(true, cx);
+                    }))
+                    .child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.fg_secondary))
+                            .child("下一处"),
+                    ),
+            );
 
         // F-83：依赖区。驱动不支持时整块不出现（R5：不假装支持）。
         let deps_visible =
@@ -431,7 +433,7 @@ impl MainView {
                     .items_center()
                     .rounded(px(3.))
                     .cursor_pointer()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .when(active, |this| {
                         this.bg(hex(t.bg_overlay)).text_color(hex(t.accent))
                     })
@@ -464,28 +466,32 @@ impl MainView {
             if panel.deps.loading {
                 row = row.child(
                     div()
-                        .text_size(px(10.5))
-                        .text_color(hex(t.fg_muted))
-                        .child("加载中…"),
+                        .w(px(96.))
+                        .h(px(12.))
+                        .rounded(px(6.))
+                        .bg(hex(t.fg_muted).opacity(0.18)),
                 );
             } else if let Some(error) = &panel.deps.error {
                 row = row.child(
                     div()
                         .flex_1()
                         .min_w_0()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.danger))
                         .text_ellipsis()
                         .child(SharedString::from(error.clone())),
                 );
             } else if entries.is_empty() {
-                row = row.child(div().text_size(px(10.5)).text_color(hex(t.fg_muted)).child(
-                    if tab == RoutineDepsTab::DependsOn {
-                        "没有记录到它依赖的对象"
-                    } else {
-                        "没有记录到依赖它的对象"
-                    },
-                ));
+                row = row.child(
+                    div()
+                        .text_size(px(crate::design::TS_CAPTION))
+                        .text_color(hex(t.fg_muted))
+                        .child(if tab == RoutineDepsTab::DependsOn {
+                            "没有记录到它依赖的对象"
+                        } else {
+                            "没有记录到依赖它的对象"
+                        }),
+                );
             } else {
                 for (index, dep) in entries.iter().take(4).enumerate() {
                     let label = format!("{} · {}", dep.path.kind.label(), dep.path.name);
@@ -522,7 +528,7 @@ impl MainView {
                     };
                     row = row.child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(text)),
                     );
@@ -542,14 +548,14 @@ impl MainView {
             left = left
                 .child(
                     div()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.danger))
                         .text_ellipsis()
                         .child(SharedString::from(failure.message.clone())),
                 )
                 .child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .text_ellipsis()
                         .child(SharedString::from(failure.hint.clone())),
@@ -557,7 +563,7 @@ impl MainView {
         } else if let Some(reason) = &panel.readonly_reason {
             left = left.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.warning))
                     .text_ellipsis()
                     .child(SharedString::from(reason.clone())),
@@ -565,21 +571,21 @@ impl MainView {
         } else if read_only {
             left = left.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.warning))
                     .child("该连接为只读模式，不能保存源码"),
             );
         } else if panel.loading {
             left = left.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("正在读取源码…"),
             );
         } else if dirty {
             left = left.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.warning))
                     .child("源码已修改，保存后生效"),
             );
@@ -672,7 +678,7 @@ impl MainView {
             .bg(hex(t.bg_elevated))
             .child(
                 div()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("保存例程源码"),
@@ -680,7 +686,7 @@ impl MainView {
             .when(warning.is_some(), |card| {
                 card.child(
                     div()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .child(SharedString::from(warning.unwrap_or_default())),
                 )
@@ -747,14 +753,14 @@ impl MainView {
             .bg(hex(t.bg_elevated))
             .child(
                 div()
-                    .text_size(px(12.))
+                    .text_size(px(crate::design::TS_BODY))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("放弃未保存的修改？"),
             )
             .child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_secondary))
                     .child("源码已被修改，关闭面板会丢掉这些改动。"),
             )

@@ -1666,3 +1666,149 @@ fn menu_click_dispatches_actions(cx: &mut gpui::TestAppContext) {
         "查看 DDL 应进入读取状态，实际：{status}"
     );
 }
+
+/// P1-①：拖动分隔条改编辑器高度，松手后写进 layout.json。
+#[gpui::test]
+fn editor_splitter_drag_persists_height(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let layout_path = temp_layout("editor-drag");
+    reset_layout(&holder, vcx, layout_path.clone());
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |main, cx| {
+            main.tabs.push(SqlTab::new(1, Some(ns("main"))));
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    let before = f32::from(
+        vcx.debug_bounds("sql-editor")
+            .expect("缺少编辑器")
+            .size
+            .height,
+    );
+    let start = vcx
+        .debug_bounds("editor-splitter")
+        .expect("缺少分隔条")
+        .center();
+    let end = gpui::Point {
+        x: start.x,
+        y: start.y + px(64.),
+    };
+    let further = gpui::Point {
+        x: start.x,
+        y: start.y + px(80.),
+    };
+    vcx.simulate_mouse_down(start, gpui::MouseButton::Left, gpui::Modifiers::default());
+    vcx.run_until_parked();
+    vcx.simulate_mouse_move(
+        end,
+        Some(gpui::MouseButton::Left),
+        gpui::Modifiers::default(),
+    );
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("editor-resize-shield").is_some(),
+        "拖起来后应盖遮罩，避免编辑器误选字"
+    );
+    // 遮罩出现后再移一帧：事件必须仍能到达 body 的 on_mouse_move，
+    // 否则真实拖拽会在第一帧后卡住。
+    vcx.simulate_mouse_move(
+        further,
+        Some(gpui::MouseButton::Left),
+        gpui::Modifiers::default(),
+    );
+    vcx.run_until_parked();
+    vcx.simulate_mouse_up(further, gpui::MouseButton::Left, gpui::Modifiers::default());
+    vcx.run_until_parked();
+
+    let after = f32::from(
+        vcx.debug_bounds("sql-editor")
+            .expect("拖拽后编辑器消失")
+            .size
+            .height,
+    );
+    assert!(
+        (after - before - 80.).abs() < 2.,
+        "下拖 80px 应增高 80（{before} → {after}）"
+    );
+    let saved = rustdb_core::load_layout(&layout_path);
+    assert!(
+        (saved.editor_height - 256.).abs() < 2.,
+        "应持久化到 layout.json：{}",
+        saved.editor_height
+    );
+    assert!(
+        vcx.debug_bounds("editor-resize-shield").is_none(),
+        "松手后遮罩应消失"
+    );
+    let _ = std::fs::remove_file(&layout_path);
+}
+
+/// P1-①：键盘微调与复位（全局按键观察者，不依赖分隔条焦点）。
+#[gpui::test]
+fn editor_height_keyboard_nudge_and_reset(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let layout_path = temp_layout("editor-keys");
+    reset_layout(&holder, vcx, layout_path.clone());
+    let view = holder.borrow().clone().expect("view 未创建");
+
+    vcx.simulate_keystrokes("ctrl-alt-down");
+    vcx.run_until_parked();
+    let h = vcx.update(|_, app| view.read(app).layout.editor_height);
+    assert!((h - 192.).abs() < 0.5, "Ctrl+Alt+↓ 应 +16：{h}");
+
+    vcx.simulate_keystrokes("ctrl-alt-up");
+    vcx.run_until_parked();
+    let h = vcx.update(|_, app| view.read(app).layout.editor_height);
+    assert!((h - 176.).abs() < 0.5, "Ctrl+Alt+↑ 应 -16：{h}");
+
+    vcx.simulate_keystrokes("ctrl-alt-down");
+    vcx.simulate_keystrokes("ctrl-alt-0");
+    vcx.run_until_parked();
+    let h = vcx.update(|_, app| view.read(app).layout.editor_height);
+    assert!((h - 176.).abs() < 0.5, "Ctrl+Alt+0 应复位：{h}");
+    let saved = rustdb_core::load_layout(&layout_path);
+    assert!((saved.editor_height - 176.).abs() < 0.5, "复位应落盘");
+    let _ = std::fs::remove_file(&layout_path);
+}
+
+/// P1-①：双击分隔条复位；缺省配置下分隔条与编辑器都存在。
+#[gpui::test]
+fn editor_splitter_double_click_resets(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let layout_path = temp_layout("editor-dblclick");
+    reset_layout(&holder, vcx, layout_path.clone());
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |main, cx| {
+            main.tabs.push(SqlTab::new(1, Some(ns("main"))));
+            main.layout.editor_height = 320.;
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    let handle = vcx
+        .debug_bounds("editor-splitter")
+        .expect("缺少分隔条")
+        .center();
+    vcx.simulate_event(gpui::MouseDownEvent {
+        position: handle,
+        button: gpui::MouseButton::Left,
+        modifiers: gpui::Modifiers::default(),
+        click_count: 2,
+        first_mouse: false,
+    });
+    vcx.simulate_event(gpui::MouseUpEvent {
+        position: handle,
+        button: gpui::MouseButton::Left,
+        modifiers: gpui::Modifiers::default(),
+        click_count: 2,
+    });
+    vcx.run_until_parked();
+    let h = vcx.update(|_, app| view.read(app).layout.editor_height);
+    assert!((h - 176.).abs() < 0.5, "双击应复位到 176：{h}");
+    let _ = std::fs::remove_file(&layout_path);
+}

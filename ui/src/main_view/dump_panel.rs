@@ -160,7 +160,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
@@ -193,7 +193,7 @@ impl MainView {
             );
         let label = |text: &str| {
             div()
-                .text_size(px(9.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child(SharedString::from(text.to_string()))
         };
@@ -210,7 +210,7 @@ impl MainView {
                 .border_1()
                 .border_color(hex(if on { t.accent } else { t.border_subtle }))
                 .when(on, |chip| chip.bg(hex(t.bg_overlay)))
-                .text_size(px(9.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(if on { t.accent } else { t.fg_muted }))
                 .child(text)
         };
@@ -299,9 +299,15 @@ impl MainView {
                         }),
                     ),
                 )
-                .child(div().text_size(px(9.5)).text_color(hex(t.fg_muted)).child(
-                    SharedString::from(format!("{} 个库 / Schema", panel.namespaces.len())),
-                ))
+                .child(
+                    div()
+                        .text_size(px(crate::design::TS_CAPTION))
+                        .text_color(hex(t.fg_muted))
+                        .child(SharedString::from(format!(
+                            "{} 个库 / Schema",
+                            panel.namespaces.len()
+                        ))),
+                )
             });
         let select_all = h_flex()
             .gap_2()
@@ -315,7 +321,7 @@ impl MainView {
                 div()
                     .id("dump-toggle-all")
                     .debug_selector(|| "dump-toggle-all".to_string())
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.accent))
                     .cursor_pointer()
                     .on_click(cx.listener(|view, _, _, cx| {
@@ -364,7 +370,7 @@ impl MainView {
                     .child(
                         div()
                             .w(px(12.))
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(if on { t.accent } else { t.border_subtle }))
                             .child(if on { "✓" } else { "·" }),
                     )
@@ -372,7 +378,7 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_ellipsis()
                             .child(SharedString::from(table.clone())),
                     ),
@@ -380,7 +386,7 @@ impl MainView {
         }
         let selection: gpui::AnyElement = if panel.export_all {
             div()
-                .text_size(px(9.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child("全部库各写一个文件；表选择不生效。")
                 .into_any_element()
@@ -392,7 +398,7 @@ impl MainView {
                 .into_any_element()
         };
         let progress = div()
-            .text_size(px(9.5))
+            .text_size(px(crate::design::TS_CAPTION))
             .text_color(hex(if panel.error.is_some() {
                 t.warning
             } else {

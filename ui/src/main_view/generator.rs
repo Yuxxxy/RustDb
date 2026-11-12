@@ -161,14 +161,14 @@ impl MainView {
             .bg(hex(t.bg_elevated))
             .child(
                 div()
-                    .text_size(px(12.))
+                    .text_size(px(crate::design::TS_BODY))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("数据生成器"),
             )
             .child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_secondary))
                     .child(SharedString::from(format!(
                         "列 {column_name} · 其余用默认值"
@@ -188,7 +188,7 @@ impl MainView {
                 card.child(
                     div()
                         .debug_selector(|| "generator-error".to_string())
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.danger))
                         .child(SharedString::from(error)),
                 )

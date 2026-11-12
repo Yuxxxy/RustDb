@@ -95,7 +95,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
@@ -128,7 +128,7 @@ impl MainView {
 
         let label = |text: &str| {
             div()
-                .text_size(px(9.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child(SharedString::from(text.to_string()))
         };
@@ -153,13 +153,16 @@ impl MainView {
             .cloned()
             .collect();
         if shown.is_empty() {
-            columns = columns.child(div().text_size(px(10.)).text_color(hex(t.fg_muted)).child(
-                if panel.loading {
-                    "正在读取字段…"
-                } else {
-                    "（没有字段）"
-                },
-            ));
+            columns = columns.child(
+                div()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .text_color(hex(t.fg_muted))
+                    .child(if panel.loading {
+                        "正在读取字段…"
+                    } else {
+                        "（没有字段）"
+                    }),
+            );
         }
         for (index, name) in shown.iter().enumerate() {
             let active = panel.selected.as_deref() == Some(name.as_str());
@@ -183,7 +186,7 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_ellipsis()
                             .child(SharedString::from(name.clone())),
                     ),
@@ -214,7 +217,7 @@ impl MainView {
                     .border_1()
                     .border_color(hex(if active { t.accent } else { t.border_subtle }))
                     .when(active, |chip| chip.bg(hex(t.bg_overlay)))
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(if active { t.accent } else { t.fg_muted }))
                     .on_click(cx.listener(move |view, _, _, cx| view.set_lineage_min(level, cx)))
                     .child(SharedString::from(format!("{} 及以上", level.label()))),
@@ -225,7 +228,7 @@ impl MainView {
         if panel.loading {
             right = right.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("正在汇总外键、视图与历史 SQL…"),
             );
@@ -233,7 +236,7 @@ impl MainView {
         if let Some(error) = &panel.error {
             right = right.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.danger))
                     .child(SharedString::from(error.clone())),
             );
@@ -242,12 +245,15 @@ impl MainView {
             let skipped_tables = input.skipped_tables + input.failed_tables;
             let skipped_views = input.skipped_views + input.failed_views;
             if skipped_tables + skipped_views + input.skipped_queries > 0 {
-                right = right.child(div().text_size(px(9.5)).text_color(hex(t.warning)).child(
-                    SharedString::from(format!(
-                        "已跳过：表 {skipped_tables} / 视图 {skipped_views} / 历史 SQL {}",
-                        input.skipped_queries
-                    )),
-                ));
+                right = right.child(
+                    div()
+                        .text_size(px(crate::design::TS_CAPTION))
+                        .text_color(hex(t.warning))
+                        .child(SharedString::from(format!(
+                            "已跳过：表 {skipped_tables} / 视图 {skipped_views} / 历史 SQL {}",
+                            input.skipped_queries
+                        ))),
+                );
             }
         }
         let mut edges_area = v_flex()
@@ -261,7 +267,7 @@ impl MainView {
                 for warning in &report.warnings {
                     edges_area = edges_area.child(
                         div()
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.warning))
                             .child(SharedString::from(format!("警告：{warning}"))),
                     );
@@ -275,7 +281,7 @@ impl MainView {
                     edges_area = edges_area.child(
                         div()
                             .debug_selector(move || format!("lineage-{direction}-count"))
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .text_color(hex(t.fg_secondary))
                             .child(SharedString::from(format!(
@@ -286,7 +292,7 @@ impl MainView {
                     if filtered.is_empty() {
                         edges_area = edges_area.child(
                             div()
-                                .text_size(px(9.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .child("（无）"),
                         );
@@ -347,14 +353,14 @@ impl MainView {
                             }))
                             .child(
                                 div()
-                                    .text_size(px(10.))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_secondary))
                                     .text_ellipsis()
                                     .child(SharedString::from(row_label)),
                             )
                             .child(
                                 div()
-                                    .text_size(px(9.))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(color))
                                     .text_ellipsis()
                                     .child(SharedString::from(format!(
@@ -368,7 +374,7 @@ impl MainView {
                                 hidden_evidence > 0 && line_index + 1 == evidence_lines.len();
                             row = row.child(
                                 div()
-                                    .text_size(px(9.))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(if muted { t.fg_muted } else { color }))
                                     .text_ellipsis()
                                     .child(SharedString::from(line.clone())),
@@ -381,7 +387,7 @@ impl MainView {
             None if !panel.loading => {
                 edges_area = edges_area.child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .child("请选择一个字段查看血缘"),
                 );

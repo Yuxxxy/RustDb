@@ -28,6 +28,12 @@ pub struct ThemeTokens {
     pub on_accent: u32,
     pub on_danger: u32,
 
+    // v1.0 扩展层：基础 Token 禁止改值，对比度修复一律新增 Token。
+    /// 结构性边界（卡片 / 工具栏 / 输入框 / 对话框），WCAG 非文本 3:1。
+    pub border_strong: u32,
+    /// 危险按钮 / 徽标前景：深色用深字，避免白字红底只有 3.35:1。
+    pub on_danger_resolved: u32,
+
     // 数据库专属
     pub sql_keyword: u32,
     pub sql_string: u32,
@@ -58,6 +64,8 @@ impl ThemeTokens {
             danger: 0xF85149,
             on_accent: 0x0D1117,
             on_danger: 0xFFFFFF,
+            border_strong: 0x6E7681,
+            on_danger_resolved: 0x0D1117,
             sql_keyword: 0xFF7B72,
             sql_string: 0xA5D6FF,
             sql_number: 0x79C0FF,
@@ -87,6 +95,8 @@ impl ThemeTokens {
             danger: 0xCF222E,
             on_accent: 0xFFFFFF,
             on_danger: 0xFFFFFF,
+            border_strong: 0x6E7781,
+            on_danger_resolved: 0xFFFFFF,
             sql_keyword: 0xCF222E,
             sql_string: 0x0A3069,
             sql_number: 0x0550AE,

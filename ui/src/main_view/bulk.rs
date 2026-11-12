@@ -407,7 +407,7 @@ impl MainView {
         if !panel.columns.is_empty() {
             body = body.child(
                 div()
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .truncate()
                     .child(SharedString::from(format!(
@@ -431,7 +431,7 @@ impl MainView {
                     .h(px(18.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .cursor_pointer()
                     .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                     .when(!active, |d| {
@@ -458,7 +458,7 @@ impl MainView {
         } else {
             let mut join_row = h_flex().gap_1().items_center().child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("条件之间"),
             );
@@ -476,7 +476,7 @@ impl MainView {
                         .h(px(18.))
                         .px_2()
                         .rounded(px(4.))
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .cursor_pointer()
                         .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                         .when(!active, |d| {
@@ -507,7 +507,7 @@ impl MainView {
                             .h(px(16.))
                             .px_1()
                             .rounded(px(4.))
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .cursor_pointer()
                             .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                             .when(!active, |d| {
@@ -608,14 +608,14 @@ impl MainView {
             let mut preview = v_flex().gap_1().child(
                 div()
                     .debug_selector(|| "bulk-count".to_string())
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.accent))
                     .child(SharedString::from(count_label)),
             );
             for warning in &plan.warnings {
                 preview = preview.child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .child(SharedString::from(warning.clone())),
                 );
@@ -635,7 +635,7 @@ impl MainView {
             body = body.child(
                 div()
                     .debug_selector(|| "bulk-error".to_string())
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.danger))
                     .child(SharedString::from(error)),
             );
@@ -660,14 +660,14 @@ impl MainView {
                     .gap(px(2.))
                     .child(
                         div()
-                            .text_size(px(12.))
+                            .text_size(px(crate::design::TS_BODY))
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .text_color(hex(t.fg_primary))
                             .child("按条件批量更新"),
                     )
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .child(SharedString::from(panel.target.display_label())),
                     ),

@@ -32,23 +32,15 @@ impl MainView {
         // 编辑条要在借用 result 之前构建（它读的是 MainView 自身状态）。
         let edit_bar = self.render_edit_bar(cx);
         let Some(result) = self.active().and_then(|tab| tab.results.get(active_result)) else {
-            return v_flex()
-                .flex_1()
-                .min_h_0()
-                .items_center()
-                .justify_center()
-                .gap_2()
-                .child(Icon::new(IconName::Database).text_color(hex(t.fg_muted)))
-                .child(
-                    div()
-                        .text_size(px(11.5))
-                        .text_color(hex(t.fg_muted))
-                        .child("执行 SQL 后显示结果"),
-                )
-                .into_any_element();
+            return crate::design::empty_state(
+                cx,
+                IconName::Database,
+                "执行 SQL 后显示结果",
+                "Ctrl+Enter 执行 · 双击左侧表直接查看数据",
+            );
         };
         let selected_range = selection_range(self.grid_selection, result);
-        let selection_bg = hex(t.accent).opacity(0.24);
+        let selection_bg = hex(t.accent).opacity(0.18);
         if result.columns.is_empty() {
             let message = match result.affected {
                 Some(n) => format!("语句已执行 · 影响 {n} 行"),
@@ -58,20 +50,12 @@ impl MainView {
                 .flex_1()
                 .min_h_0()
                 .when_some(tabs, |layout, tabs| layout.child(tabs))
-                .child(
-                    v_flex()
-                        .flex_1()
-                        .items_center()
-                        .justify_center()
-                        .gap_2()
-                        .child(Icon::new(IconName::Check).text_color(hex(t.success)))
-                        .child(
-                            div()
-                                .text_size(px(11.5))
-                                .text_color(hex(t.fg_secondary))
-                                .child(SharedString::from(message)),
-                        ),
-                )
+                .child(crate::design::empty_state(
+                    cx,
+                    IconName::Check,
+                    SharedString::from(message),
+                    "语句已执行，未返回结果集",
+                ))
                 .child(
                     h_flex()
                         .h(px(23.))
@@ -82,7 +66,7 @@ impl MainView {
                         .border_color(hex(t.border_subtle))
                         .child(
                             div()
-                                .text_size(px(10.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .child(SharedString::from(format!("{} ms", result.elapsed_ms))),
                         ),
@@ -135,11 +119,31 @@ impl MainView {
                     div()
                         .flex_1()
                         .min_w_0()
-                        .text_size(px(11.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .font_weight(gpui::FontWeight::SEMIBOLD)
                         .text_color(hex(if is_new_value { t.accent } else { t.fg_primary }))
                         .text_ellipsis()
-                        .child(SharedString::from(format!("{}{marker}", column.name))),
+                        .child(
+                            h_flex()
+                                .w_full()
+                                .min_w_0()
+                                .items_center()
+                                .gap_1()
+                                .child(
+                                    div().flex_1().min_w_0().text_ellipsis().child(
+                                        SharedString::from(format!("{}{marker}", column.name)),
+                                    ),
+                                )
+                                .child(
+                                    div()
+                                        .flex_none()
+                                        .text_size(px(crate::design::TS_CAPTION))
+                                        .text_color(hex(t.fg_muted))
+                                        .child(SharedString::from(
+                                            column.native_type.chars().take(6).collect::<String>(),
+                                        )),
+                                ),
+                        ),
                 );
             let title = match fixed {
                 Some(_) => title.w(px(cell_w)).flex_shrink_0(),
@@ -220,6 +224,7 @@ impl MainView {
             "result-rows",
             result.rows.len(),
             cx.processor(move |view, range: std::ops::Range<usize>, _window, cx| {
+                let row_h = view.layout.grid_density.row_height();
                 let Some(tab) = view.tabs.get(view.active_tab) else {
                     return Vec::new();
                 };
@@ -238,19 +243,21 @@ impl MainView {
                         break;
                     };
                     let change = result.change_of(row_index);
+                    // 差异行用 12% 语义色：实色铺满会压低文字对比度。
                     let bg = match change {
-                        Some(rustdb_core::ChangeKind::Insert) => hex(t.diff_add),
-                        Some(rustdb_core::ChangeKind::Delete) => hex(t.diff_del),
+                        Some(rustdb_core::ChangeKind::Insert) => hex(t.diff_add).opacity(0.12),
+                        Some(rustdb_core::ChangeKind::Delete) => hex(t.diff_del).opacity(0.12),
                         Some(rustdb_core::ChangeKind::Update) => hex(t.bg_overlay),
-                        None if position % 2 == 1 => hex(t.grid_row_alt),
                         None => hex(t.bg_base),
                     };
                     let mut line = h_flex()
-                        .h(px(ROW_H))
+                        .h(px(row_h))
                         .w_full()
                         .min_w_0()
                         .ml(px(-offset))
-                        .bg(bg);
+                        .bg(bg)
+                        // 废弃斑马纹：行分隔线 + 整行 hover 更可辨。
+                        .hover(|s| s.bg(hex(t.bg_overlay)));
                     for (col, cell_w) in widths.iter().enumerate() {
                         let value = result.rows.get(row_index).and_then(|row| row.get(col));
                         // 交回数据库默认值的单元格显示「(默认)」而不是 NULL。
@@ -295,12 +302,15 @@ impl MainView {
                             .border_r_1()
                             .border_b_1()
                             .border_color(hex(t.border_subtle))
-                            .text_size(px(11.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(if null { t.fg_muted } else { t.fg_primary }))
                             .when(null, |d| d.italic())
                             .text_ellipsis()
                             .hover(|s| s.bg(hex(t.bg_overlay)))
-                            .when(selected, |d| d.bg(selection_bg))
+                            .when(selected, |d| {
+                                // 淡填充 + 高对比描边：单纯提高填充会压低文字对比度。
+                                d.bg(selection_bg).border_color(hex(t.accent))
+                            })
                             // 按下开始拖拽选区；Shift 点击在 click 里扩选，避免覆盖锚点。
                             .on_mouse_down(
                                 gpui::MouseButton::Left,
@@ -381,7 +391,7 @@ impl MainView {
             .border_color(hex(t.border_subtle))
             .child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(SharedString::from(format!(
                         "{} · {} ms{}{}",
@@ -405,9 +415,16 @@ impl MainView {
             )
             // 多格选区：显示行列数与复制入口（单格仍走点击复制）。
             .when_some(selection, |row, range| {
-                row.child(div().text_size(px(10.)).text_color(hex(t.accent)).child(
-                    SharedString::from(format!("已选 {} 行 × {} 列", range.rows(), range.cols())),
-                ))
+                row.child(
+                    div()
+                        .text_size(px(crate::design::TS_CAPTION))
+                        .text_color(hex(t.accent))
+                        .child(SharedString::from(format!(
+                            "已选 {} 行 × {} 列",
+                            range.rows(),
+                            range.cols()
+                        ))),
+                )
                 .child(
                     div().debug_selector(|| "copy-selection".to_string()).child(
                         Button::new("copy-selection-btn")
@@ -506,7 +523,7 @@ impl MainView {
                 row.child(
                     div()
                         .debug_selector(|| "edit-pending".to_string())
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .child(SharedString::from(format!("待提交 {count} 条"))),
                 )
@@ -573,7 +590,7 @@ impl MainView {
                 .child(
                     div()
                         .debug_selector(|| "page-label".to_string())
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .child(SharedString::from(format!(
                             "第 {} 页 · {} 行/页",
@@ -648,7 +665,7 @@ impl MainView {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                .text_size(px(10.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_secondary))
                                 .text_ellipsis()
                                 .child(SharedString::from(note)),

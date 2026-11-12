@@ -114,7 +114,7 @@ impl MainView {
             .border_color(hex(t.border_subtle))
             .child(
                 div()
-                    .text_size(px(12.))
+                    .text_size(px(crate::design::TS_BODY))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child(self.panel.label()),
@@ -126,7 +126,7 @@ impl MainView {
                         div()
                             .id("conn-new")
                             .debug_selector(|| "conn-new".to_string())
-                            .text_size(px(13.))
+                            .text_size(px(crate::design::TS_BODY))
                             .text_color(hex(t.fg_muted))
                             .cursor_pointer()
                             .hover(|s| s.text_color(hex(t.accent)))
@@ -190,7 +190,7 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(12.))
+                            .text_size(px(crate::design::TS_BODY))
                             .text_color(hex(t.fg_primary))
                             .text_ellipsis()
                             .child(SharedString::from(
@@ -301,7 +301,7 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(11.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .text_ellipsis()
                             .child(SharedString::from(folder.label().to_string())),
@@ -378,7 +378,7 @@ impl MainView {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                .text_size(px(11.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(if is_active {
                                     t.fg_primary
                                 } else {
@@ -395,9 +395,9 @@ impl MainView {
                                     .px_1()
                                     .rounded(px(3.))
                                     .bg(hex(t.danger))
-                                    .text_size(px(8.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                                    .text_color(hex(t.on_danger))
+                                    .text_color(hex(t.on_danger_resolved))
                                     .child("生产"),
                             )
                         })
@@ -408,7 +408,7 @@ impl MainView {
                                         let selector_id = unlock_id.clone();
                                         move || format!("unlock-badge-{selector_id}")
                                     })
-                                    .text_size(px(8.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.success))
                                     .child(SharedString::from(format!(
                                         "解锁 {:02}:{:02}",
@@ -419,7 +419,7 @@ impl MainView {
                         })
                         .child(
                             div()
-                                .text_size(px(9.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .child(SharedString::from(badge)),
                         ),
@@ -537,7 +537,7 @@ impl MainView {
                                 div()
                                     .flex_1()
                                     .min_w_0()
-                                    .text_size(px(11.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(if is_current {
                                         t.accent
                                     } else {
@@ -553,15 +553,23 @@ impl MainView {
                     }
                     let objects = self.objects.get(&key).cloned().unwrap_or_default();
                     if objects.is_empty() {
-                        let hint = if loading { "加载中…" } else { "无对象" };
-                        tree = tree.child(
-                            div()
-                                .pl(px(50.))
-                                .py_1()
-                                .text_size(px(10.))
-                                .text_color(hex(t.fg_muted))
-                                .child(hint),
-                        );
+                        if loading {
+                            tree = tree.child(
+                                div()
+                                    .pl(px(50.))
+                                    .py_1()
+                                    .child(crate::design::skeleton_rows(cx, 3, 18.)),
+                            );
+                        } else {
+                            tree = tree.child(
+                                div()
+                                    .pl(px(50.))
+                                    .py_1()
+                                    .text_size(px(crate::design::TS_CAPTION))
+                                    .text_color(hex(t.fg_muted))
+                                    .child("无对象"),
+                            );
+                        }
                         continue;
                     }
                     // 原对象面板的置顶 / 最近并入树中，状态仍按连接持久化。
@@ -604,7 +612,7 @@ impl MainView {
                             .pl(px(38.))
                             .pt_2()
                             .pb_1()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(label))
                     };
@@ -682,7 +690,7 @@ impl MainView {
                                 )
                                 .child(
                                     div()
-                                        .text_size(px(10.5))
+                                        .text_size(px(crate::design::TS_CAPTION))
                                         .text_color(hex(t.fg_secondary))
                                         .child(kind_label(kind)),
                                 ),
@@ -752,7 +760,7 @@ impl MainView {
             list = list.child(
                 div()
                     .p_3()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(if filter.is_empty() && !filtered {
                         "执行过的查询会出现在这里"
@@ -799,14 +807,14 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(10.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .text_ellipsis()
                             .child(SharedString::from(preview)),
                     )
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(status.0))
                             .child(SharedString::from(status.1)),
                     )
@@ -880,7 +888,7 @@ impl MainView {
                     }))
                     .child(
                         div()
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(if active { t.accent } else { t.fg_secondary }))
                             .child(SharedString::from(label)),
                     )
@@ -946,7 +954,7 @@ impl MainView {
                 .child(
                     div()
                         .flex_1()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(if active { t.accent } else { t.fg_primary }))
                         .child(SharedString::from(label)),
                 )
@@ -1080,7 +1088,7 @@ impl MainView {
                     }))
                     .child(
                         div()
-                            .text_size(px(11.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_primary))
                             .text_ellipsis()
                             .child(SharedString::from(name.clone())),
@@ -1088,7 +1096,7 @@ impl MainView {
                     .when_some(comment, |el, comment| {
                         el.child(
                             div()
-                                .text_size(px(9.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .text_ellipsis()
                                 .child(SharedString::from(comment)),
@@ -1142,7 +1150,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .text_ellipsis()
                     .child(SharedString::from(
@@ -1230,7 +1238,7 @@ impl MainView {
                     div()
                         .flex_1()
                         .min_w_0()
-                        .text_size(px(11.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_primary))
                         .text_ellipsis()
                         .child(SharedString::from(name)),
@@ -1331,7 +1339,7 @@ impl MainView {
                     .child(
                         div()
                             .w(px(126.))
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .text_ellipsis()
                             .child(SharedString::from(name)),
@@ -1378,7 +1386,7 @@ impl MainView {
                         .child(Icon::new(IconName::Play).small().text_color(hex(t.accent)))
                         .child(
                             div()
-                                .text_size(px(10.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_primary))
                                 .child("SQL 参数"),
                         )
@@ -1407,7 +1415,7 @@ impl MainView {
                     panel.child(
                         div()
                             .debug_selector(|| "params-warning".to_string())
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.danger))
                             .child(SharedString::from(warning)),
                     )

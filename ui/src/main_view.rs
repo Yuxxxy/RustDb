@@ -113,6 +113,11 @@ const CARD_RADIUS: f32 = 8.;
 const RAIL_W: f32 = 38.4;
 const TITLE_BAR_HEIGHT: f32 = 28.;
 const STATUS_BAR_HEIGHT: f32 = 22.;
+/// 工作区固定外壳：标题栏 28 + 状态栏 22 + 标签栏 31 + 工具栏 34 + 卡片间距 12 + 边框 2。
+const WORKSPACE_CHROME_H: f32 = 129.;
+/// 可选面板占位（保守估计，仅用于夹取编辑器高度上限）。
+const PARAMS_PANEL_H: f32 = 34.;
+const IMPORT_PANEL_H: f32 = 40.;
 const MAX_VIEW_ROWS: usize = 300;
 /// 列宽下限 / 上限（拖拽把手按此夹取）。
 const MIN_COL_W: f32 = 72.;
@@ -123,10 +128,9 @@ const COL_HANDLE_W: f32 = 6.;
 const COL_FILTER_W: f32 = 16.;
 /// 表数据分页的页大小选项（循环切换，回到第 1 页）。
 const PAGE_SIZE_CHOICES: [u32; 4] = [100, 200, 500, 1000];
-/// 结果网格行高：虚拟列表要求等行高。
-const ROW_H: f32 = 25.;
+/// 结果网格行高由 `LayoutSettings::grid_density` 决定（虚拟列表要求等行高）。
 /// 网格单元格字号（表头与数据行一致，自适应列宽按此测量）。
-const CELL_FONT_SIZE: f32 = 11.;
+const CELL_FONT_SIZE: f32 = crate::design::TS_CAPTION;
 /// 单元格左右内边距合计（`.px_2()` 两侧各 8px）。
 const CELL_PAD_X: f32 = 16.;
 /// 自适应列宽时最多统计的行数（0.8.0 `fit_col` 只按可见内容估算）。
@@ -270,6 +274,16 @@ struct ColResize {
     column: usize,
     start_x: f32,
     start_w: f32,
+}
+
+/// 编辑器 / 结果区分隔条拖拽中：起点 Y、起手高度、是否真的拖起来了。
+/// `active` 把「单击 / 双击」与「拖拽」分开：只有拖起来才盖遮罩，
+/// 否则遮罩会吃掉双击的第二次 mouse_down。
+#[derive(Clone, Copy)]
+struct EditorResize {
+    start_y: f32,
+    start_h: f32,
+    active: bool,
 }
 
 /// 表设计器状态：现状（diff 基准） + 用户草稿 + 各页签输入框。
@@ -734,7 +748,7 @@ fn conn_field(
         .child(
             div()
                 .w(px(38.))
-                .text_size(px(10.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child(SharedString::from(label.to_string())),
         )
@@ -818,7 +832,7 @@ impl Render for ColumnDrag {
             .border_1()
             .border_color(hex(t.accent))
             .bg(hex(t.bg_elevated))
-            .text_size(px(10.5))
+            .text_size(px(crate::design::TS_CAPTION))
             .text_color(hex(t.fg_primary))
             .child(SharedString::from(self.label.clone()))
     }
@@ -2324,6 +2338,8 @@ pub struct MainView {
     danger: Option<DangerAction>,
     /// 表头列宽拖拽中的状态。
     col_resize: Option<ColResize>,
+    /// 编辑器 / 结果区分隔条拖拽中的状态。
+    editor_resize: Option<EditorResize>,
     /// 结果网格横向滚动偏移（像素，≥ 0）。
     grid_h: f32,
     /// 绑在行体容器上只用于量测视口宽度（自身不滚动）。
@@ -2417,7 +2433,7 @@ fn render_doc_table(rows: &[Vec<String>], t: &rustdb_core::theme::ThemeTokens) -
                     .min_w_0()
                     .px_2()
                     .py_1()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_ellipsis()
                     .when(header, |cell| {
                         cell.font_weight(gpui::FontWeight::SEMIBOLD)
@@ -2515,7 +2531,7 @@ fn card_shell(bg: u32, cx: &App) -> gpui::Div {
         .rounded(px(CARD_RADIUS))
         .bg(hex(bg))
         .border_1()
-        .border_color(hex(t.border_subtle))
+        .border_color(hex(t.border_strong))
         .overflow_hidden()
 }
 
@@ -2543,7 +2559,7 @@ fn text_width(window: &mut Window, text: &str, font_size: f32) -> f32 {
 
 fn hint_text(text: &str, t: &rustdb_core::theme::ThemeTokens) -> impl IntoElement {
     div()
-        .text_size(px(10.5))
+        .text_size(px(crate::design::TS_CAPTION))
         .text_color(hex(t.fg_muted))
         .child(SharedString::from(text.to_string()))
 }
@@ -2554,13 +2570,13 @@ fn metric_row(label: &str, value: String, t: &rustdb_core::theme::ThemeTokens) -
         .items_center()
         .child(
             div()
-                .text_size(px(10.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child(SharedString::from(label.to_string())),
         )
         .child(
             div()
-                .text_size(px(11.))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_primary))
                 .child(SharedString::from(value)),
         )
@@ -2601,14 +2617,14 @@ fn diff_line(line: &str, prefix: Option<&'static str>, color: u32) -> gpui::Div 
         .when_some(prefix, |row, prefix| {
             row.child(
                 div()
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(color))
                     .child(prefix),
             )
         })
         .child(
             div()
-                .text_size(px(10.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .whitespace_normal()
                 .text_color(hex(color))
                 .child(SharedString::from(line.to_string())),
@@ -2646,7 +2662,7 @@ fn ai_field(
         .child(
             div()
                 .w(px(64.))
-                .text_size(px(10.))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child(SharedString::from(label.to_string())),
         )

@@ -354,7 +354,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!("结构对比 · {}", panel.profile))),
@@ -383,7 +383,7 @@ impl MainView {
             );
         let label = |text: &str| {
             div()
-                .text_size(px(9.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child(SharedString::from(text.to_string()))
         };
@@ -414,7 +414,7 @@ impl MainView {
                 t.border_subtle
             }))
             .when(panel.drop_tables, |chip| chip.bg(hex(t.bg_overlay)))
-            .text_size(px(9.5))
+            .text_size(px(crate::design::TS_CAPTION))
             .text_color(hex(if panel.drop_tables {
                 t.accent
             } else {
@@ -444,7 +444,7 @@ impl MainView {
                 t.border_subtle
             }))
             .when(panel.drop_columns, |chip| chip.bg(hex(t.bg_overlay)))
-            .text_size(px(9.5))
+            .text_size(px(crate::design::TS_CAPTION))
             .text_color(hex(if panel.drop_columns {
                 t.accent
             } else {
@@ -513,28 +513,31 @@ impl MainView {
                     .child(label("差异"))
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.success))
                             .child(SharedString::from(format!("新增 {}", counts.added))),
                     )
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.danger))
                             .child(SharedString::from(format!("删除 {}", counts.removed))),
                     )
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.warning))
                             .child(SharedString::from(format!("修改 {}", counts.changed))),
                     )
-                    .child(div().text_size(px(10.)).text_color(hex(t.fg_muted)).child(
-                        SharedString::from(format!(
-                            "一致 {} · 变更列 {}",
-                            counts.same, counts.columns_changed
-                        )),
-                    )),
+                    .child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.fg_muted))
+                            .child(SharedString::from(format!(
+                                "一致 {} · 变更列 {}",
+                                counts.same, counts.columns_changed
+                            ))),
+                    ),
             );
             let mut list = v_flex()
                 .w(px(300.))
@@ -550,7 +553,7 @@ impl MainView {
             {
                 list = list.child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .child("结构一致，没有差异"),
                 );
@@ -579,7 +582,7 @@ impl MainView {
                     .child(
                         div()
                             .w(px(14.))
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(color))
                             .child(SharedString::from(table.status.symbol())),
                     )
@@ -587,41 +590,46 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_ellipsis()
                             .child(SharedString::from(table.name().to_string())),
                     );
                 if table.is_renamed() {
                     row = row.child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.accent))
                             .child("重命名"),
                     );
                 }
-                row = row.child(div().text_size(px(9.)).text_color(hex(t.fg_muted)).child(
-                    SharedString::from(if changed_columns > 0 {
-                        format!("{changed_columns} 列")
-                    } else {
-                        table.status.label().to_string()
-                    }),
-                ));
+                row = row.child(
+                    div()
+                        .text_size(px(crate::design::TS_CAPTION))
+                        .text_color(hex(t.fg_muted))
+                        .child(SharedString::from(if changed_columns > 0 {
+                            format!("{changed_columns} 列")
+                        } else {
+                            table.status.label().to_string()
+                        })),
+                );
                 list = list.child(row);
             }
             let mut side = v_flex().flex_1().min_w_0().gap_1();
             if !report.rename_candidates.is_empty() {
                 let mut candidates = v_flex().gap(px(1.));
                 for candidate in report.rename_candidates.iter().take(5) {
-                    candidates =
-                        candidates.child(div().text_size(px(9.5)).text_color(hex(t.accent)).child(
-                            SharedString::from(format!(
+                    candidates = candidates.child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.accent))
+                            .child(SharedString::from(format!(
                                 "重命名候选：{} → {}（{}/{} 列匹配；填入上方「重命名」确认）",
                                 candidate.from,
                                 candidate.to,
                                 candidate.matched_columns,
                                 candidate.total_columns
-                            )),
-                        ));
+                            ))),
+                    );
                 }
                 side = side.child(candidates);
             }
@@ -634,7 +642,7 @@ impl MainView {
                 for warning in &report.warnings {
                     warnings = warnings.child(
                         div()
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.warning))
                             .child(SharedString::from(format!("警告：{warning}"))),
                     );
@@ -652,7 +660,7 @@ impl MainView {
                         .border_color(hex(t.border_subtle))
                         .overflow_y_scrollbar()
                         .scroll_bounce(false)
-                        .text_size(px(9.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_secondary))
                         .whitespace_normal()
                         .child(SharedString::from(if script.is_empty() {
@@ -666,7 +674,7 @@ impl MainView {
                     for item in &deploy.plan.unsupported {
                         unsupported = unsupported.child(
                             div()
-                                .text_size(px(9.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.warning))
                                 .child(SharedString::from(format!("不支持：{item}"))),
                         );
@@ -682,7 +690,7 @@ impl MainView {
                     for line in &deploy.impact {
                         impact = impact.child(
                             div()
-                                .text_size(px(9.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_secondary))
                                 .child(SharedString::from(line.clone())),
                         );
@@ -704,7 +712,7 @@ impl MainView {
                             .items_center()
                             .rounded(px(3.))
                             .cursor_pointer()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.accent))
                             .hover(|style| style.bg(hex(t.bg_overlay)))
                             .on_click(cx.listener(|view, _, _, cx| {
@@ -730,7 +738,7 @@ impl MainView {
                             .border_color(hex(t.border_subtle))
                             .overflow_y_scrollbar()
                             .scroll_bounce(false)
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .whitespace_normal()
                             .child(SharedString::from(if rollback.is_empty() {
@@ -753,14 +761,14 @@ impl MainView {
         } else if panel.loading[0] || panel.loading[1] {
             report_area = report_area.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("正在读取结构快照…"),
             );
         } else if let Some(error) = panel.error.iter().flatten().next() {
             report_area = report_area.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.danger))
                     .child(SharedString::from(error.clone())),
             );
@@ -772,7 +780,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(if panel.confirm_execute {
                         t.warning
                     } else {
@@ -853,14 +861,14 @@ impl MainView {
         if panel.loading[index] {
             status = status.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("正在读取结构快照…"),
             );
         } else if let Some(error) = panel.error[index].as_ref() {
             status = status.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.danger))
                     .child(SharedString::from(error.clone())),
             );
@@ -878,7 +886,7 @@ impl MainView {
             }
             status = status.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(if snapshot.failed.is_empty() {
                         t.fg_secondary
                     } else {
@@ -889,7 +897,7 @@ impl MainView {
         } else {
             status = status.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("（未载入）"),
             );
@@ -956,7 +964,7 @@ impl MainView {
             .bg(hex(t.bg_overlay))
             .child(
                 div()
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(title),
             )

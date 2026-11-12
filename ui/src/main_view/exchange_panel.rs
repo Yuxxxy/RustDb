@@ -383,7 +383,7 @@ impl MainView {
             .child(
                 div()
                     .flex_1()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("导入 / 导出连接"),
@@ -424,7 +424,7 @@ impl MainView {
                     .h(px(20.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .cursor_pointer()
                     .when(active, |chip| {
                         chip.bg(hex(t.accent)).text_color(hex(t.on_accent))
@@ -454,7 +454,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(if message.as_ref().is_some_and(|(_, err)| *err) {
                         t.danger
                     } else {
@@ -546,7 +546,7 @@ impl MainView {
                 div()
                     .px_3()
                     .py_3()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("还没有连接可导出"),
             );
@@ -588,7 +588,7 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(11.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_primary))
                             .text_ellipsis()
                             .child(SharedString::from(name)),
@@ -596,20 +596,20 @@ impl MainView {
                     .when_some(folder, |row, folder| {
                         row.child(
                             div()
-                                .text_size(px(9.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .child(SharedString::from(folder)),
                         )
                     })
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .child(SharedString::from(endpoint)),
                     )
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(badge),
                     ),
@@ -627,7 +627,7 @@ impl MainView {
                         div()
                             .id("exchange-select-all")
                             .debug_selector(|| "exchange-select-all".to_string())
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .cursor_pointer()
                             .hover(|s| s.text_color(hex(t.accent)))
@@ -639,7 +639,7 @@ impl MainView {
                     .child(
                         div()
                             .flex_1()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(format!(
                                 "已选 {selected} / {}",
@@ -661,7 +661,7 @@ impl MainView {
                             } else {
                                 t.border_subtle
                             }))
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(if panel.include_tunnels {
                                 t.accent
                             } else {
@@ -688,7 +688,7 @@ impl MainView {
                     div()
                         .px_3()
                         .pb_2()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .child("明文导出：文件可被他人读取，主机与用户名会暴露"),
                 )
@@ -742,7 +742,7 @@ impl MainView {
             actions = actions.child(
                 div()
                     .flex_1()
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .whitespace_normal()
                     .child("支持 RustDb 导出文件、DBeaver data-sources.json、JDBC / 连接 URI"),
@@ -765,7 +765,7 @@ impl MainView {
                 div()
                     .px_3()
                     .py_3()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(if panel.needs_passphrase {
                         "输入口令后显示可导入的连接"
@@ -808,20 +808,20 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(11.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(if conflict { t.fg_muted } else { t.fg_primary }))
                             .text_ellipsis()
                             .child(SharedString::from(name)),
                     )
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .child(SharedString::from(endpoint)),
                     )
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(badge),
                     )
@@ -831,7 +831,7 @@ impl MainView {
                                 .px_1()
                                 .rounded(px(3.))
                                 .bg(hex(t.bg_overlay))
-                                .text_size(px(9.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .child("已存在"),
                         )

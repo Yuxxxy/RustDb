@@ -249,7 +249,7 @@ impl MainView {
                     .h(px(20.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .cursor_pointer()
                     .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                     .when(!active, |d| {
@@ -286,7 +286,7 @@ impl MainView {
         if kind.needs_target() {
             target_row = target_row.child(
                 div()
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("目标方言"),
             );
@@ -300,7 +300,7 @@ impl MainView {
                         .h(px(18.))
                         .px_2()
                         .rounded(px(4.))
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .cursor_pointer()
                         .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
                         .when(!active, |d| {
@@ -332,7 +332,7 @@ impl MainView {
                 div()
                     .debug_selector(|| "ai-optimize-error".to_string())
                     .whitespace_normal()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.danger))
                     .child(SharedString::from(error)),
             );
@@ -340,7 +340,7 @@ impl MainView {
         if running {
             body = body.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("正在生成…"),
             );
@@ -350,7 +350,7 @@ impl MainView {
                 body = body.child(
                     div()
                         .whitespace_normal()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_primary))
                         .child(SharedString::from(result.explanation.clone())),
                 );
@@ -367,7 +367,7 @@ impl MainView {
                         .items_start()
                         .child(
                             div()
-                                .text_size(px(9.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(color))
                                 .child(SharedString::from(note.level.label())),
                         )
@@ -376,7 +376,7 @@ impl MainView {
                                 .flex_1()
                                 .min_w_0()
                                 .whitespace_normal()
-                                .text_size(px(10.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(color))
                                 .child(SharedString::from(note.message.clone())),
                         ),
@@ -386,7 +386,7 @@ impl MainView {
                 body = body.child(
                     div()
                         .whitespace_normal()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .child(SharedString::from(format!("· {note}"))),
                 );
@@ -415,14 +415,17 @@ impl MainView {
                                 .h(px(18.))
                                 .items_center()
                                 .gap_2()
-                                .child(div().text_size(px(9.)).text_color(hex(t.fg_muted)).child(
-                                    SharedString::from(format!(
-                                        "第 {} 段 · -{} +{}",
-                                        index + 1,
-                                        hunk.removed(),
-                                        hunk.added()
-                                    )),
-                                ))
+                                .child(
+                                    div()
+                                        .text_size(px(crate::design::TS_CAPTION))
+                                        .text_color(hex(t.fg_muted))
+                                        .child(SharedString::from(format!(
+                                            "第 {} 段 · -{} +{}",
+                                            index + 1,
+                                            hunk.removed(),
+                                            hunk.added()
+                                        ))),
+                                )
                                 .child(div().flex_1())
                                 .child(
                                     div()
@@ -431,7 +434,7 @@ impl MainView {
                                         .h(px(17.))
                                         .px_2()
                                         .rounded(px(4.))
-                                        .text_size(px(9.))
+                                        .text_size(px(crate::design::TS_CAPTION))
                                         .cursor_pointer()
                                         .when(is_accepted, |d| {
                                             d.bg(hex(t.accent)).text_color(hex(t.on_accent))
@@ -463,7 +466,7 @@ impl MainView {
                                 .items_start()
                                 .child(
                                     div()
-                                        .text_size(px(9.5))
+                                        .text_size(px(crate::design::TS_CAPTION))
                                         .text_color(hex(t.accent))
                                         .child("+"),
                                 )
@@ -503,20 +506,20 @@ impl MainView {
                     .child(Icon::new(IconName::Bot).small().text_color(hex(t.purple)))
                     .child(
                         div()
-                            .text_size(px(12.))
+                            .text_size(px(crate::design::TS_BODY))
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .child("AI 优化"),
                     )
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(self.agent.provider_name())),
                     )
                     .child(div().flex_1())
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(source.display_name())),
                     ),
@@ -540,7 +543,7 @@ impl MainView {
                     .gap_2()
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child("只生成，不执行"),
                     )

@@ -403,7 +403,7 @@ impl MainView {
                     .child(
                         div()
                             .w(px(128.))
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .text_ellipsis()
                             .child(SharedString::from(source.clone())),
@@ -456,7 +456,7 @@ impl MainView {
                         )
                         .child(
                             div()
-                                .text_size(px(10.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_primary))
                                 .child(SharedString::from(format!("导入 · {table}"))),
                         )
@@ -464,7 +464,7 @@ impl MainView {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                .text_size(px(9.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .text_ellipsis()
                                 .child(SharedString::from(file)),
@@ -498,15 +498,20 @@ impl MainView {
                         .child(map_rows),
                 )
                 .when_some(plan_summary, |panel, summary| {
-                    panel.child(div().text_size(px(10.)).text_color(hex(t.fg_muted)).child(
-                        SharedString::from(format!("{summary} · 源 {rows} 行 · 目标 {target_len}")),
-                    ))
+                    panel.child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.fg_muted))
+                            .child(SharedString::from(format!(
+                                "{summary} · 源 {rows} 行 · 目标 {target_len}"
+                            ))),
+                    )
                 })
                 .when_some(error, |panel, error| {
                     panel.child(
                         div()
                             .debug_selector(|| "import-error".to_string())
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.danger))
                             .child(SharedString::from(error)),
                     )
@@ -515,7 +520,7 @@ impl MainView {
                     panel.child(
                         div()
                             .debug_selector(|| "import-warning".to_string())
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.danger))
                             .child(SharedString::from(warning)),
                     )
@@ -529,7 +534,7 @@ impl MainView {
                         .join("；");
                     panel.child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(text)),
                     )

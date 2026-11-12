@@ -21,7 +21,7 @@ impl MainView {
         if profiles.is_empty() {
             list = list.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("还没有保存的配置，从下面的预设开始。"),
             );
@@ -52,13 +52,13 @@ impl MainView {
                     }))
                     .child(
                         div()
-                            .text_size(px(10.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(if is_active { t.accent } else { t.fg_primary }))
                             .child(SharedString::from(label)),
                     )
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(kind_label)),
                     ),
@@ -67,7 +67,7 @@ impl MainView {
         // 预设。
         let mut preset_row = h_flex().items_center().gap_1().flex_wrap().child(
             div()
-                .text_size(px(10.))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child("预设"),
         );
@@ -81,7 +81,7 @@ impl MainView {
                     .h(px(20.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_secondary))
                     .cursor_pointer()
                     .hover(|row| row.bg(hex(t.bg_overlay)))
@@ -95,7 +95,7 @@ impl MainView {
         let mut kind_chips = h_flex().items_center().gap_1().flex_wrap().child(
             div()
                 .w(px(64.))
-                .text_size(px(10.))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child("类型"),
         );
@@ -109,7 +109,7 @@ impl MainView {
                     .h(px(20.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .cursor_pointer()
                     .when(option == kind, |chip| {
                         chip.bg(hex(t.accent)).text_color(hex(t.on_accent))
@@ -130,7 +130,7 @@ impl MainView {
         let mut auth_chips = h_flex().items_center().gap_1().child(
             div()
                 .w(px(64.))
-                .text_size(px(10.))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child("认证"),
         );
@@ -144,7 +144,7 @@ impl MainView {
                     .h(px(20.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .cursor_pointer()
                     .when(option == auth, |chip| {
                         chip.bg(hex(t.accent)).text_color(hex(t.on_accent))
@@ -166,14 +166,14 @@ impl MainView {
         let mut model_chips = h_flex().items_center().gap_1().flex_wrap().child(
             div()
                 .w(px(64.))
-                .text_size(px(10.))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child("发现"),
         );
         if models.is_empty() {
             model_chips = model_chips.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("点「发现模型」列出可用模型"),
             );
@@ -188,7 +188,7 @@ impl MainView {
                     .h(px(18.))
                     .px_2()
                     .rounded(px(4.))
-                    .text_size(px(9.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.accent))
                     .bg(hex(t.bg_overlay))
                     .cursor_pointer()
@@ -212,7 +212,7 @@ impl MainView {
                 .rounded(px(4.))
                 .border_1()
                 .border_color(hex(border))
-                .text_size(px(10.))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(tone))
                 .child(SharedString::from(report.line()))
                 .into_any_element()
@@ -221,7 +221,7 @@ impl MainView {
         for error in &errors {
             error_box = error_box.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.danger))
                     .child(SharedString::from(error.clone())),
             );
@@ -305,14 +305,14 @@ impl MainView {
                     .gap_2()
                     .child(
                         div()
-                            .text_size(px(11.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .child("AI 模型"),
                     )
                     .child(div().flex_1())
                     .child(
                         div()
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child("配置只存本机；密钥不落盘"),
                     )

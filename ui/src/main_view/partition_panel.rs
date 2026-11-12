@@ -317,7 +317,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!("分区 · {}", panel.label))),
@@ -355,7 +355,7 @@ impl MainView {
         if let Some(strategy) = strategy {
             info = info.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_secondary))
                     .child(SharedString::from(match key {
                         Some(key) => format!("{} 分区 · {key}", strategy.label()),
@@ -366,14 +366,14 @@ impl MainView {
         if panel.loading {
             info = info.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("正在读取分区…"),
             );
         } else if let Some(error) = &panel.error {
             info = info.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.danger))
                     .child(SharedString::from(error.clone())),
             );
@@ -382,14 +382,14 @@ impl MainView {
             info = info
                 .child(
                     div()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.danger))
                         .text_ellipsis()
                         .child(SharedString::from(failure.message.clone())),
                 )
                 .child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .text_ellipsis()
                         .child(SharedString::from(failure.hint.clone())),
@@ -398,7 +398,7 @@ impl MainView {
         if let Some(note) = note {
             info = info.child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(SharedString::from(note)),
             );
@@ -416,7 +416,7 @@ impl MainView {
                 div()
                     .px_3()
                     .py_3()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(if partitioned {
                         "还没有分区"
@@ -451,7 +451,7 @@ impl MainView {
                                 .items_center()
                                 .child(
                                     div()
-                                        .text_size(px(11.))
+                                        .text_size(px(crate::design::TS_CAPTION))
                                         .font_weight(gpui::FontWeight::MEDIUM)
                                         .text_color(hex(t.fg_primary))
                                         .text_ellipsis()
@@ -463,7 +463,7 @@ impl MainView {
                                             .px_1()
                                             .rounded(px(3.))
                                             .bg(hex(t.bg_overlay))
-                                            .text_size(px(9.5))
+                                            .text_size(px(crate::design::TS_CAPTION))
                                             .text_color(hex(t.fg_muted))
                                             .child("DEFAULT"),
                                     )
@@ -471,7 +471,7 @@ impl MainView {
                         )
                         .child(
                             div()
-                                .text_size(px(10.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .text_ellipsis()
                                 .child(SharedString::from(item.bounds.clone())),
@@ -480,7 +480,7 @@ impl MainView {
             if let Some(rows) = item.row_estimate {
                 row = row.child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .child(SharedString::from(format!("~{rows} 行"))),
                 );
@@ -525,7 +525,7 @@ impl MainView {
                 div()
                     .px_3()
                     .py_1()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("分区过多，仅显示前 500 个"),
             );
@@ -537,7 +537,7 @@ impl MainView {
             let attach = panel.form == PartitionForm::Attach;
             form = form.child(
                 div()
-                    .text_size(px(11.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child(if attach {
@@ -546,20 +546,22 @@ impl MainView {
                         "新建分区"
                     }),
             );
-            form =
-                form.child(
-                    h_flex()
-                        .gap_2()
-                        .items_center()
-                        .child(div().w(px(210.)).child(Input::new(&panel.name).small()))
-                        .child(div().text_size(px(10.)).text_color(hex(t.fg_muted)).child(
-                            if attach {
+            form = form.child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(div().w(px(210.)).child(Input::new(&panel.name).small()))
+                    .child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.fg_muted))
+                            .child(if attach {
                                 "要附加的表名（同库）"
                             } else {
                                 "分区名（同库）"
-                            },
-                        )),
-                );
+                            }),
+                    ),
+            );
             if !panel.is_default {
                 match strategy {
                     Some(PartitionStrategy::Range) => {
@@ -610,7 +612,7 @@ impl MainView {
                         .items_center()
                         .rounded(px(3.))
                         .cursor_pointer()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .when(panel.is_default, |this| {
                             this.bg(hex(t.bg_overlay)).text_color(hex(t.accent))
                         })
@@ -666,7 +668,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .text_ellipsis()
                     .child(if partitioned {
@@ -687,7 +689,7 @@ impl MainView {
                         .items_center()
                         .rounded(px(3.))
                         .cursor_pointer()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .when(panel.detach_concurrently, |this| {
                             this.bg(hex(t.bg_overlay)).text_color(hex(t.accent))
                         })
@@ -786,7 +788,7 @@ impl MainView {
             .bg(hex(t.bg_elevated))
             .child(
                 div()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("分区变更预览"),
@@ -794,7 +796,7 @@ impl MainView {
             .when(warning.is_some(), |card| {
                 card.child(
                     div()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .child(SharedString::from(warning.unwrap_or_default())),
                 )

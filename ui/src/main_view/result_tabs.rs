@@ -44,7 +44,7 @@ impl MainView {
             })))
             .child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(if auto { t.fg_secondary } else { t.warning }))
                     .child(if auto { "自动提交" } else { "手动提交" }),
             );
@@ -56,7 +56,7 @@ impl MainView {
                     div()
                         .debug_selector(|| "tx-status".to_string())
                         .px_1()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .child(SharedString::from(format!(
                             "事务 · {statements} 条 · {elapsed_s:.1}s{}",
@@ -155,7 +155,7 @@ impl MainView {
                     .rounded(px(4.))
                     .border_b_2()
                     .border_color(hex(if active { t.accent } else { t.bg_elevated }))
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .when(active, |d| {
                         d.bg(hex(t.bg_overlay)).text_color(hex(t.accent))
                     })
@@ -193,7 +193,7 @@ impl MainView {
                 } else {
                     t.bg_elevated
                 }))
-                .text_size(px(10.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .when(show_messages, |d| {
                     d.bg(hex(t.bg_overlay)).text_color(hex(t.accent))
                 })
@@ -260,7 +260,7 @@ impl MainView {
         list = list.child(
             h_flex()
                 .gap_3()
-                .text_size(px(10.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_secondary))
                 .child(SharedString::from(format!("{} ms", elapsed_ms)))
                 .when_some(affected, |row, n| {
@@ -274,7 +274,7 @@ impl MainView {
             list = list.child(
                 div()
                     .mt_1()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("无消息"),
             );
@@ -285,7 +285,7 @@ impl MainView {
                     h_flex()
                         .gap_2()
                         .items_start()
-                        .text_size(px(11.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(if is_warning {
                             t.warning
                         } else {
@@ -338,7 +338,7 @@ impl MainView {
             .bg(hex(t.bg_elevated))
             .child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(SharedString::from(format!("编辑 {column}"))),
             )
@@ -462,7 +462,11 @@ impl MainView {
                     .hover(|s| s.bg(hex(t.bg_overlay)))
                     .cursor_pointer()
                     .on_click(cx.listener(move |view, _, _, cx| view.show_run(id, cx)))
-                    .child(div().text_size(px(9.5)).child(SharedString::from(label)))
+                    .child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .child(SharedString::from(label)),
+                    )
                     .child(
                         div()
                             .id(SharedString::from(format!("run-pin-{id}")))
@@ -523,7 +527,7 @@ impl MainView {
         if total > runs.len() {
             strip = strip.child(
                 div()
-                    .text_size(px(9.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(SharedString::from(format!("+{}", total - runs.len()))),
             );

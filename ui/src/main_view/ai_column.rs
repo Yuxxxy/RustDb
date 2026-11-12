@@ -20,14 +20,34 @@ impl MainView {
         let input = self.ai_input.clone().expect("刚刚创建");
 
         let mut transcript = v_flex().gap(px(6.));
+        if self.ai_lines.is_empty() {
+            transcript = transcript.child(crate::design::empty_state(
+                cx,
+                IconName::Bot,
+                "描述需求，让 AI 生成 SQL",
+                "示例：统计上周各渠道 GMV",
+            ));
+        }
         for (line_index, (role, text)) in self.ai_lines.clone().into_iter().enumerate() {
-            let (fg, bg) = match role.as_str() {
-                "user" => (t.fg_primary, t.bg_overlay),
-                "assistant" => (t.fg_primary, t.bg_base),
-                "error" => (t.danger, t.bg_base),
-                _ => (t.fg_muted, t.bg_base),
+            let (fg, bg, role_label) = match role.as_str() {
+                "user" => (t.fg_primary, t.bg_overlay, "我"),
+                "assistant" => (t.fg_primary, t.bg_base, "AI 助手"),
+                "error" => (t.danger, t.bg_base, "错误"),
+                _ => (t.fg_muted, t.bg_base, "工具"),
             };
-            let mut bubble = v_flex().gap(px(2.)).p_2().rounded(px(6.)).bg(hex(bg));
+            let mut bubble = v_flex()
+                .gap(px(2.))
+                .p_2()
+                .rounded(px(6.))
+                .bg(hex(bg))
+                .border_1()
+                .border_color(hex(t.border_strong))
+                .child(
+                    div()
+                        .text_size(px(crate::design::TS_CAPTION))
+                        .text_color(hex(t.fg_muted))
+                        .child(role_label),
+                );
             // 助手回答：SQL 围栏块单独成卡（应用 / 试跑 / 执行），其余仍按文本渲染。
             let blocks = if role == "assistant" {
                 rustdb_core::answer_blocks(&text)
@@ -43,7 +63,7 @@ impl MainView {
                         }
                         bubble = bubble.child(
                             div()
-                                .text_size(px(10.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(fg))
                                 .whitespace_normal()
                                 .child(SharedString::from(part)),
@@ -72,7 +92,7 @@ impl MainView {
             if self.ai_sessions.is_empty() {
                 list = list.child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .child("还没有历史会话"),
                 );
@@ -95,7 +115,7 @@ impl MainView {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                .text_size(px(10.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_primary))
                                 .text_ellipsis()
                                 .cursor_pointer()
@@ -187,13 +207,13 @@ impl MainView {
                 .bg(hex(t.bg_base))
                 .child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .child(SharedString::from(format!("需要确认 · {tool}"))),
                 )
                 .child(
                     div()
-                        .text_size(px(10.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_primary))
                         .whitespace_normal()
                         .child(SharedString::from(summary)),
@@ -300,7 +320,7 @@ impl MainView {
                 if choices.is_empty() {
                     list = list.child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child("先展开左侧数据库，加载表对象"),
                     );
@@ -327,13 +347,13 @@ impl MainView {
                                 div()
                                     .flex_1()
                                     .min_w_0()
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_ellipsis()
                                     .child(SharedString::from(label)),
                             )
                             .child(
                                 div()
-                                    .text_size(px(9.))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_muted))
                                     .child(SharedString::from(kind)),
                             ),
@@ -348,7 +368,7 @@ impl MainView {
                     .bg(hex(t.bg_base))
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child("表结构（列 / 主键 / 索引）"),
                     )
@@ -366,7 +386,7 @@ impl MainView {
                 if entries.is_empty() {
                     list = list.child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child("还没有固定的历史 SQL（在历史面板点「固定」）"),
                     );
@@ -401,13 +421,13 @@ impl MainView {
                                 div()
                                     .flex_1()
                                     .min_w_0()
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_ellipsis()
                                     .child(SharedString::from(label)),
                             )
                             .child(
                                 div()
-                                    .text_size(px(9.))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_muted))
                                     .child(SharedString::from(source)),
                             ),
@@ -422,7 +442,7 @@ impl MainView {
                     .bg(hex(t.bg_base))
                     .child(
                         div()
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child("固定的历史 SQL"),
                     )
@@ -448,7 +468,7 @@ impl MainView {
                     .child(Icon::new(IconName::Bot).small().text_color(hex(t.purple)))
                     .child(
                         div()
-                            .text_size(px(12.))
+                            .text_size(px(crate::design::TS_BODY))
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .child("AI 助手"),
                     )
@@ -490,7 +510,7 @@ impl MainView {
                     .child(
                         div()
                             .debug_selector(|| "ai-provider".to_string())
-                            .text_size(px(9.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(self.agent.provider_name())),
                     )
@@ -543,7 +563,13 @@ impl MainView {
                                 div().debug_selector(|| "ai-send".to_string()).child(
                                     Button::new("ai-send-btn")
                                         .small()
-                                        .label(if self.ai_running { "…" } else { "发送" })
+                                        .label(if self.ai_running {
+                                            "生成中…"
+                                        } else {
+                                            "发送"
+                                        })
+                                        .disabled(self.ai_running)
+                                        .tooltip("发送需求给 AI 助手")
                                         .on_click(cx.listener(|view, _, window, cx| {
                                             view.ai_send(window, cx);
                                         })),

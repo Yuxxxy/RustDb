@@ -96,7 +96,7 @@ impl MainView {
             .bg(hex(t.bg_elevated))
             .child(
                 div()
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(SharedString::from(format!("筛选「{column}」"))),
             )
@@ -119,7 +119,7 @@ impl MainView {
                             .rounded(px(4.))
                             .cursor_pointer()
                             .hover(|s| s.bg(hex(t.bg_overlay)))
-                            .text_size(px(10.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .on_click(cx.listener(move |view, _, window, cx| {
                                 if let Some(tab) = view.tabs.get_mut(view.active_tab) {
@@ -146,7 +146,7 @@ impl MainView {
                             .rounded(px(4.))
                             .cursor_pointer()
                             .hover(|s| s.bg(hex(t.bg_overlay)))
-                            .text_size(px(10.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.accent))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.filter_menu = None;
@@ -216,7 +216,7 @@ impl MainView {
                 .rounded(px(4.))
                 .cursor_pointer()
                 .when(active, |el| el.bg(hex(t.bg_overlay)))
-                .text_size(px(10.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(if active { t.accent } else { t.fg_secondary }))
                 .hover(|s| s.bg(hex(t.bg_overlay)))
                 .on_click(cx.listener(move |view, _, _, cx| {
@@ -267,7 +267,7 @@ impl MainView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(11.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .text_ellipsis()
                             .child(SharedString::from(format!(
@@ -277,7 +277,7 @@ impl MainView {
                     )
                     .child(
                         div()
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_muted))
                             .child(SharedString::from(format!("{null_label} · 只读"))),
                     )
@@ -292,7 +292,7 @@ impl MainView {
                             .rounded(px(4.))
                             .cursor_pointer()
                             .hover(|s| s.bg(hex(t.bg_overlay)))
-                            .text_size(px(10.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 cx.write_to_clipboard(ClipboardItem::new_string(copy_body.clone()));
@@ -357,7 +357,7 @@ impl MainView {
                         .gap(px(2.))
                         .children(notes.into_iter().map(|note| {
                             div()
-                                .text_size(px(9.5))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .child(SharedString::from(note))
                         })),
@@ -374,7 +374,7 @@ impl MainView {
                     .p_3()
                     .child(
                         div()
-                            .text_size(px(11.))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_primary))
                             .whitespace_normal()
                             .child(SharedString::from(body)),

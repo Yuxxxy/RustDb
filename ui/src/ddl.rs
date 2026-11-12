@@ -189,7 +189,7 @@ pub fn render_sql(text: &str, t: &ThemeTokens) -> Div {
         .flex_col()
         .min_w_0()
         .debug_selector(|| "ddl-sql".to_string())
-        .text_size(px(10.5))
+        .text_size(px(crate::design::TS_CAPTION))
         .text_color(rgb(t.fg_primary));
     for line in text.lines() {
         let mut row = div().flex().flex_row().flex_wrap().items_start().min_w_0();

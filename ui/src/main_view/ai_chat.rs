@@ -919,20 +919,24 @@ impl MainView {
             .is_some();
         let line_count = sql.lines().count().max(1);
 
-        let mut header =
-            h_flex()
-                .h(px(18.))
-                .items_center()
-                .gap_1()
-                .child(div().text_size(px(9.)).text_color(hex(t.fg_muted)).child(
-                    SharedString::from(format!("SQL · {language} · {line_count} 行")),
-                ))
-                .child(div().flex_1());
+        let mut header = h_flex()
+            .h(px(18.))
+            .items_center()
+            .gap_1()
+            .child(
+                div()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .text_color(hex(t.fg_muted))
+                    .child(SharedString::from(format!(
+                        "SQL · {language} · {line_count} 行"
+                    ))),
+            )
+            .child(div().flex_1());
         if let Some((text, color)) = status.clone() {
             header = header.child(
                 div()
                     .debug_selector(|| format!("ai-block-status-{line}-{ordinal}"))
-                    .text_size(px(9.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(color))
                     .text_ellipsis()
                     .max_w(px(120.))

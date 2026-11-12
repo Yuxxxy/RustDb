@@ -28,6 +28,15 @@ impl MainView {
         cx.notify();
     }
 
+    fn set_grid_density(&mut self, density: rustdb_core::GridDensity, cx: &mut Context<Self>) {
+        if self.layout.grid_density == density {
+            return;
+        }
+        self.layout.grid_density = density;
+        self.persist_layout();
+        cx.notify();
+    }
+
     fn set_ai_default(&mut self, open: bool, cx: &mut Context<Self>) {
         if self.layout.ai_open == open {
             return;
@@ -57,10 +66,17 @@ impl MainView {
 
     pub(crate) fn render_settings(
         &mut self,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
         let t = current(cx);
+        // 对话框按视口夹取：740 是 Settings 组件不裁剪内容的最小宽度，
+        // 只在视口不足以容纳时才缩小，避免在 1024×640 下撑满整个窗口。
+        let viewport = window.viewport_size();
+        let vw = f32::from(viewport.width);
+        let vh = f32::from(viewport.height);
+        let dialog_w = if vw > 0. { (vw * 0.9).min(740.) } else { 740. };
+        let dialog_h = if vh > 0. { (vh * 0.85).min(560.) } else { 560. };
         let me = cx.entity();
         let connected = self.session.is_some();
 
@@ -155,34 +171,101 @@ impl MainView {
             .group(tools)
             .group(config);
 
-        let me_theme = me.clone();
-        let theme_page = SettingPage::new("外观").icon(IconName::Sun).group(
-            SettingGroup::new().item(
-                SettingItem::new(
-                    "主题",
-                    SettingField::dropdown(
-                        vec![
-                            (SharedString::from("dark"), SharedString::from("深色")),
-                            (SharedString::from("light"), SharedString::from("浅色")),
-                            (SharedString::from("system"), SharedString::from("跟随系统")),
-                        ],
-                        {
-                            let me = me_theme.clone();
-                            move |cx: &App| SharedString::from(theme_key(me.read(cx).layout.theme))
-                        },
-                        {
-                            let me = me_theme.clone();
-                            move |value: SharedString, cx: &mut App| {
-                                let mode = theme_from_key(&value);
-                                me.update(cx, |view, cx| view.set_theme_mode(mode, cx));
-                            }
-                        },
-                    )
-                    .default_value("dark"),
-                )
-                .description("深色 / 浅色，或跟随系统"),
-            ),
+        let me_editor = me.clone();
+        let editor_group = SettingGroup::new().title("工作区").item(
+            SettingItem::new(
+                "编辑器高度",
+                SettingField::render(move |options, _, _| {
+                    let me = me_editor.clone();
+                    h_flex()
+                        .debug_selector(|| "settings-editor-reset".to_string())
+                        .child(
+                            Button::new("settings-editor-reset-btn")
+                                .small()
+                                .outline()
+                                .with_size(options.size())
+                                .label("复位为 176px")
+                                .tooltip("Ctrl+Alt+0 复位；Ctrl+Alt+↑/↓ 每次 16px")
+                                .on_click(move |_, window, cx| {
+                                    me.update(cx, |view, cx| {
+                                        let available = view.available_workspace_height(window);
+                                        view.reset_editor_height(available, cx);
+                                    });
+                                }),
+                        )
+                        .into_any_element()
+                }),
+            )
+            .description("拖动编辑器与结果区之间的分隔条；Ctrl+Alt+↑/↓ 微调，Ctrl+Alt+0 复位"),
         );
+
+        let me_theme = me.clone();
+        let me_density = me.clone();
+        let theme_page = SettingPage::new("外观")
+            .icon(IconName::Sun)
+            .group(
+                SettingGroup::new().item(
+                    SettingItem::new(
+                        "主题",
+                        SettingField::dropdown(
+                            vec![
+                                (SharedString::from("dark"), SharedString::from("深色")),
+                                (SharedString::from("light"), SharedString::from("浅色")),
+                                (SharedString::from("system"), SharedString::from("跟随系统")),
+                            ],
+                            {
+                                let me = me_theme.clone();
+                                move |cx: &App| {
+                                    SharedString::from(theme_key(me.read(cx).layout.theme))
+                                }
+                            },
+                            {
+                                let me = me_theme.clone();
+                                move |value: SharedString, cx: &mut App| {
+                                    let mode = theme_from_key(&value);
+                                    me.update(cx, |view, cx| view.set_theme_mode(mode, cx));
+                                }
+                            },
+                        )
+                        .default_value("dark"),
+                    )
+                    .description("深色 / 浅色，或跟随系统"),
+                ),
+            )
+            .group(
+                SettingGroup::new().title("数据密度").item(
+                    SettingItem::new(
+                        "网格行高",
+                        SettingField::dropdown(
+                            rustdb_core::GridDensity::ALL
+                                .iter()
+                                .map(|density| {
+                                    (
+                                        SharedString::from(density.key()),
+                                        SharedString::from(density.label()),
+                                    )
+                                })
+                                .collect::<Vec<_>>(),
+                            {
+                                let me = me_density.clone();
+                                move |cx: &App| {
+                                    SharedString::from(me.read(cx).layout.grid_density.key())
+                                }
+                            },
+                            {
+                                let me = me_density.clone();
+                                move |value: SharedString, cx: &mut App| {
+                                    let density = rustdb_core::GridDensity::from_key(&value);
+                                    me.update(cx, |view, cx| view.set_grid_density(density, cx));
+                                }
+                            },
+                        )
+                        .default_value("standard"),
+                    )
+                    .description("紧凑 22px / 标准 25px / 宽松 30px，重启后保留"),
+                ),
+            )
+            .group(editor_group);
 
         let me_ai = me.clone();
         let ai_page = SettingPage::new("AI 助手").icon(IconName::Bot).group(
@@ -222,7 +305,7 @@ impl MainView {
                     SettingGroup::new().item(SettingItem::render(move |_, _, _| {
                         v_flex()
                             .gap_1()
-                            .text_size(px(11.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .child(SharedString::from(format!(
                                 "RustDb v{}",
@@ -230,7 +313,7 @@ impl MainView {
                             )))
                             .child(
                                 div()
-                                    .text_size(px(10.))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_muted))
                                     .child("Rust · GPUI"),
                             )
@@ -252,7 +335,7 @@ impl MainView {
             .child(
                 div()
                     .flex_1()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("设置"),
@@ -261,12 +344,12 @@ impl MainView {
                 div()
                     .id("settings-close")
                     .debug_selector(|| "settings-close".to_string())
-                    .w(px(18.))
-                    .h(px(18.))
+                    .w(px(28.))
+                    .h(px(28.))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(3.))
+                    .rounded(px(6.))
                     .cursor_pointer()
                     .hover(|style| style.bg(hex(t.bg_overlay)))
                     .on_click(cx.listener(|view, _, _, cx| view.close_settings(cx)))
@@ -286,14 +369,15 @@ impl MainView {
             .id("settings-card")
             .debug_selector(|| "settings-card".to_string())
             .occlude()
-            .w(px(740.))
-            .h(px(560.))
-            .rounded(px(8.))
+            .w(px(dialog_w))
+            .h(px(dialog_h))
+            .rounded(px(10.))
             .border_1()
-            .border_color(hex(t.border_subtle))
+            .border_color(hex(t.border_strong))
             .bg(hex(t.bg_elevated))
             .child(header)
-            .child(div().w_full().h(px(525.)).child(settings))
+            // Settings 需要确定高度：flex_1 + min_h_0 会让内容区在测试/小窗口下塌缩。
+            .child(div().w_full().h(px(dialog_h - 36.)).child(settings))
             .into_any_element()
     }
 }

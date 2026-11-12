@@ -17,6 +17,61 @@ pub const AI_WIDTH_MAX: f32 = 480.;
 pub const AI_WIDTH_DEFAULT: f32 = 360.;
 /// 低于该窗口宽度时侧栏自动收起（不改变用户自己的折叠开关）。
 pub const NARROW_WINDOW: f32 = 1024.;
+/// SQL 编辑器高度（UI-设计规范 §8）：默认 176，可拖拽范围 96-480。
+pub const EDITOR_HEIGHT_MIN: f32 = 96.;
+pub const EDITOR_HEIGHT_MAX: f32 = 480.;
+pub const EDITOR_HEIGHT_DEFAULT: f32 = 176.;
+/// 编辑器与结果区之间分隔条的视觉/命中厚度（9px：1px 线 + 上下各 4px）。
+pub const EDITOR_SPLITTER_H: f32 = 9.;
+/// 结果区至少保留的高度，窗口变小时优先压缩编辑器。
+pub const RESULT_HEIGHT_MIN: f32 = 120.;
+/// 键盘微调一档（Ctrl+Alt+↑/↓）。
+pub const EDITOR_RESIZE_STEP: f32 = 16.;
+
+/// 结果网格行高三档（UI-设计规范 §4），落 `layout.json`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GridDensity {
+    Compact,
+    #[default]
+    Standard,
+    Spacious,
+}
+
+impl GridDensity {
+    pub const ALL: [Self; 3] = [Self::Compact, Self::Standard, Self::Spacious];
+
+    pub const fn row_height(self) -> f32 {
+        match self {
+            Self::Compact => 22.,
+            Self::Standard => 25.,
+            Self::Spacious => 30.,
+        }
+    }
+
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::Compact => "compact",
+            Self::Standard => "standard",
+            Self::Spacious => "spacious",
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Compact => "紧凑",
+            Self::Standard => "标准",
+            Self::Spacious => "宽松",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Self {
+        Self::ALL
+            .into_iter()
+            .find(|density| density.key() == key)
+            .unwrap_or(Self::Standard)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LayoutSettings {
@@ -33,6 +88,12 @@ pub struct LayoutSettings {
     pub ai_open: bool,
     #[serde(default)]
     pub theme: crate::theme::ThemeMode,
+    /// 结果网格行高密度，旧配置文件缺字段时回落到标准。
+    #[serde(default)]
+    pub grid_density: GridDensity,
+    /// SQL 编辑器高度（不含分隔条）；旧配置缺字段时回落到 176。
+    #[serde(default = "default_editor_height")]
+    pub editor_height: f32,
 }
 
 fn default_version() -> u32 {
@@ -47,6 +108,10 @@ fn default_ai_open() -> bool {
     false
 }
 
+fn default_editor_height() -> f32 {
+    EDITOR_HEIGHT_DEFAULT
+}
+
 impl Default for LayoutSettings {
     fn default() -> Self {
         Self {
@@ -56,6 +121,8 @@ impl Default for LayoutSettings {
             sidebar_collapsed: false,
             ai_open: false,
             theme: crate::theme::ThemeMode::Dark,
+            grid_density: GridDensity::default(),
+            editor_height: EDITOR_HEIGHT_DEFAULT,
         }
     }
 }
@@ -76,6 +143,19 @@ pub fn clamp_ai_width(width: f32) -> f32 {
     }
 }
 
+/// 夹取编辑器高度：`available_h` 是工作区 body 的可用总高（编辑器 + 分隔条 + 结果区）。
+/// 窗口不足时优先压缩编辑器，保证结果区至少 [`RESULT_HEIGHT_MIN`]；非有限值回落到默认。
+pub fn clamp_editor_height(height: f32, available_h: f32) -> f32 {
+    if !height.is_finite() {
+        return EDITOR_HEIGHT_DEFAULT;
+    }
+    let mut max = EDITOR_HEIGHT_MAX;
+    if available_h.is_finite() && available_h > 0. {
+        max = max.min(available_h - EDITOR_SPLITTER_H - RESULT_HEIGHT_MIN);
+    }
+    height.clamp(EDITOR_HEIGHT_MIN, max.max(EDITOR_HEIGHT_MIN))
+}
+
 impl LayoutSettings {
     pub fn sidebar_width(&self, panel: &str) -> f32 {
         self.sidebar_widths
@@ -92,6 +172,11 @@ impl LayoutSettings {
 
     pub fn clamped_ai_width(&self) -> f32 {
         clamp_ai_width(self.ai_width)
+    }
+
+    /// 按当前工作区可用高度夹取后的编辑器高度（唯一读取口径）。
+    pub fn clamped_editor_height(&self, available_h: f32) -> f32 {
+        clamp_editor_height(self.editor_height, available_h)
     }
 }
 
@@ -200,6 +285,30 @@ mod tests {
     }
 
     #[test]
+    fn grid_density_defaults_and_roundtrip() {
+        let layout = LayoutSettings::default();
+        assert_eq!(layout.grid_density, GridDensity::Standard);
+        assert_eq!(layout.grid_density.row_height(), 25.);
+        assert_eq!(GridDensity::Compact.row_height(), 22.);
+        assert_eq!(GridDensity::Spacious.row_height(), 30.);
+        let path = temp_path("density");
+        let mut next = LayoutSettings::default();
+        next.grid_density = GridDensity::Spacious;
+        save_layout(&path, &next).unwrap();
+        assert_eq!(load_layout(&path).grid_density, GridDensity::Spacious);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn legacy_file_without_density_uses_default() {
+        let path = temp_path("legacy-density");
+        std::fs::write(&path, r#"{"ai_width":400.0}"#).unwrap();
+        assert_eq!(load_layout(&path).grid_density, GridDensity::Standard);
+        assert_eq!(load_layout(&path).ai_width, 400.);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
     fn atomic_save_replaces_previous_content() {
         let path = temp_path("replace");
         save_layout(&path, &LayoutSettings::default()).unwrap();
@@ -209,5 +318,53 @@ mod tests {
         assert_eq!(load_layout(&path).ai_width, 420.);
         assert!(!path.with_extension("json.tmp").exists());
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn editor_height_defaults_to_current_visual() {
+        let layout = LayoutSettings::default();
+        assert_eq!(layout.editor_height, EDITOR_HEIGHT_DEFAULT);
+        assert_eq!(layout.clamped_editor_height(800.), 176.);
+        assert_eq!(clamp_editor_height(f32::NAN, 800.), EDITOR_HEIGHT_DEFAULT);
+    }
+
+    #[test]
+    fn editor_height_is_clamped_and_leaves_result_room() {
+        assert_eq!(clamp_editor_height(10., 800.), EDITOR_HEIGHT_MIN);
+        assert_eq!(clamp_editor_height(9999., 800.), EDITOR_HEIGHT_MAX);
+        // 可用 300 → 上限 = 300 - 9 - 120 = 171。
+        assert_eq!(clamp_editor_height(400., 300.), 171.);
+        // 视口再小也不得压过下限。
+        assert_eq!(clamp_editor_height(400., 120.), EDITOR_HEIGHT_MIN);
+    }
+
+    #[test]
+    fn editor_height_roundtrip_and_legacy_default() {
+        let path = temp_path("editor-height");
+        let mut next = LayoutSettings::default();
+        next.editor_height = 240.;
+        save_layout(&path, &next).unwrap();
+        assert_eq!(load_layout(&path).editor_height, 240.);
+        let _ = std::fs::remove_file(&path);
+
+        let legacy = temp_path("legacy-editor-height");
+        std::fs::write(&legacy, r#"{"ai_width":400.0}"#).unwrap();
+        assert_eq!(load_layout(&legacy).editor_height, EDITOR_HEIGHT_DEFAULT);
+        assert_eq!(load_layout(&legacy).ai_width, 400.);
+        let _ = std::fs::remove_file(&legacy);
+    }
+
+    #[test]
+    fn editor_height_keyboard_step_stays_in_range() {
+        let step = EDITOR_RESIZE_STEP;
+        assert_eq!(
+            clamp_editor_height(EDITOR_HEIGHT_MIN - step, 800.),
+            EDITOR_HEIGHT_MIN
+        );
+        assert_eq!(
+            clamp_editor_height(EDITOR_HEIGHT_MAX + step, 800.),
+            EDITOR_HEIGHT_MAX
+        );
+        assert_eq!(clamp_editor_height(176. + step, 800.), 192.);
     }
 }

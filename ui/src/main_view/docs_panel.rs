@@ -279,7 +279,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .text_size(px(11.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
@@ -312,7 +312,7 @@ impl MainView {
 
         let label = |text: &str| {
             div()
-                .text_size(px(9.5))
+                .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))
                 .child(SharedString::from(text.to_string()))
         };
@@ -352,14 +352,14 @@ impl MainView {
                                 div()
                                     .flex_1()
                                     .min_w_0()
-                                    .text_size(px(10.5))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_ellipsis()
                                     .child(SharedString::from(name)),
                             )
                             .when(has_note, |row| {
                                 row.child(
                                     div()
-                                        .text_size(px(9.))
+                                        .text_size(px(crate::design::TS_CAPTION))
                                         .text_color(hex(t.accent))
                                         .child("笔记"),
                                 )
@@ -370,7 +370,7 @@ impl MainView {
             _ => {
                 list = list.child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .child("（暂无表）"),
                 );
@@ -404,7 +404,7 @@ impl MainView {
             if items.is_empty() {
                 columns = columns.child(
                     div()
-                        .text_size(px(9.5))
+                        .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
                         .child("（没有列信息）"),
                 );
@@ -433,14 +433,14 @@ impl MainView {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                .text_size(px(10.))
+                                .text_size(px(crate::design::TS_CAPTION))
                                 .text_ellipsis()
                                 .child(SharedString::from(name.clone())),
                         )
                         .when(has_note, |row| {
                             row.child(
                                 div()
-                                    .text_size(px(9.))
+                                    .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.accent))
                                     .child("笔记"),
                             )
@@ -459,7 +459,7 @@ impl MainView {
         if panel.loading {
             right = right.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child("正在汇总表结构…"),
             );
@@ -467,7 +467,7 @@ impl MainView {
         if let Some(error) = &panel.error {
             right = right.child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.danger))
                     .child(SharedString::from(error.clone())),
             );
@@ -482,7 +482,7 @@ impl MainView {
                 for warning in &docs.warnings {
                     warnings = warnings.child(
                         div()
-                            .text_size(px(9.5))
+                            .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.warning))
                             .child(SharedString::from(format!("警告：{warning}"))),
                     );
@@ -501,7 +501,7 @@ impl MainView {
                     .p_2()
                     .overflow_y_scrollbar()
                     .scroll_bounce(false)
-                    .text_size(px(10.))
+                    .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_secondary))
                     .whitespace_normal()
                     .child(render_doc_markdown(&docs.markdown, &t)),

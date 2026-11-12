@@ -48,7 +48,7 @@ pub fn apply_theme_mode(cx: &mut App, mode: ThemeMode) {
     let colors = &mut theme.colors;
     colors.background = to_hsla(t.bg_base);
     colors.foreground = to_hsla(t.fg_primary);
-    colors.border = to_hsla(t.border_subtle);
+    colors.border = to_hsla(t.border_strong);
     colors.accent = to_hsla(t.accent);
     colors.accent_foreground = to_hsla(t.on_accent);
     colors.muted = to_hsla(t.bg_elevated);
@@ -79,14 +79,14 @@ pub fn apply_theme_mode(cx: &mut App, mode: ThemeMode) {
     colors.sidebar_accent_foreground = to_hsla(t.fg_primary);
     colors.popover = to_hsla(t.bg_overlay);
     colors.popover_foreground = to_hsla(t.fg_primary);
-    colors.input = to_hsla(t.border_subtle);
+    colors.input = to_hsla(t.border_strong);
     colors.primary = to_hsla(t.accent);
     colors.primary_foreground = to_hsla(t.on_accent);
     colors.ring = to_hsla(t.accent);
     colors.link = to_hsla(t.accent);
     colors.selection = to_hsla(t.accent).opacity(0.35);
     colors.danger = to_hsla(t.danger);
-    colors.danger_foreground = to_hsla(t.on_danger);
+    colors.danger_foreground = to_hsla(t.on_danger_resolved);
     colors.success = to_hsla(t.success);
     colors.warning = to_hsla(t.warning);
     colors.info = to_hsla(t.accent);
@@ -127,10 +127,10 @@ pub fn apply_theme_mode(cx: &mut App, mode: ThemeMode) {
     colors.button_danger = to_hsla(t.danger);
     colors.button_danger_hover = dan_hover;
     colors.button_danger_active = dan_active;
-    colors.button_danger_foreground = to_hsla(t.on_danger);
+    colors.button_danger_foreground = to_hsla(t.on_danger_resolved);
 
     let fitted = theme.colors;
     theme.tokens = ComponentThemeTokens::from(&fitted);
-    theme.font_size = px(15.);
+    theme.font_size = px(crate::design::TS_BASE);
     theme.focus_ring = false;
 }

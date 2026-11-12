@@ -135,7 +135,7 @@ impl Render for MainView {
                         card_shell(t.bg_base, cx)
                             .debug_selector(|| "workspace-card".to_string())
                             .size_full()
-                            .child(self.render_workspace(cx)),
+                            .child(self.render_workspace(window, cx)),
                     ),
             );
         }
@@ -189,7 +189,7 @@ impl Render for MainView {
             .justify_start()
             .bg(hex(t.bg_base))
             .text_color(hex(t.fg_primary))
-            .text_size(px(13.))
+            .text_size(px(crate::design::TS_BODY))
             .overflow_hidden()
             .child(self.render_title_bar(cx))
             .child(
@@ -894,7 +894,7 @@ impl Render for MainView {
                                     .bg(hex(t.bg_elevated))
                                     .child(
                                         div()
-                                            .text_size(px(11.5))
+                                            .text_size(px(crate::design::TS_CAPTION))
                                             .font_weight(gpui::FontWeight::SEMIBOLD)
                                             .text_color(hex(t.fg_primary))
                                             .child("待提交 SQL 预览"),
