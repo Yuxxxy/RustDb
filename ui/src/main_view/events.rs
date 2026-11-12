@@ -838,6 +838,7 @@ impl MainView {
                 if let Some(panel) = self.routine.as_mut() {
                     if panel.path.display_label() == path.as_str() {
                         panel.deps.loading = false;
+                        panel.deps.phase.finish();
                         panel.deps.error = None;
                         panel.deps.list = Some(dependencies.clone());
                     }
@@ -848,6 +849,7 @@ impl MainView {
                 if let Some(panel) = self.routine.as_mut() {
                     if panel.path.display_label() == path.as_str() {
                         panel.deps.loading = false;
+                        panel.deps.phase.finish();
                         panel.deps.error = Some(message.clone());
                     }
                 }

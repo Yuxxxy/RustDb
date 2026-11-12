@@ -381,12 +381,23 @@ impl MainView {
     pub(crate) fn render_result(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let strip = self.render_run_strip(cx);
         let body = self.render_result_body(cx);
+        // P1-②：长查询保留旧结果并降透明度，不用遮罩、不清空内容。
+        let stale_opacity = self.result_opacity();
         v_flex()
             .flex_1()
             .min_h_0()
+            .opacity(stale_opacity)
             .when_some(strip, |layout, strip| layout.child(strip))
             .child(body)
             .into_any_element()
+    }
+
+    /// 结果区当前不透明度：仅「超时 + 有旧结果」降到 `STALE_CONTENT_OPACITY`。
+    pub(crate) fn result_opacity(&self) -> f32 {
+        self.active()
+            .map(|tab| tab.id)
+            .and_then(|id| self.query_loading_phase.get(&id))
+            .map_or(1., crate::design::LoadingPhase::opacity)
     }
 
     /// 运行记录条（F-65）：最近几次执行，可切换查看 / 固定 / 关闭。

@@ -971,6 +971,7 @@ fn routine_dependency_strip_and_tabs(cx: &mut gpui::TestAppContext) {
                 deps: RoutineDeps {
                     tab: RoutineDepsTab::DependsOn,
                     loading: false,
+                    phase: crate::design::LoadingPhase::default(),
                     error: None,
                     list: Some(rustdb_db_api::DependencyList {
                         depends_on: vec![table.clone()],
@@ -1811,4 +1812,102 @@ fn editor_splitter_double_click_resets(cx: &mut gpui::TestAppContext) {
     let h = vcx.update(|_, app| view.read(app).layout.editor_height);
     assert!((h - 176.).abs() < 0.5, "双击应复位到 176：{h}");
     let _ = std::fs::remove_file(&layout_path);
+}
+
+/// P1-②：加载相位由既有轮询同步，起手不显骨架、结束即回收。
+#[gpui::test]
+fn loading_phase_sync_follows_loading_state(cx: &mut gpui::TestAppContext) {
+    let (_vcx, holder) = test_view(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+    _vcx.update(|_, app| {
+        view.update(app, |main, _| {
+            main.tabs.push(SqlTab::new(7, Some(ns("main"))));
+            main.tabs[0].running = Some(rustdb_db_api::QueryId::new());
+            main.loading.insert("main".into());
+            assert!(!main.sync_loading_phases(), "刚起手不应触发骨架重绘");
+            assert!(main.query_loading_phase.contains_key(&7));
+            assert!(main.object_loading_phase.contains_key("main"));
+            assert_eq!(
+                main.query_loading_phase[&7].visual(),
+                crate::design::LoadingVisual::Normal
+            );
+            main.tabs[0].running = None;
+            main.loading.clear();
+            main.sync_loading_phases();
+            assert!(main.query_loading_phase.is_empty(), "查询结束应回收相位");
+            assert!(main.object_loading_phase.is_empty(), "加载结束应回收相位");
+        });
+    });
+}
+
+/// P1-②：结果区骨架 400ms 内不可见，超时后才出现。
+#[gpui::test]
+fn result_skeleton_waits_for_400ms(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |main, cx| {
+            main.tabs.push(SqlTab::new(1, Some(ns("main"))));
+            main.tabs[0].running = Some(rustdb_db_api::QueryId::new());
+            main.query_loading_phase.insert(
+                1,
+                crate::design::LoadingPhase::begin_at(std::time::Instant::now(), false),
+            );
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("result-loading-skeleton").is_none(),
+        "400ms 内不应闪骨架"
+    );
+
+    vcx.update(|_, app| {
+        view.update(app, |main, cx| {
+            let mut phase = crate::design::LoadingPhase::begin_at(
+                std::time::Instant::now() - std::time::Duration::from_millis(500),
+                false,
+            );
+            assert!(phase.reveal_if_due(std::time::Instant::now()));
+            main.query_loading_phase.insert(1, phase);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("result-loading-skeleton").is_some(),
+        "超过 400ms 且无旧结果应显示 8 行骨架"
+    );
+}
+
+/// P1-②：长查询且已有旧结果时只降透明度，不铺骨架、不清空内容。
+#[gpui::test]
+fn result_opacity_dims_stale_content(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |main, _| {
+            main.tabs.push(SqlTab::new(3, Some(ns("main"))));
+            assert_eq!(main.result_opacity(), 1., "未加载时不应变暗");
+            let now = std::time::Instant::now();
+            let mut stale = crate::design::LoadingPhase::begin_at(
+                now - std::time::Duration::from_millis(500),
+                true,
+            );
+            assert!(stale.reveal_if_due(now));
+            main.query_loading_phase.insert(3, stale);
+            assert!(
+                (main.result_opacity() - crate::design::STALE_CONTENT_OPACITY).abs() < f32::EPSILON,
+                "有旧结果应降透明度：{}",
+                main.result_opacity()
+            );
+            let mut skeleton = crate::design::LoadingPhase::begin_at(
+                now - std::time::Duration::from_millis(500),
+                false,
+            );
+            assert!(skeleton.reveal_if_due(now));
+            main.query_loading_phase.insert(3, skeleton);
+            assert_eq!(main.result_opacity(), 1., "铺骨架时容器不应变暗");
+        });
+    });
 }

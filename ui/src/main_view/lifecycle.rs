@@ -212,6 +212,8 @@ impl MainView {
             import_panel: None,
             objects: HashMap::new(),
             loading: HashSet::new(),
+            object_loading_phase: HashMap::new(),
+            query_loading_phase: HashMap::new(),
             expanded_ns: HashSet::new(),
             group_state,
             object_filter: String::new(),
@@ -437,6 +439,59 @@ impl MainView {
         if tick != self.unlock_tick {
             self.unlock_tick = tick;
             changed = true;
+        }
+        // P1-②：跨过 400ms 时主动补一帧，否则骨架 / 旧内容降透明度不会自己出现。
+        changed |= self.sync_loading_phases();
+        changed
+    }
+
+    /// 把「正在加载」同步成带 400ms 延迟的加载相位。
+    /// 复用既有 80ms 轮询，不新建定时器；只在跨阈值时返回 true 触发重绘。
+    pub(crate) fn sync_loading_phases(&mut self) -> bool {
+        use crate::design::LoadingPhase;
+        let now = Instant::now();
+
+        let object_keys: Vec<String> = self.loading.iter().cloned().collect();
+        self.object_loading_phase
+            .retain(|key, _| object_keys.contains(key));
+        for key in &object_keys {
+            let stale = self.objects.contains_key(key);
+            self.object_loading_phase
+                .entry(key.clone())
+                .or_insert_with(|| LoadingPhase::begin_at(now, stale));
+        }
+
+        let running: Vec<(u64, bool)> = self
+            .tabs
+            .iter()
+            .filter(|tab| tab.running.is_some())
+            .map(|tab| (tab.id, !tab.results.is_empty()))
+            .collect();
+        self.query_loading_phase
+            .retain(|id, _| running.iter().any(|(running_id, _)| running_id == id));
+        for (id, stale) in running {
+            self.query_loading_phase
+                .entry(id)
+                .or_insert_with(|| LoadingPhase::begin_at(now, stale));
+        }
+
+        let mut changed = false;
+        for phase in self
+            .object_loading_phase
+            .values_mut()
+            .chain(self.query_loading_phase.values_mut())
+        {
+            changed |= phase.reveal_if_due(now);
+        }
+        if let Some(panel) = self.routine.as_mut() {
+            if panel.deps.loading {
+                if !panel.deps.phase.is_loading() {
+                    panel.deps.phase = LoadingPhase::begin_at(now, panel.deps.list.is_some());
+                }
+                changed |= panel.deps.phase.reveal_if_due(now);
+            } else if panel.deps.phase.is_loading() {
+                panel.deps.phase.finish();
+            }
         }
         changed
     }

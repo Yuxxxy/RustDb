@@ -131,7 +131,7 @@
 | 标签页 | 高 30px，选中底部 2px accent，可关闭，溢出滚动 | — |
 | 对话框 | `min(90vw, 740) × min(85vh, 560)`，圆角 10，遮罩 35% 黑，**Esc 可关**，焦点约束在弹层内 | — |
 | 空态 | 图标 32px（`fg_muted`）+ 13px 一句说明 + **一个主操作** + 12px 快捷键提示；不使用插画 | 主操作可键盘触发 |
-| 加载态 | 骨架屏（列表 3 行 / 网格 8 行），**> 400ms 才显示**；不用转圈遮罩；保留旧内容并降透明度 | — |
+| 加载态 | 骨架屏（列表 3 行 / 网格 8 行），**> 400ms 才显示**；不用转圈遮罩；保留旧内容并降透明度（`0.55`） | 400ms 内 / 旧内容 / 无旧内容，见 §11.2 |
 | 错误态 | 图标 + 一句话 + 「详情」折叠 + 「复制」 | — |
 | 结果网格 | 表头 27px + 列类型角标；行分隔线 `border_subtle`；**废弃斑马纹**；整行 hover `bg_overlay`；选区 `accent@18%` + accent 高对比描边 | selected / hover / dirty / NULL |
 | diff 行 | `diff_add` / `diff_del` **@12% 底色**；禁止实色铺满（会压低文字对比度）。2px 语义色左条列为 P2 增强 | — |
@@ -222,7 +222,7 @@ cargo test -p rustdb-ui --lib
 | P0-4 | 焦点态 | ✅ 已落地 | 保留 `focus_ring = false`；核对 gpui-component 0.8 `focus_style`：聚焦时 `border_color` 自动换 `theme.ring`(accent)。本轮把**默认**描边由 1.5:1 提到 ≥3.77:1，两态均可辨 |
 | P0-5 | 网格 | ✅ 已落地 | `GridDensity` 三档（22/25/30）落 `layout.json`；diff @12%；废弃斑马纹 + 整行 hover；选区 18% + accent 描边；列头类型角标 |
 | P1 | 统一空态 | ✅ 已落地 | `empty_state` 复用 4 处：SQL 工作区 / 无结果 / DDL 成功 / AI 空会话 |
-| P1 | 加载骨架 | 🟡 部分 | `skeleton_rows` / `skeleton_bar` 接入连接树与例程依赖面板；**>400ms 延迟与「保留旧内容」未接**，需新增计时状态 |
+| P1 | 加载骨架 | ✅ 已落地 | `LoadingPhase` 统一 400ms 阈值：连接树 3 行骨架、结果区 8 行骨架、例程依赖 96×12 骨架条全部延迟显示；长查询保留旧结果并降透明度 `0.55`；复用 80ms 轮询，不新建定时器 |
 | P1 | 设置响应式 + Esc | ✅ 已落地 | `min(90vw, 740) × min(85vh, 560)`、圆角 10、内容 `flex_1`、边框 `border_strong`、接入 Esc 链 |
 | P1 | 命中区 | 🟡 部分 | 设置关闭 18×18→28×28、导出下拉 20×24→28×28；**导出下拉 tooltip 与工具栏 <900px 折叠未做**（既有测试依赖 `on_mouse_down` 与 debug 选择器） |
 | P1 | AI 气泡 | 🟡 部分 | 角色标签 + `border_strong` 描边 + 运行中禁用发送；**长会话虚拟化未做** |
@@ -232,9 +232,14 @@ cargo test -p rustdb-ui --lib
 **本轮改动文件**：`core/{theme,layout,lib}.rs`、`ui/{design,theme,lib}.rs`、
 `ui/main_view.rs` 及 29 个 `ui/src/**` 视图文件（字号收敛）、
 `ui/src/main_view/{result_view,settings_panel,workspace,status_bar,sidebar,ai_column,routine_panel}.rs`、
-`docs/UI-设计规范.md`。所有改动均**未提交**，可用 `git diff` 复核。
+`docs/UI-设计规范.md`。
 **P1-① 追加**：`ui/src/main_view/{workspace,render,lifecycle,settings_panel,tests_layout}.rs`、
 `ui/src/main_view.rs`、`core/src/{layout,lib}.rs`（单文件多处改动走 `.tmp/p1_editor_split.py` 字节级精确补丁）。
+**P1-② 追加**：`ui/src/{design,main_view}.rs`、
+`ui/src/main_view/{lifecycle,sidebar,result_view,result_tabs,routine_panel,events,tests_layout}.rs`
+（走 `.tmp/p1_loading.py`）。
+
+**提交边界**：P0 全项 + P1-① 已提交为 `c206c1a`；P1-② 仍在工作区、未提交，可用 `git diff` 复核。
 
 ---
 
@@ -254,13 +259,13 @@ cargo test -p rustdb-ui --lib
 | 格式 | `cargo fmt --all -- --check` | 通过 |
 | 单 crate 编译 | `cargo check -p rustdb-ui --lib` | 通过 |
 | 全工作区编译 | `cargo check --workspace --all-targets` | 通过（11 个 crate） |
-| UI 单元测试 | `cargo test -p rustdb-ui --lib` | **140 passed / 0 failed**（137 + P1-① 3 条分隔条用例） |
+| UI 单元测试 | `cargo test -p rustdb-ui --lib` | **147 passed / 0 failed**（140 + P1-② 4 条相位单测 + 3 条接线用例） |
 | core 单元测试 | `cargo test -p rustdb-core --lib` | **334 passed / 0 failed**（330 + P1-① 4 条高度夹取用例） |
 | 设计系统扫描 | `python .tmp/ui_verify.py` | 字号字面量 0；`ui/src` 十六进制色值 0；6 组对比度全部 PASS |
 
 **实测验收数字**：`text_size` 字面量 0，Token 调用 367 处
 （`TS_CAPTION` 355 / `TS_BODY` 10 / `TS_BASE` 2）；`border_strong` 接线 8 处、
-`on_danger_resolved` 4 处；`empty_state` 4 处；`px()` 数字常量 589 处 / 88 种值
+`on_danger_resolved` 4 处；`empty_state` 4 处、`skeleton` 调用点 2 处；`px()` 数字常量 589 处 / 88 种值
 （较基线 950 / 98 下降，剩余为尺寸与图标，P2 继续收敛）。
 修复后对比度：Dark 边界 4.12 / 3.77，Light 4.55 / 4.27，危险按钮 5.65 / 5.36，全部达标。
 
@@ -278,9 +283,9 @@ cargo test -p rustdb-ui --lib
 **护栏**：凡「拖拽中覆盖全屏遮罩」的交互，遮罩必须自带事件转发，并至少测两帧移动。
 
 **下一轮起点**（按优先级）：~~① 编辑器 / 结果区拖拽分隔 + 高度持久化~~（已落地，见 §11.1，含遮罩事件转发护栏）；
-② 加载骨架的 400ms 延迟与旧内容保留；③ 导出下拉换 `Button`（补 tooltip 与键盘可达）并同步回归测试；
+~~② 加载骨架的 400ms 延迟与旧内容保留~~（已落地，见 §11.2）；③ 导出下拉换 `Button`（补 tooltip 与键盘可达）并同步回归测试；
 ④ 工具栏 < 900px 折叠；⑤ AI 长会话虚拟化；⑥ P2 命令面板 / 状态栏常驻字段 / 设置搜索 / i18n 全量。
-**当前起点 = ②**（加载骨架 400ms 延迟 + 旧内容保留）。
+**当前起点 = ③**（导出下拉换 `Button` + tooltip + 键盘可达，并同步回归测试）。
 
 ### §11.1 P1-① 编辑器分隔条（本轮追加）
 
@@ -306,5 +311,31 @@ cargo test -p rustdb-ui --lib
 
 core 侧 4 条：默认值 / 夹取与结果区保底 / 序列化与旧配置回落 / 键盘步长边界。
 本轮全量：`cargo fmt --all -- --check`、`cargo check --workspace --all-targets`、
-`cargo test -p rustdb-ui --lib`（140）、`cargo test -p rustdb-core --lib`（334）、
+`cargo test -p rustdb-ui --lib`（当时 140，P1-② 后 147）、`cargo test -p rustdb-core --lib`（334）、
 `python .tmp/ui_verify.py`（6 组对比度全 PASS）均通过。
+
+### §11.2 P1-② 加载骨架延迟与旧内容保留（本轮追加）
+
+| 口径 | 值 |
+| --- | --- |
+| 阈值 | `LOADING_DELAY = 400ms`；短于阈值的请求**完全不产生视觉变化**，避免快响应闪骨架 |
+| 三态 | `Normal`（<400ms，同尺寸透明占位）/ `Stale`（超时 + 有旧内容）/ `Skeleton`（超时 + 无旧内容） |
+| 旧内容 | 保留并降到 `STALE_CONTENT_OPACITY = 0.55`；不清空、不盖转圈遮罩、不禁用交互 |
+| 骨架规格 | 连接树 3×18px；结果网格 8 行、行高取 `grid_density.row_height()`；例程依赖 96×12px 条 |
+| 驱动 | `LoadingPhase` 由既有 80ms `poll()` 推进，跨阈值时返回 `true` 补一帧；**不新建定时器 / 不逐帧起异步任务** |
+| 状态源 | `object_loading_phase: HashMap<String, LoadingPhase>`、`query_loading_phase: HashMap<u64, LoadingPhase>`、`RoutineDeps.phase`，均由 `loading` / `tab.running` 派生，结束即回收 |
+| 可测性 | `begin_at(now, has_stale_content)` 可注入时钟，精确验证 399ms / 400ms 边界；`result_opacity()` 抽成可测方法 |
+
+**设计取舍**：连接树在刷新期间仍允许点开别的表，所以旧对象行保持全不透明（降透明度会误示为禁用）；
+「保留旧内容 + 降透明度」落在**结果区**——那才是内容会被整体替换的区域。
+骨架在 400ms 内用同尺寸 `opacity(0)` 占位，保证阈值前后布局零跳动。
+
+**验收用例**：`design.rs` 4 条（400ms 边界 / Stale 不铺骨架 / finish 复位 / 常量口径）；
+`tests_layout.rs` 3 条（`loading_phase_sync_follows_loading_state`、`result_skeleton_waits_for_400ms`、
+`result_opacity_dims_stale_content`）。
+调试选择器：`object-loading-skeleton` / `result-loading-skeleton` / `routine-deps-skeleton`，
+仅在真正可见时挂载，便于回归断言。
+
+**回归记录**：新增 `RoutineDeps.phase` 后 `cargo check -p rustdb-ui --lib` 通过，但
+`cargo test -p rustdb-ui --lib` 报 `E0063 missing field phase`（测试模块里的结构体字面量）。
+再次印证 `cargo check` 不编译 `#[cfg(test)]`，新增结构体字段必须跑 test 复核。

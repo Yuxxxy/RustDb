@@ -70,6 +70,11 @@ impl MainView {
             loading: true,
             deps: RoutineDeps {
                 loading: deps_supported,
+                phase: if deps_supported {
+                    crate::design::LoadingPhase::begin(false)
+                } else {
+                    crate::design::LoadingPhase::default()
+                },
                 ..RoutineDeps::default()
             },
         });
@@ -463,9 +468,13 @@ impl MainView {
                     tab == RoutineDepsTab::DependedBy,
                     RoutineDepsTab::DependedBy,
                 ));
-            if panel.deps.loading {
+            if panel.deps.loading
+                && panel.deps.phase.visual() == crate::design::LoadingVisual::Skeleton
+            {
                 row = row.child(
                     div()
+                        .id("routine-deps-skeleton")
+                        .debug_selector(|| "routine-deps-skeleton".to_string())
                         .w(px(96.))
                         .h(px(12.))
                         .rounded(px(6.))

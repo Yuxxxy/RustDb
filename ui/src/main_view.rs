@@ -339,6 +339,8 @@ pub(crate) enum RoutineDepsTab {
 struct RoutineDeps {
     tab: RoutineDepsTab,
     loading: bool,
+    /// P1-②：骨架条 400ms 延迟相位。
+    phase: crate::design::LoadingPhase,
     error: Option<String>,
     list: Option<rustdb_db_api::DependencyList>,
 }
@@ -2180,6 +2182,10 @@ pub struct MainView {
     objects: HashMap<String, Vec<ObjectSummary>>,
     /// 正在加载的命名空间键。
     loading: HashSet<String>,
+    /// P1-②：对象树加载相位（键与 `loading` 一致），驱动 400ms 延迟骨架。
+    object_loading_phase: HashMap<String, crate::design::LoadingPhase>,
+    /// P1-②：查询加载相位（键为标签 id），超时后旧结果降透明度 / 无结果显骨架。
+    query_loading_phase: HashMap<u64, crate::design::LoadingPhase>,
     /// 连接树里展开的库节点。
     expanded_ns: HashSet<String>,
     /// 对象分组的展开状态（键 `连接|库|种类`）；未记录时默认只展开「表」。

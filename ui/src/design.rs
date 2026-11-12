@@ -90,6 +90,85 @@ pub fn skeleton_rows(cx: &gpui::App, count: usize, row_h: f32) -> gpui::AnyEleme
     list.into_any_element()
 }
 
+/// 加载态延迟：短于 400ms 的请求不显示骨架，避免快速响应闪烁（规范 §5）。
+pub const LOADING_DELAY: std::time::Duration = std::time::Duration::from_millis(400);
+/// 超时且存在旧内容时，旧内容降到该不透明度（不用转圈遮罩）。
+pub const STALE_CONTENT_OPACITY: f32 = 0.55;
+
+/// 加载态三种视觉：400ms 内不打扰 / 旧内容降透明度 / 无旧内容时骨架屏。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LoadingVisual {
+    #[default]
+    Normal,
+    Stale,
+    Skeleton,
+}
+
+/// 一次加载的相位。由既有 80ms 轮询推进，不新建定时器、不逐帧起异步任务。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LoadingPhase {
+    started_at: Option<std::time::Instant>,
+    has_stale_content: bool,
+    revealed: bool,
+}
+
+impl LoadingPhase {
+    pub fn begin(has_stale_content: bool) -> Self {
+        Self::begin_at(std::time::Instant::now(), has_stale_content)
+    }
+
+    /// 可注入时钟：测试用回拨的 now 精确验证 400ms 边界。
+    pub fn begin_at(now: std::time::Instant, has_stale_content: bool) -> Self {
+        Self {
+            started_at: Some(now),
+            has_stale_content,
+            revealed: false,
+        }
+    }
+
+    pub fn finish(&mut self) {
+        *self = Self::default();
+    }
+
+    pub fn is_loading(&self) -> bool {
+        self.started_at.is_some()
+    }
+
+    /// 跨过阈值时返回 true，调用方据此触发一次重绘；只触发一次。
+    pub fn reveal_if_due(&mut self, now: std::time::Instant) -> bool {
+        if self.revealed {
+            return false;
+        }
+        let Some(started) = self.started_at else {
+            return false;
+        };
+        if now.saturating_duration_since(started) < LOADING_DELAY {
+            return false;
+        }
+        self.revealed = true;
+        true
+    }
+
+    pub fn visual(&self) -> LoadingVisual {
+        if !self.revealed {
+            return LoadingVisual::Normal;
+        }
+        if self.has_stale_content {
+            LoadingVisual::Stale
+        } else {
+            LoadingVisual::Skeleton
+        }
+    }
+
+    pub fn opacity(&self) -> f32 {
+        if self.visual() == LoadingVisual::Stale {
+            STALE_CONTENT_OPACITY
+        } else {
+            1.
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,5 +224,46 @@ mod tests {
     fn type_scale_minimum_is_readable() {
         assert!(TS_CAPTION >= 12.);
         assert!(TS_CAPTION < TS_BODY && TS_BODY < TS_BASE && TS_BASE < TS_TITLE);
+    }
+
+    #[test]
+    fn loading_phase_delays_skeleton_by_400ms() {
+        let now = std::time::Instant::now();
+        let mut phase = LoadingPhase::begin_at(now, false);
+        assert!(phase.is_loading());
+        assert_eq!(phase.visual(), LoadingVisual::Normal);
+        assert_eq!(phase.opacity(), 1.);
+        assert!(!phase.reveal_if_due(now + std::time::Duration::from_millis(399)));
+        assert_eq!(phase.visual(), LoadingVisual::Normal);
+        assert!(phase.reveal_if_due(now + LOADING_DELAY));
+        assert_eq!(phase.visual(), LoadingVisual::Skeleton);
+        assert_eq!(phase.opacity(), 1.);
+        assert!(!phase.reveal_if_due(now + LOADING_DELAY), "只触发一次重绘");
+    }
+
+    #[test]
+    fn loading_phase_dims_stale_content_instead_of_skeleton() {
+        let now = std::time::Instant::now();
+        let mut phase = LoadingPhase::begin_at(now, true);
+        assert!(phase.reveal_if_due(now + LOADING_DELAY));
+        assert_eq!(phase.visual(), LoadingVisual::Stale);
+        assert!((phase.opacity() - STALE_CONTENT_OPACITY).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn loading_phase_finish_resets_for_next_request() {
+        let now = std::time::Instant::now();
+        let mut phase = LoadingPhase::begin_at(now, false);
+        assert!(phase.reveal_if_due(now + LOADING_DELAY));
+        phase.finish();
+        assert!(!phase.is_loading());
+        assert_eq!(phase.visual(), LoadingVisual::Normal);
+        assert!(!phase.reveal_if_due(now + std::time::Duration::from_secs(5)));
+    }
+
+    #[test]
+    fn loading_delay_is_400ms_per_spec() {
+        assert_eq!(LOADING_DELAY.as_millis(), 400);
+        assert!(STALE_CONTENT_OPACITY > 0.4 && STALE_CONTENT_OPACITY < 1.);
     }
 }

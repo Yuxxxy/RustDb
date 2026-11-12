@@ -441,6 +441,11 @@ impl MainView {
                         .iter()
                         .any(|tab| tab.ns_key().as_deref() == Some(key.as_str()));
                     let loading = self.loading.contains(&key);
+                    // P1-②：400ms 内只留透明占位，超时后才真正显示骨架。
+                    let skeleton_visible =
+                        self.object_loading_phase.get(&key).is_some_and(|phase| {
+                            phase.visual() == crate::design::LoadingVisual::Skeleton
+                        });
 
                     let open_ns = ns.clone();
                     let row_key = key.clone();
@@ -554,12 +559,20 @@ impl MainView {
                     let objects = self.objects.get(&key).cloned().unwrap_or_default();
                     if objects.is_empty() {
                         if loading {
-                            tree = tree.child(
-                                div()
-                                    .pl(px(50.))
-                                    .py_1()
-                                    .child(crate::design::skeleton_rows(cx, 3, 18.)),
-                            );
+                            let skeleton = div()
+                                .pl(px(50.))
+                                .py_1()
+                                .opacity(if skeleton_visible { 1. } else { 0. })
+                                .child(crate::design::skeleton_rows(cx, 3, 18.));
+                            if skeleton_visible {
+                                tree = tree.child(
+                                    skeleton
+                                        .id("object-loading-skeleton")
+                                        .debug_selector(|| "object-loading-skeleton".to_string()),
+                                );
+                            } else {
+                                tree = tree.child(skeleton);
+                            }
                         } else {
                             tree = tree.child(
                                 div()

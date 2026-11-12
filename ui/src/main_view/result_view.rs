@@ -32,6 +32,25 @@ impl MainView {
         // 编辑条要在借用 result 之前构建（它读的是 MainView 自身状态）。
         let edit_bar = self.render_edit_bar(cx);
         let Some(result) = self.active().and_then(|tab| tab.results.get(active_result)) else {
+            // P1-②：查询超过 400ms 且没有旧结果，才铺 8 行网格骨架。
+            let phase = self
+                .active()
+                .map(|tab| tab.id)
+                .and_then(|id| self.query_loading_phase.get(&id))
+                .copied();
+            if phase.is_some_and(|phase| phase.visual() == crate::design::LoadingVisual::Skeleton) {
+                return div()
+                    .id("result-loading-skeleton")
+                    .debug_selector(|| "result-loading-skeleton".to_string())
+                    .flex_1()
+                    .min_h_0()
+                    .child(crate::design::skeleton_rows(
+                        cx,
+                        8,
+                        self.layout.grid_density.row_height(),
+                    ))
+                    .into_any_element();
+            }
             return crate::design::empty_state(
                 cx,
                 IconName::Database,
