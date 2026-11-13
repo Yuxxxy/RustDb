@@ -13,7 +13,9 @@ use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::{Editor, EditorState, Input, InputEvent};
 use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::Disableable as _;
+use gpui_component::ElementExt as _;
 use gpui_component::RopeExt as _;
+use gpui_component::Selectable as _;
 use gpui_component::{h_flex, v_flex, Icon, Sizable as _, Size, TitleBar};
 use gpui_kit_assets::IconName;
 use rustdb_core::docs::DocInput;
@@ -118,6 +120,8 @@ const WORKSPACE_CHROME_H: f32 = 129.;
 /// 可选面板占位（保守估计，仅用于夹取编辑器高度上限）。
 const PARAMS_PANEL_H: f32 = 34.;
 const IMPORT_PANEL_H: f32 = 40.;
+/// 工具栏底边的窗口 y：标题栏 28 + 卡片上留白 6 + 卡片边框 1 + 标签栏 31 + 工具栏 34。
+const TOOLBAR_BOTTOM_Y: f32 = 100.;
 const MAX_VIEW_ROWS: usize = 300;
 /// 列宽下限 / 上限（拖拽把手按此夹取）。
 const MIN_COL_W: f32 = 72.;
@@ -980,6 +984,12 @@ pub(crate) enum MenuAction {
     SetCellDefault,
     /// 结果网格（F-71）：撤销选中行的待提交变更。
     RevertRow,
+    /// P1-④：工具栏折叠项 —— 改写为只读 SELECT。
+    PreviewDml,
+    /// P1-④：工具栏折叠项 —— 打开 .sql 文件。
+    OpenSqlFile,
+    /// P1-④：工具栏折叠项 —— 保存当前 SQL。
+    SaveSqlFile,
 }
 
 /// 历史面板的日期快捷范围。
@@ -1074,6 +1084,9 @@ pub(crate) struct MenuEntry {
     icon: IconName,
     hint: Option<String>,
     danger: bool,
+    /// P1-③：键盘高亮项。导出菜单与工具栏「更多 ▾」按当前高亮序号置位，
+    /// 其余菜单恒为 `false`，因此共用 `render_menu` 不必改签名。
+    highlight: bool,
 }
 
 impl MenuEntry {
@@ -1085,6 +1098,7 @@ impl MenuEntry {
             icon,
             hint: None,
             danger: false,
+            highlight: false,
         }
     }
 
@@ -1101,6 +1115,23 @@ impl MenuEntry {
     fn danger(mut self) -> Self {
         self.danger = true;
         self
+    }
+}
+
+/// 菜单键盘导航：↑/↓ 循环、Home/End 跳首尾；返回 `None` 表示该键不改高亮。
+/// 导出菜单与工具栏「更多 ▾」共用，保证两处的循环与边界口径一致。
+pub(crate) fn menu_hover_move(key: &str, current: Option<usize>, total: usize) -> Option<usize> {
+    if total == 0 {
+        return None;
+    }
+    let current = current.unwrap_or(0) as isize;
+    let total = total as isize;
+    match key {
+        "home" => Some(0),
+        "end" => Some(total as usize - 1),
+        "up" => Some((current - 1).rem_euclid(total) as usize),
+        "down" => Some((current + 1).rem_euclid(total) as usize),
+        _ => None,
     }
 }
 
@@ -2244,6 +2275,19 @@ pub struct MainView {
     layout_path: PathBuf,
     /// 结果区「导出格式」菜单：打开位置（窗口坐标）；`None` 为关闭。
     export_menu: Option<Point<gpui::Pixels>>,
+    /// P1-③：导出触发按钮的自有焦点句柄 —— Tab 可停留、Enter / Space 可开菜单。
+    export_focus: FocusHandle,
+    /// P1-③：导出菜单键盘高亮项（跨分组展平后的序号）。
+    export_hover: Option<usize>,
+    /// P1-④：工具栏「更多 ▾」菜单的打开位置（窗口坐标）；`None` 为关闭。
+    toolbar_menu: Option<Point<gpui::Pixels>>,
+    /// P1-④：「更多 ▾」触发按钮的自有焦点句柄。
+    toolbar_focus: FocusHandle,
+    /// P1-④：「更多 ▾」菜单键盘高亮项（跨分组展平后的序号）。
+    toolbar_hover: Option<usize>,
+    /// P1-④：上一帧实测的工作区内容宽。窗口缩放时定宽面板会被 flex 压缩且不回写
+    /// `layout`，纯视口估算会偏小，所以折叠判定以实测为准；`None` 时用估算兜底首帧。
+    measured_workspace_w: Option<f32>,
     /// 「设计表」面板：对象名 + 表详情。
     table_panel: Option<(String, rustdb_db_api::TableDetail)>,
     /// 列筛选面板：列下标 + 打开位置。

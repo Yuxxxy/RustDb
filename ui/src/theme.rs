@@ -50,7 +50,14 @@ pub fn apply_theme_mode(cx: &mut App, mode: ThemeMode) {
     colors.foreground = to_hsla(t.fg_primary);
     colors.border = to_hsla(t.border_strong);
     colors.accent = to_hsla(t.accent);
-    colors.accent_foreground = to_hsla(t.on_accent);
+    // gpui-component 的 ghost 悬停底色在深色下是 accent@50%（浅色才是实心 accent），
+    // 但文字色两态都取 `accent_foreground`。深色若沿用 `on_accent`(#0D1117) 就与卡片
+    // 背景同色，悬停时按钮文字整个消失，所以深色必须改用常规前景色。
+    colors.accent_foreground = if dark {
+        to_hsla(t.fg_primary)
+    } else {
+        to_hsla(t.on_accent)
+    };
     colors.muted = to_hsla(t.bg_elevated);
     colors.muted_foreground = to_hsla(t.fg_muted);
     colors.secondary = to_hsla(t.bg_elevated);
@@ -133,4 +140,80 @@ pub fn apply_theme_mode(cx: &mut App, mode: ThemeMode) {
     theme.tokens = ComponentThemeTokens::from(&fitted);
     theme.font_size = px(crate::design::TS_BASE);
     theme.focus_ring = false;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hex(color: Hsla) -> u32 {
+        let rgba = gpui::Rgba::from(color);
+        let byte = |v: f32| (v * 255.).round() as u32;
+        (byte(rgba.r) << 16) | (byte(rgba.g) << 8) | byte(rgba.b)
+    }
+
+    fn luminance(color: u32) -> f32 {
+        let channel = |shift: u32| {
+            let c = ((color >> shift) & 0xFF) as f32 / 255.;
+            if c <= 0.03928 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+    }
+
+    fn contrast(a: u32, b: u32) -> f32 {
+        let (la, lb) = (luminance(a), luminance(b));
+        let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
+        (hi + 0.05) / (lo + 0.05)
+    }
+
+    fn over(fg: u32, alpha: f32, bg: u32) -> u32 {
+        let mix = |shift: u32| {
+            let f = ((fg >> shift) & 0xFF) as f32;
+            let b = ((bg >> shift) & 0xFF) as f32;
+            (f * alpha + b * (1. - alpha)).round() as u32
+        };
+        (mix(16) << 16) | (mix(8) << 8) | mix(0)
+    }
+
+    /// 护栏：gpui-component 的 ghost 悬停文字色固定取 `accent_foreground`，悬停底色深色为
+    /// accent@50%、浅色为实心 accent（button.rs hovered 分支）。深色若映射成 `on_accent`
+    /// 就与卡片背景同色，悬停时按钮文字整个消失（P1-④ 实测标签区 1917/1920 px 纯背景）。
+    #[gpui::test]
+    fn ghost_hover_label_keeps_aa_contrast(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| gpui_component::init(cx));
+        for mode in [ThemeMode::Dark, ThemeMode::Light] {
+            cx.update(|cx| apply_theme_mode(cx, mode));
+            let (t, dark, fg) = cx.update(|cx| {
+                (
+                    current(cx),
+                    is_dark(cx),
+                    hex(Theme::global(cx).colors.accent_foreground),
+                )
+            });
+            for surface in [t.bg_base, t.bg_elevated, t.bg_overlay] {
+                let hover_bg = if dark {
+                    over(t.accent, 0.5, surface)
+                } else {
+                    t.accent
+                };
+                let ratio = contrast(fg, hover_bg);
+                assert!(
+                    ratio >= 4.5,
+                    "{mode:?} 悬停文字 #{fg:06X} 对悬停底 #{hover_bg:06X} 对比度 {ratio:.2} < 4.5"
+                );
+                // 实测深色悬停区底色就是卡片裸背景，半透明 accent 层不可见，裸底也要达标。
+                if dark {
+                    let bare = contrast(fg, surface);
+                    assert!(
+                        bare >= 4.5,
+                        "{mode:?} 悬停文字 #{fg:06X} 对裸底 #{surface:06X} 对比度 {bare:.2} < 4.5"
+                    );
+                }
+            }
+        }
+    }
 }

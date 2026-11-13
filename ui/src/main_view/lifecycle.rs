@@ -244,6 +244,12 @@ impl MainView {
             layout,
             layout_path,
             export_menu: None,
+            export_focus: cx.focus_handle(),
+            export_hover: None,
+            toolbar_menu: None,
+            toolbar_focus: cx.focus_handle(),
+            toolbar_hover: None,
+            measured_workspace_w: None,
             table_panel: None,
             filter_menu: None,
             filter_input: None,
@@ -339,6 +345,11 @@ impl MainView {
                 view.handle_escape(cx);
                 return;
             }
+            // P1-③：导出菜单的键盘闭环（打开 / 移高亮 / 执行）也走这条全局
+            // 观察者 —— 元素级按键在鼠标打开的浮层上不可靠。
+            view.export_menu_handle_key(&event.keystroke, window, cx);
+            // P1-④：工具栏「更多 ▾」与导出菜单同口径的键盘闭环。
+            view.toolbar_menu_handle_key(&event.keystroke, window, cx);
             // P1-①：分隔条键盘可达。全局观察者与 Esc 同口径，不要求焦点落在分隔条上，
             // 在 SQL 编辑器里也能用；Ctrl+Alt+0 复位到默认高度。
             if event.keystroke.modifiers.control && event.keystroke.modifiers.alt {

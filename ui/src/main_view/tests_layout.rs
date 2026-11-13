@@ -151,11 +151,22 @@ fn export_format_menu_lists_all_formats(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let chevron = vcx.debug_bounds("export-format").expect("导出格式按钮缺失");
-    vcx.simulate_mouse_down(
-        chevron.center(),
-        gpui::MouseButton::Left,
-        gpui::Modifiers::default(),
+    // P1-③：换成组件 Button 后命中区由 `Size::Small` 决定（24×24，正好是
+    // WCAG 2.2 SC 2.5.8 的最小目标尺寸），且必须是正方形、不撑高工具栏。
+    let (w, h) = (
+        f32::from(chevron.size.width),
+        f32::from(chevron.size.height),
     );
+    assert!((w - h).abs() < 1., "导出触发器应为正方形（{w}×{h}）");
+    assert!(
+        h >= 24. && h <= 34.,
+        "命中区高度应落在 24~34 之间（当前 {h}）"
+    );
+    assert!(
+        w >= 24.,
+        "命中区不能低于 WCAG 2.2 SC 2.5.8 的 24×24（当前 {w}×{h}）"
+    );
+    vcx.simulate_click(chevron.center(), gpui::Modifiers::default());
     vcx.run_until_parked();
 
     for key in [
@@ -192,11 +203,7 @@ fn export_format_menu_lists_all_formats(cx: &mut gpui::TestAppContext) {
 
     // 「复制为」与导出共用同一编码器：未连接时同样给连接提示。
     let chevron = vcx.debug_bounds("export-format").expect("导出格式按钮缺失");
-    vcx.simulate_mouse_down(
-        chevron.center(),
-        gpui::MouseButton::Left,
-        gpui::Modifiers::default(),
-    );
+    vcx.simulate_click(chevron.center(), gpui::Modifiers::default());
     vcx.run_until_parked();
     let copy = vcx
         .debug_bounds("menu-copy-tsv")
@@ -210,6 +217,90 @@ fn export_format_menu_lists_all_formats(cx: &mut gpui::TestAppContext) {
     });
     assert_eq!(status, "请先在「连接」面板连接一个数据源");
     assert!(!menu_open, "复制动作后菜单必须关闭");
+}
+
+/// P1-③：导出格式菜单的键盘闭环 —— Enter 打开、↓ 移高亮、Enter 执行、Esc 收起。
+///
+/// 鼠标点击不会自动聚焦（Button 在 mouse down 时刻意 `prevent_default`），
+/// 所以这里显式把焦点交给触发器，模拟 Tab 到达之后的状态。
+#[gpui::test]
+fn export_format_menu_is_keyboard_reachable(cx: &mut gpui::TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        crate::theme::apply_theme_mode(cx, rustdb_core::theme::ThemeMode::Dark);
+    });
+    let core = rustdb_core::Core::new(rustdb_db_api::DriverRegistry::new());
+    let holder: std::rc::Rc<std::cell::RefCell<Option<gpui::Entity<MainView>>>> =
+        std::rc::Rc::new(std::cell::RefCell::new(None));
+    let slot = holder.clone();
+    let (_, vcx) = cx.add_window_view(move |window, cx| {
+        let view = cx.new(|cx| MainView::new(window, cx, core));
+        *slot.borrow_mut() = Some(view.clone());
+        gpui_component::Root::new(view, window, cx)
+    });
+    vcx.run_until_parked();
+
+    let focus = vcx.update(|_, app| {
+        let view = holder.borrow();
+        let view = view.as_ref().expect("view 未创建").read(app);
+        view.export_focus.clone()
+    });
+    // 焦点交给触发器：Button 在 mouse down 时刻意 prevent_default，鼠标点击
+    // 不会自动聚焦，这里模拟「Tab 到达触发器之后」的状态。
+    vcx.update(|window, cx| window.focus(&focus, cx));
+    vcx.run_until_parked();
+
+    vcx.simulate_keystrokes("enter");
+    vcx.run_until_parked();
+    let (open, hover) = vcx.update(|_, app| {
+        let view = holder.borrow();
+        let view = view.as_ref().expect("view 未创建").read(app);
+        (view.export_menu.is_some(), view.export_hover)
+    });
+    assert!(open, "Enter 应打开导出格式菜单");
+    assert_eq!(hover, Some(0), "打开时默认高亮第一项");
+    assert!(
+        vcx.debug_bounds("menu-fmt-csv").is_some(),
+        "键盘打开的菜单必须真的渲染出来"
+    );
+
+    // CSV 在下标 0，↓ 两次落到 JSON。
+    vcx.simulate_keystrokes("down");
+    vcx.simulate_keystrokes("down");
+    vcx.run_until_parked();
+    let hover = vcx.update(|_, app| {
+        let view = holder.borrow();
+        view.as_ref().expect("view 未创建").read(app).export_hover
+    });
+    assert_eq!(hover, Some(2), "↓ 两次应高亮第 3 项（JSON）");
+
+    vcx.simulate_keystrokes("enter");
+    vcx.run_until_parked();
+    let (status, open) = vcx.update(|_, app| {
+        let view = holder.borrow();
+        let view = view.as_ref().expect("view 未创建").read(app);
+        (view.status.clone(), view.export_menu.is_some())
+    });
+    assert_eq!(
+        status, "请先在「连接」面板连接一个数据源",
+        "键盘执行与鼠标执行必须走同一条导出链路"
+    );
+    assert!(!open, "执行后菜单必须关闭");
+
+    // 再开一次，Esc 应能收起（不必去点遮罩）。
+    vcx.simulate_keystrokes("enter");
+    vcx.run_until_parked();
+    vcx.simulate_keystrokes("escape");
+    vcx.run_until_parked();
+    let open = vcx.update(|_, app| {
+        let view = holder.borrow();
+        view.as_ref()
+            .expect("view 未创建")
+            .read(app)
+            .export_menu
+            .is_some()
+    });
+    assert!(!open, "Esc 应收起导出菜单");
 }
 
 #[test]
@@ -1910,4 +2001,272 @@ fn result_opacity_dims_stale_content(cx: &mut gpui::TestAppContext) {
             assert_eq!(main.result_opacity(), 1., "铺骨架时容器不应变暗");
         });
     });
+}
+
+/// P1-④：把视口调到指定宽度并让实测宽度收敛（prepaint 回调补一帧）。
+fn resize_toolbar_view(
+    vcx: &mut gpui::VisualTestContext,
+    view: &gpui::Entity<MainView>,
+    width: f32,
+    ai_open: bool,
+) {
+    vcx.update(|window, app| {
+        window.resize(gpui::size(gpui::px(width), gpui::px(800.)));
+        window.bounds_changed(app);
+        view.update(app, |main, cx| {
+            main.layout.ai_open = ai_open;
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    vcx.update(|_, app| {
+        view.update(app, |_, cx| cx.notify());
+    });
+    vcx.run_until_parked();
+}
+
+/// P1-④：工具栏 ≥900px 时次要动作平铺，<900px 时收进「更多 ▾」。
+/// 判定必须用实测宽度——窗口缩放会把定宽面板 flex 压缩且不回写 layout，
+/// 纯视口估算会偏小并在 900 边界附近误折叠。
+#[gpui::test]
+fn toolbar_collapses_secondary_actions_below_900(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+
+    // 宽：1600 视口 + AI 栏 → 工具栏约 1038px，次要动作平铺。
+    resize_toolbar_view(vcx, &view, 1600., true);
+    let (width, compact) = vcx.update(|window, app| {
+        let main = view.read(app);
+        (main.toolbar_width(window), main.toolbar_compact(window))
+    });
+    let toolbar = vcx.debug_bounds("workspace-toolbar").expect("工具栏缺失");
+    assert!(
+        (width - f32::from(toolbar.size.width)).abs() < 1.,
+        "折叠判定用的宽度必须等于工具栏实测宽（判定 {width} / 实测 {}）",
+        f32::from(toolbar.size.width)
+    );
+    assert!(width >= 900. && !compact, "宽工具栏不应折叠（{width}）");
+    for key in ["preview-dml", "open-sql", "save-sql"] {
+        assert!(vcx.debug_bounds(key).is_some(), "宽工具栏应平铺 {key}");
+    }
+    assert!(
+        vcx.debug_bounds("toolbar-more").is_none(),
+        "宽工具栏不应出现「更多 ▾」"
+    );
+
+    // 窄：同一配置只把视口收到 1280 → 工具栏约 773px，次要动作折叠。
+    resize_toolbar_view(vcx, &view, 1280., true);
+    let (width, compact) = vcx.update(|window, app| {
+        let main = view.read(app);
+        (main.toolbar_width(window), main.toolbar_compact(window))
+    });
+    assert!(width < 900. && compact, "窄工具栏应折叠（{width}）");
+    for key in ["preview-dml", "open-sql", "save-sql"] {
+        assert!(
+            vcx.debug_bounds(key).is_none(),
+            "折叠后 {key} 不应再平铺（否则会被裁切）"
+        );
+    }
+    let more = vcx
+        .debug_bounds("toolbar-more")
+        .expect("折叠后缺少「更多 ▾」");
+    let h = f32::from(more.size.height);
+    assert!(
+        h >= 24. && h <= 34.,
+        "「更多 ▾」命中区高度应落在 24~34（当前 {h}）"
+    );
+    assert!(
+        f32::from(more.size.width) >= 24.,
+        "「更多 ▾」命中区不得低于 WCAG 2.2 的 24×24"
+    );
+
+    // 主环路与状态指示保持常驻，不能被折叠掉。
+    for key in ["db-picker", "tx-autocommit", "export-slot"] {
+        assert!(vcx.debug_bounds(key).is_some(), "折叠后 {key} 仍应常驻");
+    }
+}
+
+/// P1-④：折叠阈值严格是 900（半开半闭：<900 折叠，=900 不折叠）。
+/// 直接钉实测宽度，避免依赖「视口 → 面板 flex 压缩」的历史相关映射。
+#[gpui::test]
+fn toolbar_compact_threshold_is_900(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+    assert_eq!(rustdb_core::TOOLBAR_COMPACT_W, 900., "阈值口径见规范 §8");
+    for (width, want) in [(899.5, true), (900., false), (900.5, false)] {
+        // 同一次 update 内钉值并读判定：一旦重绘，prepaint 就会用真实宽度覆盖它。
+        let compact = vcx.update(|window, app| {
+            view.update(app, |main, _| {
+                main.measured_workspace_w = Some(width);
+            });
+            view.read(app).toolbar_compact(window)
+        });
+        assert_eq!(compact, want, "宽度 {width} 的折叠判定应为 {want}");
+    }
+}
+
+/// P1-④：「更多 ▾」鼠标闭环 —— 三个折叠项齐全、执行后关闭、点遮罩也能收起。
+#[gpui::test]
+fn toolbar_more_menu_executes_and_closes(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+    resize_toolbar_view(vcx, &view, 1280., true);
+
+    let more = vcx.debug_bounds("toolbar-more").expect("缺少「更多 ▾」");
+    vcx.simulate_click(more.center(), gpui::Modifiers::default());
+    vcx.run_until_parked();
+    for key in [
+        "menu-more-preview-dml",
+        "menu-more-open-sql",
+        "menu-more-save-sql",
+    ] {
+        assert!(vcx.debug_bounds(key).is_some(), "「更多 ▾」缺少 {key}");
+    }
+
+    let save = vcx.debug_bounds("menu-more-save-sql").expect("缺少保存项");
+    vcx.simulate_click(save.center(), gpui::Modifiers::default());
+    vcx.run_until_parked();
+    let (open, hover) = vcx.update(|_, app| {
+        let main = view.read(app);
+        (main.toolbar_menu.is_some(), main.toolbar_hover)
+    });
+    assert!(!open, "执行动作后菜单必须关闭");
+    assert_eq!(hover, None, "关闭时高亮位必须一起清掉");
+
+    let more = vcx.debug_bounds("toolbar-more").expect("缺少「更多 ▾」");
+    vcx.simulate_click(more.center(), gpui::Modifiers::default());
+    vcx.run_until_parked();
+    let scrim = vcx
+        .debug_bounds("toolbar-more-scrim")
+        .expect("打开时应有遮罩");
+    vcx.simulate_click(scrim.center(), gpui::Modifiers::default());
+    vcx.run_until_parked();
+    let open = vcx.update(|_, app| view.read(app).toolbar_menu.is_some());
+    assert!(!open, "点遮罩应收起菜单");
+}
+
+/// P1-④：「更多 ▾」键盘闭环 —— Enter 打开、↓ 移高亮、Enter 执行、Esc 收起。
+/// 与导出菜单同口径走全局观察者，不依赖组件的键盘 ClickEvent 合成。
+#[gpui::test]
+fn toolbar_more_menu_is_keyboard_reachable(cx: &mut gpui::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+    resize_toolbar_view(vcx, &view, 1280., true);
+
+    let focus = vcx.update(|_, app| view.read(app).toolbar_focus.clone());
+    vcx.update(|window, cx| window.focus(&focus, cx));
+    vcx.run_until_parked();
+
+    vcx.simulate_keystrokes("enter");
+    vcx.run_until_parked();
+    let (open, hover) = vcx.update(|_, app| {
+        let main = view.read(app);
+        (main.toolbar_menu.is_some(), main.toolbar_hover)
+    });
+    assert!(open, "Enter 应打开「更多 ▾」");
+    assert_eq!(hover, Some(0), "打开时默认高亮第一项");
+    assert!(
+        vcx.debug_bounds("menu-more-preview-dml").is_some(),
+        "键盘打开的菜单必须真的渲染出来"
+    );
+
+    vcx.simulate_keystrokes("down");
+    vcx.simulate_keystrokes("down");
+    vcx.run_until_parked();
+    let hover = vcx.update(|_, app| view.read(app).toolbar_hover);
+    assert_eq!(hover, Some(2), "↓ 两次应高亮第 3 项（保存 SQL）");
+
+    vcx.simulate_keystrokes("home");
+    vcx.run_until_parked();
+    assert_eq!(vcx.update(|_, app| view.read(app).toolbar_hover), Some(0));
+    vcx.simulate_keystrokes("up");
+    vcx.run_until_parked();
+    assert_eq!(
+        vcx.update(|_, app| view.read(app).toolbar_hover),
+        Some(2),
+        "第一项再 ↑ 应循环到末项"
+    );
+
+    vcx.simulate_keystrokes("enter");
+    vcx.run_until_parked();
+    let open = vcx.update(|_, app| view.read(app).toolbar_menu.is_some());
+    assert!(!open, "键盘执行后菜单必须关闭");
+
+    vcx.simulate_keystrokes("enter");
+    vcx.run_until_parked();
+    vcx.simulate_keystrokes("escape");
+    vcx.run_until_parked();
+    let (open, hover) = vcx.update(|_, app| {
+        let main = view.read(app);
+        (main.toolbar_menu.is_some(), main.toolbar_hover)
+    });
+    assert!(!open, "Esc 应收起「更多 ▾」");
+    assert_eq!(hover, None);
+}
+
+/// P1-④：规范 §8「禁止溢出裁切」——在规范支持的窗口范围（≥1024）内，
+/// 工具栏任何可见子项都不得越过工作区卡片右缘（卡片 overflow_hidden 会裁掉）。
+///
+/// 每个配置都新建 view：共用一个 view 连续 resize 时，定宽面板会保留上一轮被 flex
+/// 压缩后的宽度，可用宽偏大，裁切会被历史状态掩盖（实测 700px 共用 370.5 / 新建 290.5）。
+/// 宽度 ≥NARROW_WINDOW 时可用宽随视口单调递增，所以 1024 是最紧的约束点；
+/// 1280 / 1920 分别覆盖折叠态与平铺态。
+#[gpui::test]
+fn toolbar_never_clips_in_supported_window_range(cx: &mut gpui::TestAppContext) {
+    for ai in [false, true] {
+        for w in [1024., 1280., 1920.] {
+            let (vcx, holder) = test_view(cx);
+            let view = holder.borrow().clone().expect("view 未创建");
+            resize_toolbar_view(vcx, &view, w, ai);
+            let card = vcx.debug_bounds("workspace-card").expect("工作区卡片缺失");
+            let right = f32::from(card.origin.x + card.size.width);
+            for key in [
+                "toolbar-more",
+                "preview-dml",
+                "open-sql",
+                "save-sql",
+                "db-picker",
+                "tx-autocommit",
+                "diag-badge",
+                "export-slot",
+            ] {
+                if let Some(b) = vcx.debug_bounds(key) {
+                    let edge = f32::from(b.origin.x + b.size.width);
+                    assert!(
+                        edge <= right + 0.5,
+                        "ai={ai} vw={w} 时 {key} 被裁切（右缘 {edge} > 卡片 {right}）"
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// P1-④：导出菜单与「更多 ▾」共用的键盘导航口径（循环、首尾、空菜单）。
+#[test]
+fn menu_hover_move_wraps_and_handles_empty() {
+    assert_eq!(menu_hover_move("down", Some(0), 3), Some(1));
+    assert_eq!(
+        menu_hover_move("down", Some(2), 3),
+        Some(0),
+        "末项 ↓ 回首项"
+    );
+    assert_eq!(menu_hover_move("up", Some(0), 3), Some(2), "首项 ↑ 到末项");
+    assert_eq!(menu_hover_move("up", Some(2), 3), Some(1));
+    assert_eq!(menu_hover_move("home", Some(2), 3), Some(0));
+    assert_eq!(menu_hover_move("end", Some(0), 3), Some(2));
+    assert_eq!(
+        menu_hover_move("down", None, 3),
+        Some(1),
+        "未高亮时按首项起步"
+    );
+    assert_eq!(menu_hover_move("enter", Some(1), 3), None, "执行键不改高亮");
+    for key in ["up", "down", "home", "end"] {
+        assert_eq!(menu_hover_move(key, Some(0), 0), None, "空菜单不产生高亮");
+    }
+    assert_eq!(
+        menu_hover_move("down", Some(0), 1),
+        Some(0),
+        "单项菜单原地不动"
+    );
 }

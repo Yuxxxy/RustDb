@@ -383,7 +383,23 @@ impl MainView {
     }
 
     pub(crate) fn render_export_menu(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let groups = self.export_menu_groups();
+        // 高亮位按「跨分组展平」的序号标注，与 `export_menu_actions` 一一对应。
+        let hover = self.export_hover;
+        let mut index = 0usize;
+        let groups = self
+            .export_menu_groups()
+            .into_iter()
+            .map(|group| {
+                group
+                    .into_iter()
+                    .map(|mut entry| {
+                        entry.highlight = hover == Some(index);
+                        index += 1;
+                        entry
+                    })
+                    .collect()
+            })
+            .collect();
         self.render_menu(groups, cx)
     }
 

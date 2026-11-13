@@ -197,13 +197,15 @@ cargo test -p rustdb-ui --lib
 | 项 | 改动前基线 | 当前 / 目标 |
 | --- | --- | --- |
 | `text_size` 字面量调用 | 369 处 / 10 种 / 357 处 < 12px | **0 处**（全部走 `TS_*`）/ 3 级在用 / < 12px = 0 |
-| `px(...)` 硬编码常量 | 950 处 / 98 种值 | 仍为 950 处（P2：布局类收敛到 8pt 栅格） |
+| `px(...)` 硬编码常量 | 950 处 / 98 种值 | 587 处 / 89 种值（P2：布局类收敛到 8pt 栅格） |
 | `ui/src` 十六进制色值 | 0 | 0 |
 | 结构性边界对比度 | 1.45–1.55 | 卡片 / 工具栏 / 输入框 / 状态栏 / 对话框改 `border_strong`：3.77–4.55 |
 | 危险按钮文字对比度 | 3.35（Dark） | 5.65（Dark）/ 5.36（Light） |
+| ghost 悬停文字对比度 | 1.00（Dark，与卡片背景同色，悬停时标签整个消失） | 深色改 `fg_primary`：裸底 13.7–16.0 / accent@50% 复合底 5.5–5.8；浅色 `on_accent` 对实心 accent 5.19 |
 | 图标按钮 tooltip | 9/9 纯图标按钮已覆盖；133 个 Button 链仅 38 个有 tooltip | 纯图标 100%；**文字按钮 tooltip 与快捷键提示仍待补** |
-| 命中区 | 18×18 / 20×24 存在 | 已改 28×28；其余零散小控件 P2 排查 |
-| UI 用例 | 135 passed | 见本轮 `cargo test -p rustdb-ui --lib` 结果 |
+| 命中区 | 18×18 / 20×24 存在 | 设置关闭 / 导出下拉 / 工具栏「更多 ▾」均 ≥24px；其余零散小控件 P2 排查 |
+| 工具栏溢出 | < 900px 时次要动作被裁切 | 折叠为「更多 ▾」；1024–1920 × AI 开/关 12 组配置**零裁切**（`toolbar_never_clips_in_supported_window_range`） |
+| UI 用例 | 135 passed | **155 passed / 0 failed** |
 
 对比度脚本口径：WCAG 2.1 相对亮度 `L = 0.2126R + 0.7152G + 0.0722B`（sRGB 线性化），
 `CR = (L1 + 0.05) / (L2 + 0.05)`；透明度按 sRGB 通道线性混合后再计算。
@@ -224,7 +226,9 @@ cargo test -p rustdb-ui --lib
 | P1 | 统一空态 | ✅ 已落地 | `empty_state` 复用 4 处：SQL 工作区 / 无结果 / DDL 成功 / AI 空会话 |
 | P1 | 加载骨架 | ✅ 已落地 | `LoadingPhase` 统一 400ms 阈值：连接树 3 行骨架、结果区 8 行骨架、例程依赖 96×12 骨架条全部延迟显示；长查询保留旧结果并降透明度 `0.55`；复用 80ms 轮询，不新建定时器 |
 | P1 | 设置响应式 + Esc | ✅ 已落地 | `min(90vw, 740) × min(85vh, 560)`、圆角 10、内容 `flex_1`、边框 `border_strong`、接入 Esc 链 |
-| P1 | 命中区 | 🟡 部分 | 设置关闭 18×18→28×28、导出下拉 20×24→28×28；**导出下拉 tooltip 与工具栏 <900px 折叠未做**（既有测试依赖 `on_mouse_down` 与 debug 选择器） |
+| P1 | 命中区 | ✅ 已落地 | 设置关闭 18×18→28×28；导出下拉换 `Button` 并显式 `with_size(px(24.))`（`Size::Small` 实测 22.5px，低于 WCAG 2.2 的 24px 下限）；「更多 ▾」用 `.small().h(px(24.))`（带 label 时 `with_size` 只改内边距） |
+| P1 | 工具栏 < 900px 折叠 | ✅ 已落地 | `TOOLBAR_COMPACT_W = 900`；判定用 `on_prepaint` **实测**工作区宽（侧栏被 flex 压缩且不回写 layout，视口估算偏小 79.9px，会误折叠 vw≈1130–1209）；只读预览 / 打开 / 保存收进「更多 ▾」，复用 `MenuEntry` + 全局按键观察者；库选择器省略号吸收余量、折叠态去掉两条装饰分隔线。**< 1024px 仍会裁切**，见 §11.4 |
+| P1 | 导出触发器 | ✅ 已落地 | 手写 `div + on_mouse_down` 换 `Button`：Idle / Hover / Focus / Open 四态由组件提供，`tooltip` 说明可用格式，`track_focus` + 全局按键观察者打通 Enter / ↑ / ↓ / Home / End / Esc；菜单高亮项与 hover 同底色 |
 | P1 | AI 气泡 | 🟡 部分 | 角色标签 + `border_strong` 描边 + 运行中禁用发送；**长会话虚拟化未做** |
 | P1 | 编辑器可拖拽分隔 | ✅ 已落地 | `core/layout.rs` 新增 `editor_height` + 6 个常量与 `clamp_editor_height`（`#[serde(default)]` 兼容旧配置）；`workspace.rs` 单一 setter 接线拖拽 / 键盘 / 双击 / 设置页复位；拖拽期遮罩防误选字；`layout.json` 只在松手时写一次 |
 | P2 | 命令面板 / 状态栏常驻字段 / 设置搜索 / i18n 全量 | ❌ 未做 | 仅把标题栏品牌名回 15px；其余排期 |
@@ -238,8 +242,16 @@ cargo test -p rustdb-ui --lib
 **P1-② 追加**：`ui/src/{design,main_view}.rs`、
 `ui/src/main_view/{lifecycle,sidebar,result_view,result_tabs,routine_panel,events,tests_layout}.rs`
 （走 `.tmp/p1_loading.py`）。
+**P1-③ 追加**：`ui/src/main_view.rs`（`MenuEntry.highlight` + `export_focus` / `export_hover`）、
+`ui/src/main_view/{workspace,grid,lifecycle,tests_layout}.rs`（走 `.tmp/p1_export_button.py`、
+`.tmp/p1_export_key2.py`）。
+**P1-④ 追加**：`core/src/{layout,lib}.rs`（`TOOLBAR_COMPACT_W`）、
+`ui/src/main_view.rs`（`toolbar_menu` / `toolbar_focus` / `toolbar_hover` / `measured_workspace_w`、
+3 个 `MenuAction`、共用 `menu_hover_move`）、
+`ui/src/main_view/{workspace,render,lifecycle,tests_layout}.rs`、
+`ui/src/theme.rs`（ghost 悬停文字色深色分支 + 对比度护栏，见 §11.4 回归记录五）。
 
-**提交边界**：P0 全项 + P1-① 已提交为 `c206c1a`；P1-② 仍在工作区、未提交，可用 `git diff` 复核。
+**提交边界**：P0 全项 + P1-① = `c206c1a`；P1-② = `6c6e52c`；P1-③ + P1-④ + ghost 悬停修复仍在工作区、未提交。
 
 ---
 
@@ -259,13 +271,14 @@ cargo test -p rustdb-ui --lib
 | 格式 | `cargo fmt --all -- --check` | 通过 |
 | 单 crate 编译 | `cargo check -p rustdb-ui --lib` | 通过 |
 | 全工作区编译 | `cargo check --workspace --all-targets` | 通过（11 个 crate） |
-| UI 单元测试 | `cargo test -p rustdb-ui --lib` | **147 passed / 0 failed**（140 + P1-② 4 条相位单测 + 3 条接线用例） |
+| UI 单元测试 | `cargo test -p rustdb-ui --lib` | **155 passed / 0 failed**（148 + P1-④ 6 条折叠 / 阈值 / 键盘 / 裁切用例 + 1 条 ghost 悬停对比度护栏） |
 | core 单元测试 | `cargo test -p rustdb-core --lib` | **334 passed / 0 failed**（330 + P1-① 4 条高度夹取用例） |
 | 设计系统扫描 | `python .tmp/ui_verify.py` | 字号字面量 0；`ui/src` 十六进制色值 0；6 组对比度全部 PASS |
+| 真机视觉 | PrintWindow 截图 + 像素直方图（`.tmp/p4_diag.ps1` / `p4_final.ps1`） | 悬停标签可见：idle / 悬停亮像素 6373 / 6373（修复前 6373 / 6122）；恢复真实用户配置后 1200×820 启动、折叠态无裁切 |
 
 **实测验收数字**：`text_size` 字面量 0，Token 调用 367 处
 （`TS_CAPTION` 355 / `TS_BODY` 10 / `TS_BASE` 2）；`border_strong` 接线 8 处、
-`on_danger_resolved` 4 处；`empty_state` 4 处、`skeleton` 调用点 2 处；`px()` 数字常量 589 处 / 88 种值
+`on_danger_resolved` 4 处；`empty_state` 4 处、`skeleton` 调用点 2 处；`px()` 数字常量 587 处 / 89 种值
 （较基线 950 / 98 下降，剩余为尺寸与图标，P2 继续收敛）。
 修复后对比度：Dark 边界 4.12 / 3.77，Light 4.55 / 4.27，危险按钮 5.65 / 5.36，全部达标。
 
@@ -283,9 +296,10 @@ cargo test -p rustdb-ui --lib
 **护栏**：凡「拖拽中覆盖全屏遮罩」的交互，遮罩必须自带事件转发，并至少测两帧移动。
 
 **下一轮起点**（按优先级）：~~① 编辑器 / 结果区拖拽分隔 + 高度持久化~~（已落地，见 §11.1，含遮罩事件转发护栏）；
-~~② 加载骨架的 400ms 延迟与旧内容保留~~（已落地，见 §11.2）；③ 导出下拉换 `Button`（补 tooltip 与键盘可达）并同步回归测试；
-④ 工具栏 < 900px 折叠；⑤ AI 长会话虚拟化；⑥ P2 命令面板 / 状态栏常驻字段 / 设置搜索 / i18n 全量。
-**当前起点 = ③**（导出下拉换 `Button` + tooltip + 键盘可达，并同步回归测试）。
+~~② 加载骨架的 400ms 延迟与旧内容保留~~（已落地，见 §11.2）；~~③ 导出下拉换 `Button`~~（已落地，见 §11.3）；
+~~④ 工具栏 < 900px 折叠~~（已落地，见 §11.4，含「折叠判定必须用实测宽度」护栏）；
+⑤ AI 长会话虚拟化；⑥ P2 命令面板 / 状态栏常驻字段 / 设置搜索 / i18n 全量。
+**当前起点 = ⑤**（AI 长会话虚拟化）。
 
 ### §11.1 P1-① 编辑器分隔条（本轮追加）
 
@@ -339,3 +353,155 @@ core 侧 4 条：默认值 / 夹取与结果区保底 / 序列化与旧配置回
 **回归记录**：新增 `RoutineDeps.phase` 后 `cargo check -p rustdb-ui --lib` 通过，但
 `cargo test -p rustdb-ui --lib` 报 `E0063 missing field phase`（测试模块里的结构体字面量）。
 再次印证 `cargo check` 不编译 `#[cfg(test)]`，新增结构体字段必须跑 test 复核。
+### §11.3 P1-③ 导出下拉换 Button + 键盘可达（本轮追加）
+
+| 口径 | 值 |
+| --- | --- |
+| 触发器 | `Button::new("export-format-btn").with_size(px(24.)).ghost().icon(ChevronDown)`，外层 `div` 仍挂 `export-format` 调试选择器供回归定位 |
+| 命中区 | **24×24**。`Size::Small` 实测只有 22.5px（1.5rem × 15px 根字号），低于 WCAG 2.2 SC 2.5.8；28px 又比旁边的「导出」高出一截，故取 24 |
+| 四态 | Idle（ghost 透明）/ Hover（`bg_overlay`）/ Focus（`theme.ring = accent` 描边）/ Open（`Selectable::open(true)` 保持选中底色）—— 全部由组件提供，不再自绘 |
+| tooltip | 「更多导出格式：CSV / TSV / JSON / Markdown / Excel / SQL」，把菜单内容前置到悬停提示里 |
+| 打开 | 鼠标：`on_click` → `export_menu = Some(event.position())`；键盘：焦点在触发器上按 Enter / Space / ↓ |
+| 导航 | ↑ / ↓ 循环、Home / End 跳首尾；高亮项 `MenuEntry.highlight` 置位后与 hover 同底色（`bg_overlay`），序号按「跨分组展平」与 `export_menu_actions()` 一一对应 |
+| 执行 | Enter / Space → `commit_export_hover` → `dispatch_menu`，与鼠标点击走同一条导出链路 |
+| 收起 | Esc（`handle_escape` 新分支）、点遮罩、执行动作（`dispatch_menu` 统一清 `export_menu` + `export_hover`） |
+| 锚点 | 键盘打开时无指针坐标，锚到 `(viewport_w − 24, WORKSPACE_CHROME_H)`，配合菜单自身 `offset(-190, 6)` 落在右上角工具栏下方 |
+
+**设计取舍：键盘不用元素级 `on_key_down`。** 触发器嵌在 `h_resizable` 面板里，元素级按键依赖渲染帧的
+焦点节点映射（`window.focus(handle)` 只写焦点 id，不保证节点已注册），鼠标点开浮层时这条映射并不成立，
+方向键会静默丢失。改由既有的全局 `observe_keystrokes`（Esc 早就走这条路）统一处理，判定条件为
+「菜单开着」或「焦点 == `export_focus`」，因此不会抢走编辑器的 Enter。
+
+**回归记录一（键盘激活不生效）**：首次把键盘逻辑挂在 `Button` 的 `on_click`（`ClickEvent::Keyboard`）上，
+用例失败在「Enter 应打开导出格式菜单」。定位过程：焦点断言为 `true`，但 `on_key_down` 一次都没被调用；
+换成 `window.focus_next` 做 Tab 遍历 80 次也到不了触发器。根因是 `div.rs` 的 Enter→Click 合成依赖
+「key down 记录的 focus 代际 == key up 时的代际」，而这两次事件之间的重绘会重建 `pending_keyboard_down`，
+断言条件失效。结论：**浮层的键盘闭环不要依赖组件的键盘 ClickEvent 合成，走全局观察者更可靠。**
+
+**回归记录二（命中区反而变小）**：换 `Button` 时沿用 `.small()`，实测 `debug_bounds("export-format")`
+为 **22.5×22.5**——`size_6()` 是 `1.5rem`，根字号 15px ⇒ 22.5。断言「≥24」当场失败，暴露的是真实
+可访问性回退而非断言过严。改为 `with_size(px(24.))` 后 24×24 通过。
+**护栏**：该断言（正方形 + 24~34 高度 + 宽度 ≥24）留在 `export_format_menu_lists_all_formats` 里，
+以后任何人调小触发器都会被测试拦住。
+
+**验收用例**（`ui/src/main_view/tests_layout.rs`）：
+- `export_format_menu_lists_all_formats`：鼠标点击开菜单、11 个格式项齐全、命中区尺寸护栏、执行后关闭；
+- `export_format_menu_is_keyboard_reachable`：Enter 打开（默认高亮第 1 项）→ ↓ 两次到 JSON → Enter 执行
+  → 再开 → Esc 收起。
+
+### §11.4 P1-④ 工具栏 < 900px 折叠为「更多 ▾」（本轮追加）
+
+| 口径 | 值 |
+| --- | --- |
+| 阈值 | `core/layout.rs::TOOLBAR_COMPACT_W = 900`，判定对象是**工具栏可用宽**，不是窗口宽 |
+| 宽度来源 | `on_prepaint` 实测工作区根容器宽 → `measured_workspace_w`；视口估算仅用于首帧兜底 |
+| 测量层 | 工作区根 `v_flex().size_full()`——宽度由卡片决定、不随工具栏内容变化，因此测量与折叠判定不会互相振荡 |
+| 补帧 | 只在折叠判定**真的翻转**时 `cx.notify()`；宽度变化 < 0.5px 直接忽略，避免逐帧重绘 |
+| 折叠项 | 只读预览 / 打开 SQL / 保存 SQL 三项进「更多 ▾」；运行 / 取消 / 库选择器 / 事务 / 诊断徽标 / 导出**两种模式都常驻** |
+| 触发器 | `Button.small().h(px(24.)).ghost().label("更多").dropdown_caret(true)`，四态与命中区口径同导出触发器 |
+| 菜单 | 复用 `MenuEntry` / `render_menu` / `dispatch_menu`，3 项带快捷键提示（改写为 SELECT / Ctrl+O / Ctrl+S） |
+| 键盘 | 全局 `observe_keystrokes`：Enter / Space 开、↑↓ 循环、Home / End 跳首尾、Enter 执行、Esc 收起；导航逻辑与导出菜单共用 `menu_hover_move` |
+| 锚点 | 左缘对齐触发器（`RAIL_W + CARD_GAP + 1 + 8`，侧栏可见时再加 `sidebar_width − CARD_GAP/2`），y = 100（标题栏 28 + 留白 6 + 边框 1 + 标签栏 31 + 工具栏 34）；菜单宽 204px，左对齐必然覆盖触发器，故不估算前导按钮宽度 |
+| 溢出策略 | 折叠态去掉两条装饰性分隔线（§2.3 判定其不承载结构信息，省 26px）；库选择器是唯一可压缩项（`min_w_0` + 标签 `flex_shrink_1` + 省略号，图标 `flex_none`） |
+
+**设计取舍一：折叠判定必须用实测宽度，视口估算不可用。** `h_resizable` 的定宽侧栏在空间不足时
+会被 flex 压向 `SIDEBAR_WIDTH_MIN`(180)，但**不会把压缩后的宽度回写 `LayoutSettings`**，
+于是 `layout.sidebar_width()` 仍报标称 260，估算比真实可用宽小 **79.9px**（= 260 − 180）。
+这不是缩放历史造成的，首帧就会发生。后果是**一段视口区间被误折叠**（AI 关，vw ≈ 1130–1209）：
+
+| 视口（AI 关） | 实测宽 / 判定 | 估算宽 / 判定 |
+| --- | --- | --- |
+| 1120 | 890.5 / 折叠 | 810.6 / 折叠 |
+| 1140 | **910.5 / 平铺** | 830.6 / **误折叠** |
+| 1200 | **970.5 / 平铺** | 890.6 / **误折叠** |
+| 1220 | 990.5 / 平铺 | 910.6 / 平铺 |
+
+AI 开时两者相差 ≤0.1px（AI 列没被压缩），所以问题只在侧栏被压缩的分支出现——这正是「看起来对」
+最容易骗过抽查的地方。护栏：`toolbar_collapses_secondary_actions_below_900` 断言判定宽度与
+`debug_bounds("workspace-toolbar")` 实测宽相差 < 1px。
+
+> **更正（2026-11-12）**：本轮早期记录曾写「vw=1500 真实 971.5 / 估算 833.6，估算最多偏小 160px」。
+> 该数字取自**共用一个 view 连续 resize** 的探测，含面板压缩历史，不可复现。
+> 每配置新建 view 重测后：vw=1500 AI 开时实测 833.5 / 估算 833.6（无偏差），
+> 真实最大偏差是 79.9px，出现在 AI **关**的分支。以本表为准。
+
+**设计取舍二：真正修掉裁切的是库选择器可压缩，不是去掉分隔线。** 变异测试确证：只把两条分隔线
+加回去，用例仍全绿（选择器把 26px 吸收掉了）；把选择器的 `min_w_0` / `flex_shrink_1` 去掉，
+用例立刻失败在 `ai=true vw=1024 时 export-slot 被裁切（右缘 662 > 卡片 661）`。
+去掉分隔线是**额外的可读性余量**（让库名少省略 26px），不是正确性必需项。
+
+**回归记录一（`resize` 不改视口）**：`window.resize(size)` 之后所有宽度读数不变。根因是
+`Window::viewport_size` 只在 `Window::bounds_changed` 里刷新（gpui-pre 0.3.9 `window.rs`，
+注释写明「exposed publicly for test infrastructure」）。护栏：测试辅助
+`resize_toolbar_view` 里 `resize` 必须紧跟 `bounds_changed`，并跑两轮 `run_until_parked`
+让 prepaint 测量收敛。
+
+**回归记录二（带 label 的 Button 高度不受 `with_size` 控制）**：`.with_size(px(24.))` 对
+**纯图标** Button 才设 `size(px)`；带 label 时走的是 `px(size * 0.2)` 内边距分支，高度由内容决定，
+实测只有 **18.5px**，断言「24~34」当场失败。改 `.small().h(px(24.))` 通过——`refine_style`
+在 size 分支之后执行，调用方的 `.h()` 会覆盖组件高度。
+
+**回归记录三（首帧判定不补帧）**：`observe_workspace_width` 最初用
+`measured_workspace_w.unwrap_or(width) < 900` 取 `before`，首帧时它恒等于新值，
+即使估算驱动的首帧渲染错了折叠态也不会补帧。改为先按 `window` 算出上一帧真正用过的判定
+再赋值。此缺陷由自查发现，不是用例发现——**护栏**：判定翻转补帧的逻辑要连首帧一起推演。
+
+**回归记录四（共用 view 的 resize 历史会掩盖裁切）**：一个 view 连续 resize 时，定宽面板保留上一轮
+被压缩后的宽度，可用宽偏大。实测 vw=700 共用 view 报 370.5px、新建 view 报 290.5px。
+`toolbar_never_clips_in_supported_window_range` 因此改为**每个配置新建 view**；
+宽度 ≥ `NARROW_WINDOW`(1024) 时可用宽随视口单调递增，故 1024 是最紧约束点，
+1280 / 1920 覆盖折叠态与平铺态。
+
+**实测数字（每配置新建 view，确证）**：
+
+| 视口 | AI 关：工具栏宽 / 裁切 | AI 开：工具栏宽 / 裁切 |
+| --- | --- | --- |
+| 1024 | 794.5 / 0 | **357.5 / 0**（库选择器压到 62.5px） |
+| 1280 | 1050.5 / 0 | 613.5 / 0 |
+| 1920 | 1610.5 / 0 | 1253.5 / 0 |
+
+1024–1920 × AI 开/关共 12 组配置全部零裁切（含 1100 / 1440 / 1600，逐一实测）。
+
+**未落地 / 已知限制（显式登记）**：
+- **低于规范窗口最小宽 1024 时仍会裁切**：AI 开 + vw=640 溢出 56px、vw=560 溢出 136px（均为导出按钮）；
+  vw ≤ 700 时库选择器被压到 0px 即完全不可见。AI 关时到 560px 仍无裁切。
+  未做第二级折叠——再折就要收掉「取消」，而它是查询运行中的必要控制，代价高于收益。
+  规范 §8 已把 1024×640 定为窗口下限，故按「支持范围外」登记，不当作已解决。
+- 最紧配置下库名只剩约 62.5px（含图标与内边距），**只能靠省略号辨认，且目前没有 tooltip**
+  （库选择器是 `div`，用不了 `Button::tooltip`）；统一 tooltip 组件仍是 P2 缺口（同 §11.1）。
+
+**验收用例**（`ui/src/main_view/tests_layout.rs`，本轮 +6）：
+- `toolbar_collapses_secondary_actions_below_900`：宽/窄两态的平铺与折叠、判定宽 == 实测宽、
+  「更多 ▾」命中区 24~34 高且宽 ≥24、常驻项不消失；
+- `toolbar_compact_threshold_is_900`：把 `measured_workspace_w` 钉在 899.5 / 900 / 900.5，
+  **在同一次 `update` 内**读判定（中间不能重绘，否则 prepaint 会覆盖注入值）；
+- `toolbar_more_menu_executes_and_closes`：点击开菜单 → 3 项齐全 → 执行后关闭 → 再开 → 点遮罩关闭；
+- `toolbar_more_menu_is_keyboard_reachable`：Enter 开（高亮首项）→ ↓↓ 到末项 → Home → ↑ 回绕 →
+  Enter 执行并关闭 → 再开 → Esc 收起且清空高亮；
+- `toolbar_never_clips_in_supported_window_range`：见上，每配置新建 view；
+- `menu_hover_move_wraps_and_handles_empty`：纯函数口径（循环 / 首尾 / 未高亮起步 / 非导航键 / 空菜单 / 单项）。
+
+调试选择器：`workspace-toolbar` / `toolbar-more` / `toolbar-more-scrim` /
+`menu-more-preview-dml` / `menu-more-open-sql` / `menu-more-save-sql`
+（菜单项由 `render_menu` 统一加 `menu-` 前缀）。
+
+**回归记录五（ghost 悬停文字与背景同色，标签整个消失）**：P1-④ 真机视觉验收时发现，
+用例没抓到。Esc 收起「更多 ▾」后指针仍停在按钮上，标签文字被画成与卡片背景同色：
+标签区（60×32 物理像素）修复前 `m3-after-esc` 为 1917/1920 px 纯背景 `#0D1117`，
+修复后 `d1-after-esc` 恢复 114 px 字形像素；整行亮像素计数修复前 idle 6373 → 悬停 6122，
+修复后 idle / 悬停均 6373（二次 Esc 6375）。根因：gpui-component 的 ghost 悬停文字色固定取
+`accent_foreground`（button.rs hovered 分支），主题此前把它映射成 `on_accent`(#0D1117)，
+恰等于深色卡片背景；caret 走 `normal_style.fg.opacity(0.75)` 所以单独存活，
+造成「只剩箭头」的观感。「取消」「只读预览」共用同一 `.ghost() + .label()` 模式，
+属主题既有缺陷，非 P1-④ 引入。修复：`ui/src/theme.rs` 深色分支把 `accent_foreground`
+改取 `fg_primary`，浅色保留 `on_accent`（浅色悬停底是实心 accent，白字正确）。
+应用未使用 gpui-component 的 MenuItem / Toggle / Calendar 等组件，重映射无副作用。
+
+**护栏**：`theme::tests::ghost_hover_label_keeps_aa_contrast` 读回真实
+`Theme::global` 的 `accent_foreground`：深色对三种裸底与 accent@50% 复合底逐一断言
+对比度 ≥4.5，浅色对实心 accent 断言 ≥4.5。变异验证：改回旧映射用例立即失败
+（`Dark 悬停文字 #0D1117 对悬停底 #335C8B 对比度 2.74 < 4.5`）。
+教训：对比度验收必须覆盖**悬停态**文字色，只查静态态会漏掉同色缺陷。
+
+**验收用例**（+1）：`ui/src/theme.rs` 上述护栏；真机截图对照
+`.tmp/p4shots/` 的 m1 / m3（修复前）与 d1 / d2 / d5（修复后）。

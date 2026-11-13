@@ -27,6 +27,8 @@ pub const EDITOR_SPLITTER_H: f32 = 9.;
 pub const RESULT_HEIGHT_MIN: f32 = 120.;
 /// 键盘微调一档（Ctrl+Alt+↑/↓）。
 pub const EDITOR_RESIZE_STEP: f32 = 16.;
+/// 工具栏可用宽度低于该值时，次要动作折叠进「更多 ▾」（UI-设计规范 §8）。
+pub const TOOLBAR_COMPACT_W: f32 = 900.;
 
 /// 结果网格行高三档（UI-设计规范 §4），落 `layout.json`。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]

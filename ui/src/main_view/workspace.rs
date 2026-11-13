@@ -11,31 +11,46 @@ impl MainView {
         let t = current(cx);
         let has_tab = self.active().is_some();
         let tab_bar = self.render_tab_bar(cx);
+        let compact = self.toolbar_compact(window);
+        let divider = || div().w(px(1.)).h(px(16.)).mx_1().bg(hex(t.border_subtle));
 
-        let toolbar =
-            h_flex()
-                .h(px(34.))
-                .px_2()
-                .items_center()
-                .gap_1()
-                .border_b_1()
-                .border_color(hex(t.border_strong))
-                .child(
+        let mut toolbar = h_flex()
+            .id("workspace-toolbar")
+            .debug_selector(|| "workspace-toolbar".to_string())
+            .h(px(34.))
+            .px_2()
+            .items_center()
+            .gap_1()
+            .min_w_0()
+            .border_b_1()
+            .border_color(hex(t.border_strong))
+            .child(
+                div().debug_selector(|| "run-query".to_string()).child(
                     Button::new("run-query")
                         .small()
                         .primary()
                         .icon(IconName::Play)
                         .label("执行")
                         .on_click(cx.listener(|view, _, window, cx| view.run(window, cx))),
-                )
-                .child(
+                ),
+            )
+            .child(
+                div().debug_selector(|| "cancel-query".to_string()).child(
                     Button::new("cancel-query")
                         .small()
                         .ghost()
                         .icon(IconName::Square)
                         .label("取消")
                         .on_click(cx.listener(|view, _, _, cx| view.cancel(cx))),
-                )
+                ),
+            );
+
+        // P1-④：工具栏窄于 900px 时把文件类次要动作收进「更多 ▾」，而不是让它们
+        // 被裁掉。执行 / 取消 / 库 / 事务 / 诊断 / 导出是查询主环路与状态指示，保持常驻。
+        if compact {
+            toolbar = toolbar.child(self.render_toolbar_more(cx));
+        } else {
+            toolbar = toolbar
                 .child(
                     div().debug_selector(|| "preview-dml".to_string()).child(
                         Button::new("preview-dml-btn")
@@ -47,7 +62,7 @@ impl MainView {
                             .on_click(cx.listener(|view, _, _, cx| view.preview_dml(cx))),
                     ),
                 )
-                .child(div().w(px(1.)).h(px(16.)).mx_1().bg(hex(t.border_subtle)))
+                .child(divider())
                 .child(
                     div().debug_selector(|| "open-sql".to_string()).child(
                         Button::new("open-sql-btn")
@@ -71,66 +86,66 @@ impl MainView {
                                 view.save_sql_file(false, window, cx)
                             })),
                     ),
+                );
+        }
+
+        // 折叠态去掉两条装饰性分隔线（规范 §2.3：不承载结构信息），省下 26px；
+        // 余量由库选择器省略号吸收，保证定宽按钮永远不被挤出卡片。
+        let toolbar = toolbar
+            .when(!compact, |row| row.child(divider()))
+            .child(self.render_db_picker(cx))
+            .when(!compact, |row| row.child(divider()))
+            .child(self.render_tx_controls(cx))
+            .when_some(self.diagnostic_badge(), |row, (label, tip)| {
+                row.child(
+                    div().debug_selector(|| "diag-badge".to_string()).child(
+                        Button::new("diag-badge-btn")
+                            .small()
+                            .ghost()
+                            .label(SharedString::from(label))
+                            .tooltip(tip)
+                            .on_click(
+                                cx.listener(|view, _, window, cx| view.jump_to_issue(window, cx)),
+                            ),
+                    ),
                 )
-                .child(div().w(px(1.)).h(px(16.)).mx_1().bg(hex(t.border_subtle)))
-                .child(self.render_db_picker(cx))
-                .child(div().w(px(1.)).h(px(16.)).mx_1().bg(hex(t.border_subtle)))
-                .child(self.render_tx_controls(cx))
-                .when_some(self.diagnostic_badge(), |row, (label, tip)| {
-                    row.child(
-                        div().debug_selector(|| "diag-badge".to_string()).child(
-                            Button::new("diag-badge-btn")
-                                .small()
+            })
+            .child(div().flex_1())
+            .child(
+                div()
+                    .debug_selector(|| "export-slot".to_string())
+                    .flex()
+                    .items_center()
+                    .gap(px(2.))
+                    .child(
+                        Button::new("export-csv")
+                            .small()
+                            .ghost()
+                            .label("导出")
+                            .tooltip("导出 CSV")
+                            .on_click(cx.listener(|view, _, _, cx| view.export_csv(cx))),
+                    )
+                    // P1-③：纯图标触发器换成 Button —— 统一的 Idle / Hover /
+                    // Focus / Open 四态，Tab 可停留、Enter / Space 可开，
+                    // tooltip 说明可导出的格式，不再是自己拼的 hover 样式。
+                    .child(
+                        div().debug_selector(|| "export-format".to_string()).child(
+                            Button::new("export-format-btn")
+                                // 22.5px（Size::Small）低于 WCAG 2.2 SC 2.5.8 的
+                                // 24×24 最小目标，而 28px 又会比旁边的「导出」
+                                // 高出一截；24 是既合规又与工具栏齐平的取值。
+                                .with_size(px(24.))
                                 .ghost()
-                                .label(SharedString::from(label))
-                                .tooltip(tip)
-                                .on_click(cx.listener(|view, _, window, cx| {
-                                    view.jump_to_issue(window, cx)
+                                .icon(IconName::ChevronDown)
+                                .tooltip("更多导出格式：CSV / TSV / JSON / Markdown / Excel / SQL")
+                                .open(self.export_menu.is_some())
+                                .track_focus(&self.export_focus)
+                                .on_click(cx.listener(|view, event, window, cx| {
+                                    view.on_export_trigger(event, window, cx)
                                 })),
                         ),
-                    )
-                })
-                .child(div().flex_1())
-                .child(
-                    div()
-                        .debug_selector(|| "export-slot".to_string())
-                        .flex()
-                        .items_center()
-                        .gap(px(2.))
-                        .child(
-                            Button::new("export-csv")
-                                .small()
-                                .ghost()
-                                .label("导出")
-                                .tooltip("导出 CSV")
-                                .on_click(cx.listener(|view, _, _, cx| view.export_csv(cx))),
-                        )
-                        .child(
-                            div()
-                                .id("export-format")
-                                .debug_selector(|| "export-format".to_string())
-                                .h(px(28.))
-                                .w(px(28.))
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .rounded(px(6.))
-                                .cursor_pointer()
-                                .hover(|s| s.bg(hex(t.bg_overlay)))
-                                .on_mouse_down(
-                                    gpui::MouseButton::Left,
-                                    cx.listener(|view, event: &gpui::MouseDownEvent, _, cx| {
-                                        view.export_menu = Some(event.position);
-                                        cx.notify();
-                                    }),
-                                )
-                                .child(
-                                    Icon::new(IconName::ChevronDown)
-                                        .small()
-                                        .text_color(hex(t.fg_secondary)),
-                                ),
-                        ),
-                );
+                    ),
+            );
 
         let import_panel = self.render_import_panel(cx);
         let available_h = self.available_workspace_height(window);
@@ -211,11 +226,20 @@ impl MainView {
             )
         };
 
+        let measure = cx.entity();
         v_flex()
             .size_full()
             .min_h_0()
             .min_w_0()
             .overflow_hidden()
+            // 工具栏折叠判定用实测宽度：这一层是 size_full，宽度由卡片决定，
+            // 不随工具栏内容变化，所以量它不会和折叠状态互相振荡。
+            .on_prepaint(move |bounds, window, cx| {
+                let width = f32::from(bounds.size.width);
+                measure.update(cx, |view, cx| {
+                    view.observe_workspace_width(width, window, cx)
+                });
+            })
             .child(tab_bar)
             .child(toolbar)
             .when_some(import_panel, |layout, panel| layout.child(panel))
@@ -237,6 +261,209 @@ impl MainView {
             available -= IMPORT_PANEL_H;
         }
         available.max(0.)
+    }
+
+    /// 外壳三列的可见性，render 与工具栏宽度估算共用一个口径：
+    /// 窄窗时侧栏自动让位，但不改用户自己的折叠开关。
+    pub(crate) fn shell_visibility(&self, viewport_w: f32) -> (bool, bool) {
+        let narrow = viewport_w < rustdb_core::NARROW_WINDOW;
+        (
+            !self.layout.sidebar_collapsed && !narrow,
+            self.layout.ai_open,
+        )
+    }
+
+    /// 工具栏可用宽度。优先用上一帧实测的工作区内容宽（父容器决定，不受折叠影响，
+    /// 因此不会和折叠状态互相振荡）；首帧还没量过时退回视口估算。
+    pub(crate) fn toolbar_width(&self, window: &Window) -> f32 {
+        if let Some(width) = self.measured_workspace_w {
+            return width;
+        }
+        self.estimated_toolbar_width(window)
+    }
+
+    /// 视口估算：扣掉竖栏、定宽面板、卡片留白与边框。只在首帧兜底——
+    /// 窗口缩放后定宽面板会被 flex 压缩且不回写 `layout`，估算会偏小。
+    pub(crate) fn estimated_toolbar_width(&self, window: &Window) -> f32 {
+        let viewport_w = f32::from(window.viewport_size().width);
+        if viewport_w <= 0. {
+            return 0.;
+        }
+        let (sidebar_visible, ai_visible) = self.shell_visibility(viewport_w);
+        let mut width = viewport_w - RAIL_W;
+        if sidebar_visible {
+            width -= self.layout.sidebar_width(self.panel.key());
+        }
+        if ai_visible {
+            width -= self.layout.clamped_ai_width();
+        }
+        // 工作区卡片左右留白：独占时两侧各 CARD_GAP，每多一个邻居就少半个。
+        let neighbours = usize::from(sidebar_visible) + usize::from(ai_visible);
+        width -= CARD_GAP * 2. - CARD_GAP * 0.5 * neighbours as f32;
+        width -= 2.; // card_shell 的 border_1
+        width.max(0.)
+    }
+
+    /// prepaint 回调：记录实测宽度。只在折叠判定真的翻转时补一帧，避免逐帧重绘。
+    /// `before` 取上一帧真正用过的判定——首帧用的是视口估算，不是实测值。
+    pub(crate) fn observe_workspace_width(
+        &mut self,
+        width: f32,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self
+            .measured_workspace_w
+            .is_some_and(|last| (last - width).abs() < 0.5)
+        {
+            return;
+        }
+        let before = self.toolbar_compact(window);
+        self.measured_workspace_w = Some(width);
+        if self.toolbar_compact(window) != before {
+            cx.notify();
+        }
+    }
+
+    /// P1-④：是否折叠次要动作（规范 §8：工具栏 < 900px）。
+    pub(crate) fn toolbar_compact(&self, window: &Window) -> bool {
+        self.toolbar_width(window) < rustdb_core::TOOLBAR_COMPACT_W
+    }
+
+    /// P1-④：「更多 ▾」触发器。四态与命中区口径与导出触发器一致（24px 下限）。
+    pub(crate) fn render_toolbar_more(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        div().debug_selector(|| "toolbar-more".to_string()).child(
+            Button::new("toolbar-more-btn")
+                // 带 label 的 Button 里 `with_size` 只改内边距、不改高度（高度由内容决定，
+                // 实测 18.5px）。这里显式抬到 24px 以满足 WCAG 2.2 SC 2.5.8。
+                .small()
+                .h(px(24.))
+                .ghost()
+                .label("更多")
+                .dropdown_caret(true)
+                .tooltip("更多操作：只读预览 / 打开文件 / 保存 SQL")
+                .open(self.toolbar_menu.is_some())
+                .track_focus(&self.toolbar_focus)
+                .on_click(cx.listener(|view, event, window, cx| {
+                    view.on_toolbar_trigger(event, window, cx)
+                })),
+        )
+    }
+
+    /// 折叠进「更多 ▾」的动作清单。顺序与工具栏展开态一致。
+    pub(crate) fn toolbar_menu_groups(&self) -> Vec<Vec<MenuEntry>> {
+        vec![vec![
+            MenuEntry::new(MenuAction::PreviewDml, "只读预览", IconName::Eye)
+                .key("more-preview-dml")
+                .hint("改写为 SELECT"),
+            MenuEntry::new(MenuAction::OpenSqlFile, "打开文件", IconName::FolderOpen)
+                .key("more-open-sql")
+                .hint("Ctrl+O"),
+            MenuEntry::new(MenuAction::SaveSqlFile, "保存 SQL", IconName::Save)
+                .key("more-save-sql")
+                .hint("Ctrl+S"),
+        ]]
+    }
+
+    /// 动作清单按分组展平 —— 与 `render_toolbar_menu` 的高亮序号同口径。
+    pub(crate) fn toolbar_menu_actions(&self) -> Vec<MenuAction> {
+        self.toolbar_menu_groups()
+            .into_iter()
+            .flatten()
+            .map(|entry| entry.action)
+            .collect()
+    }
+
+    pub(crate) fn render_toolbar_menu(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let hover = self.toolbar_hover;
+        let mut index = 0usize;
+        let groups = self
+            .toolbar_menu_groups()
+            .into_iter()
+            .map(|group| {
+                group
+                    .into_iter()
+                    .map(|mut entry| {
+                        entry.highlight = hover == Some(index);
+                        index += 1;
+                        entry
+                    })
+                    .collect()
+            })
+            .collect();
+        self.render_menu(groups, cx)
+    }
+
+    /// 鼠标点击「更多 ▾」：打开菜单并接管焦点（Button 在 mouse down 时不抢焦点）。
+    pub(crate) fn on_toolbar_trigger(
+        &mut self,
+        event: &gpui::ClickEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if matches!(event, gpui::ClickEvent::Keyboard(_)) {
+            return;
+        }
+        self.toolbar_menu = Some(event.position());
+        self.toolbar_hover = Some(0);
+        window.focus(&self.toolbar_focus, cx);
+        cx.notify();
+    }
+
+    /// 「更多 ▾」的键盘闭环，与导出菜单同口径：走全局观察者，不用元素级按键。
+    pub(crate) fn toolbar_menu_handle_key(
+        &mut self,
+        keystroke: &gpui::Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let on_trigger = window
+            .focused(&**cx)
+            .is_some_and(|handle| handle == self.toolbar_focus);
+
+        if self.toolbar_menu.is_none() {
+            if !on_trigger || !matches!(keystroke.key.as_str(), "enter" | "space" | "down") {
+                return;
+            }
+            // 键盘没有指针坐标：锚到触发器所在的工具栏左段正下方。
+            self.toolbar_menu = Some(self.toolbar_more_anchor(window));
+            self.toolbar_hover = Some(0);
+            cx.notify();
+            return;
+        }
+
+        let total = self.toolbar_menu_actions().len();
+        if let Some(next) = menu_hover_move(keystroke.key.as_str(), self.toolbar_hover, total) {
+            self.toolbar_hover = Some(next);
+            cx.notify();
+            return;
+        }
+        if matches!(keystroke.key.as_str(), "enter" | "space") {
+            self.commit_toolbar_hover(window, cx);
+        }
+    }
+
+    /// 键盘打开时的菜单锚点：工具栏内容区左缘、工具栏正下方。
+    /// 不估算「执行 / 取消」的实测宽度——菜单 204px 宽，从左缘展开必然覆盖触发器。
+    pub(crate) fn toolbar_more_anchor(&self, window: &Window) -> gpui::Point<gpui::Pixels> {
+        let viewport_w = f32::from(window.viewport_size().width);
+        let (sidebar_visible, _) = self.shell_visibility(viewport_w);
+        let mut x = RAIL_W + CARD_GAP + 1. + 8.;
+        if sidebar_visible {
+            x += self.layout.sidebar_width(self.panel.key()) - CARD_GAP * 0.5;
+        }
+        gpui::point(px(x), px(TOOLBAR_BOTTOM_Y))
+    }
+
+    /// 执行当前高亮的折叠动作。
+    pub(crate) fn commit_toolbar_hover(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(index) = self.toolbar_hover else {
+            return;
+        };
+        let Some(action) = self.toolbar_menu_actions().into_iter().nth(index) else {
+            return;
+        };
+        self.dispatch_menu(action, window, cx);
     }
 
     /// 编辑器 / 结果区分隔条：静置 1px 结构线；hover 给 9px 命中带淡底；
@@ -469,11 +696,14 @@ impl MainView {
             .map(ns_label)
             .unwrap_or_else(|| "选择库".into());
         let enabled = !self.namespaces.is_empty();
-        div().relative().child(
+        // 库选择器是工具栏里唯一可压缩的项：空间不足时靠标签省略号让位，
+        // 而不是把右侧定宽的导出按钮挤出卡片（规范 §7 / §8「禁止溢出裁切」）。
+        div().relative().min_w_0().child(
             h_flex()
                 .id("db-picker")
                 .debug_selector(|| "db-picker".to_string())
                 .h(px(22.))
+                .min_w_0()
                 .px_2()
                 .gap_1()
                 .rounded(px(5.))
@@ -497,11 +727,14 @@ impl MainView {
                 .child(
                     Icon::new(IconName::Database)
                         .small()
+                        .flex_none()
                         .text_color(hex(if enabled { t.accent } else { t.fg_muted })),
                 )
                 .child(
                     div()
                         .max_w(px(150.))
+                        .min_w_0()
+                        .flex_shrink_1()
                         .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(if enabled { t.fg_primary } else { t.fg_muted }))
                         .text_ellipsis()
@@ -510,6 +743,7 @@ impl MainView {
                 .child(
                     Icon::new(IconName::ChevronDown)
                         .small()
+                        .flex_none()
                         .text_color(hex(t.fg_muted)),
                 ),
         )
@@ -604,6 +838,7 @@ impl MainView {
                 let hint = entry.hint.clone();
                 let danger = entry.danger;
                 let icon = entry.icon;
+                let hot = entry.highlight;
                 let action = entry.action.clone();
                 let selector = if entry.key.is_empty() {
                     format!("menu-{label}")
@@ -624,6 +859,9 @@ impl MainView {
                         .rounded(px(4.))
                         .cursor_pointer()
                         .hover(|s| s.bg(hex(t.bg_overlay)))
+                        // 键盘高亮与 hover 同底色：焦点在菜单上时高亮项就是
+                        // 「按 Enter 会执行的项」，视觉上要和 hover 一致。
+                        .when(hot, |s| s.bg(hex(t.bg_overlay)))
                         .on_click(cx.listener(move |view, _, window, cx| {
                             view.dispatch_menu(action.clone(), window, cx);
                         }))
@@ -1183,6 +1421,87 @@ impl MainView {
         cx.notify();
     }
 
+    /// P1-③：鼠标点击导出触发器 —— 打开菜单并接管焦点。
+    ///
+    /// 键盘激活（Enter / Space）不走这里，统一交给 `export_menu_handle_key`；
+    /// 两条链路分开，避免一次 Enter 被两边各 toggle 一次。
+    pub(crate) fn on_export_trigger(
+        &mut self,
+        event: &gpui::ClickEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if matches!(event, gpui::ClickEvent::Keyboard(_)) {
+            return;
+        }
+        self.export_menu = Some(event.position());
+        self.export_hover = Some(0);
+        // 组件在 mouse down 时刻意 `prevent_default`（不抢焦点），所以这里
+        // 主动把焦点交给触发器，键盘接着操作时才有落点。
+        window.focus(&self.export_focus, cx);
+        cx.notify();
+    }
+
+    /// P1-③：导出菜单的键盘闭环 —— Enter / Space 打开，↑ / ↓ 移高亮，
+    /// Home / End 跳首尾，Enter / Space 执行，Esc 由 `handle_escape` 收起。
+    ///
+    /// 由全局按键观察者调用，不用元素级 `on_key_down`：触发器嵌在
+    /// `h_resizable` 面板里，元素级按键依赖渲染帧的焦点节点映射，鼠标点开
+    /// 菜单时这条映射并不存在，方向键会静默丢失（实测回归）。
+    pub(crate) fn export_menu_handle_key(
+        &mut self,
+        keystroke: &gpui::Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // 只在触发器持有焦点时响应「打开」，避免抢走编辑器的 Enter。
+        let on_trigger = window
+            .focused(&**cx)
+            .is_some_and(|handle| handle == self.export_focus);
+
+        if self.export_menu.is_none() {
+            if !on_trigger || !matches!(keystroke.key.as_str(), "enter" | "space" | "down") {
+                return;
+            }
+            // 键盘没有指针坐标：锚到右上角、工具栏正下方，与触发按钮同片区域。
+            let width = f32::from(window.viewport_size().width);
+            self.export_menu = Some(gpui::point(px(width - 24.), px(WORKSPACE_CHROME_H)));
+            self.export_hover = Some(0);
+            cx.notify();
+            return;
+        }
+
+        let total = self.export_menu_actions().len();
+        if let Some(next) = menu_hover_move(keystroke.key.as_str(), self.export_hover, total) {
+            self.export_hover = Some(next);
+            cx.notify();
+            return;
+        }
+        if matches!(keystroke.key.as_str(), "enter" | "space") {
+            self.commit_export_hover(window, cx);
+        }
+    }
+
+    /// 导出菜单的动作清单，按分组展平 —— 与 `render_export_menu` 的序号同口径。
+    pub(crate) fn export_menu_actions(&self) -> Vec<MenuAction> {
+        self.export_menu_groups()
+            .into_iter()
+            .flatten()
+            .map(|entry| entry.action)
+            .collect()
+    }
+
+    /// 执行当前高亮的导出格式。
+    pub(crate) fn commit_export_hover(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(index) = self.export_hover else {
+            return;
+        };
+        let Some(action) = self.export_menu_actions().into_iter().nth(index) else {
+            return;
+        };
+        self.dispatch_menu(action, window, cx);
+    }
+
     /// 菜单动作的唯一出口。
     pub(crate) fn dispatch_menu(
         &mut self,
@@ -1195,6 +1514,9 @@ impl MainView {
         self.ns_menu = None;
         self.conn_menu = None;
         self.export_menu = None;
+        self.export_hover = None;
+        self.toolbar_menu = None;
+        self.toolbar_hover = None;
         self.row_menu = None;
         match action {
             MenuAction::Connect(profile_id) => {
@@ -1394,6 +1716,15 @@ impl MainView {
             }
             MenuAction::RevertRow => {
                 self.revert_selected_row(cx);
+            }
+            MenuAction::PreviewDml => {
+                self.preview_dml(cx);
+            }
+            MenuAction::OpenSqlFile => {
+                self.open_sql_file(window, cx);
+            }
+            MenuAction::SaveSqlFile => {
+                self.save_sql_file(false, window, cx);
             }
             MenuAction::Truncate(path) => {
                 self.ask_danger(DangerAction::Truncate { path }, cx);
@@ -1617,6 +1948,20 @@ impl MainView {
         // F-73：批量更新面板（预览 / 输入随关闭丢弃）。
         if self.bulk.is_some() {
             self.bulk = None;
+            cx.notify();
+            return;
+        }
+        // P1-③：导出格式菜单也是浮层，Esc 直接收起，不必去点遮罩。
+        if self.export_menu.is_some() {
+            self.export_menu = None;
+            self.export_hover = None;
+            cx.notify();
+            return;
+        }
+        // P1-④：工具栏「更多 ▾」同上。
+        if self.toolbar_menu.is_some() {
+            self.toolbar_menu = None;
+            self.toolbar_hover = None;
             cx.notify();
             return;
         }

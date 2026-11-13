@@ -78,9 +78,7 @@ impl Render for MainView {
         // 与 RustShell 同口径：窗口窄于 1024 时侧栏自动让位，但不改用户自己的折叠开关，
         // 窗口拉宽后按原样回来。
         let viewport_w = f32::from(window.viewport_size().width);
-        let narrow = viewport_w < rustdb_core::NARROW_WINDOW;
-        let sidebar_visible = !self.layout.sidebar_collapsed && !narrow;
-        let ai_visible = self.layout.ai_open;
+        let (sidebar_visible, ai_visible) = self.shell_visibility(viewport_w);
         let sidebar_w = self.layout.sidebar_width(self.panel.key());
         let ai_w = self.layout.clamped_ai_width();
 
@@ -314,6 +312,28 @@ impl Render for MainView {
                         anchored()
                             .position(at)
                             .offset(gpui::point(px(-190.), px(6.)))
+                            .child(menu),
+                    )
+            })
+            .when_some(self.toolbar_menu, |layout, at| {
+                let menu = self.render_toolbar_menu(cx);
+                layout
+                    .child(
+                        div()
+                            .id("toolbar-more-scrim")
+                            .debug_selector(|| "toolbar-more-scrim".to_string())
+                            .absolute()
+                            .inset_0()
+                            .on_click(cx.listener(|view, _, _, cx| {
+                                view.toolbar_menu = None;
+                                view.toolbar_hover = None;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        anchored()
+                            .position(at)
+                            .offset(gpui::point(px(0.), px(6.)))
                             .child(menu),
                     )
             })
