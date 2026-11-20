@@ -2,7 +2,7 @@
 use super::*;
 impl MainView {
     /// F-94：模型配置浮层（预设 / 列表 / 表单 / 测试 / 发现 / 导出）。
-    pub(crate) fn render_ai_model_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_ai_model_panel(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.ai_model_panel.as_ref() else {
             return div().into_any_element();
@@ -306,7 +306,7 @@ impl MainView {
                     .child(
                         div()
                             .text_size(px(crate::design::TS_CAPTION))
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .child("AI 模型"),
                     )
                     .child(div().flex_1())

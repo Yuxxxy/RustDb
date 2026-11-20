@@ -115,7 +115,7 @@ impl MainView {
             .child(
                 div()
                     .text_size(px(crate::design::TS_BODY))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child(self.panel.label()),
             )
@@ -150,7 +150,7 @@ impl MainView {
                     ),
             );
 
-        let body: gpui::AnyElement = match self.panel {
+        let body: gpui_kit::AnyElement = match self.panel {
             PanelKind::Dashboard => self.render_dashboard(cx).into_any_element(),
             PanelKind::Connections => self.render_connections(window, cx).into_any_element(),
             PanelKind::Files => self.render_files(window, cx).into_any_element(),
@@ -219,7 +219,7 @@ impl MainView {
         // 对象面板并入连接树后，搜索框随树一起出现。
         if self.object_input.is_none() {
             let input = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx).placeholder("搜索对象")
+                gpui_kit::component::input::InputState::new(window, cx).placeholder("搜索对象")
             });
             cx.subscribe(&input, |view, _, event: &InputEvent, cx| {
                 if let InputEvent::Change = event {
@@ -250,7 +250,7 @@ impl MainView {
                     div()
                         .px_1()
                         .pb_1()
-                        .child(gpui_component::input::Input::new(input).small()),
+                        .child(gpui_kit::component::input::Input::new(input).small()),
                 );
             }
         }
@@ -355,8 +355,8 @@ impl MainView {
                             view.connect(click_id.clone(), cx);
                         }))
                         .on_mouse_down(
-                            gpui::MouseButton::Right,
-                            cx.listener(move |view, event: &gpui::MouseDownEvent, _, cx| {
+                            gpui_kit::MouseButton::Right,
+                            cx.listener(move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
                                 view.conn_menu =
                                     Some((menu_id.clone(), menu_name.clone(), event.position));
                                 cx.notify();
@@ -396,7 +396,7 @@ impl MainView {
                                     .rounded(px(3.))
                                     .bg(hex(t.danger))
                                     .text_size(px(crate::design::TS_CAPTION))
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                                     .text_color(hex(t.on_danger_resolved))
                                     .child("生产"),
                             )
@@ -468,10 +468,10 @@ impl MainView {
                             .hover(|s| s.bg(hex(t.bg_overlay)))
                             // 单击展开 / 收起；双击打开 SQL 标签页。
                             .on_click(cx.listener(
-                                move |view, event: &gpui::ClickEvent, window, cx| {
+                                move |view, event: &gpui_kit::ClickEvent, window, cx| {
                                     let double = matches!(
                                         event,
-                                        gpui::ClickEvent::Mouse(mouse) if mouse.down.click_count >= 2
+                                        gpui_kit::ClickEvent::Mouse(mouse) if mouse.down.click_count >= 2
                                     );
                                     if double {
                                         view.open_tab(open_ns.clone(), window, cx);
@@ -481,9 +481,9 @@ impl MainView {
                                 },
                             ))
                             .on_mouse_down(
-                                gpui::MouseButton::Right,
+                                gpui_kit::MouseButton::Right,
                                 cx.listener(
-                                    move |view, event: &gpui::MouseDownEvent, _, cx| {
+                                    move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
                                         view.ns_menu = Some(NamespaceMenu {
                                             ns: row_key_ns.clone(),
                                             at: event.position,
@@ -748,7 +748,7 @@ impl MainView {
         // 搜索框按需创建一次。
         if self.history_input.is_none() {
             let input = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx).placeholder("搜索 SQL")
+                gpui_kit::component::input::InputState::new(window, cx).placeholder("搜索 SQL")
             });
             cx.subscribe(&input, |view, _, event: &InputEvent, cx| {
                 if let InputEvent::Change = event {
@@ -895,7 +895,7 @@ impl MainView {
                     .border_color(hex(if active { t.accent } else { t.border_subtle }))
                     .cursor_pointer()
                     .hover(|s| s.bg(hex(t.bg_overlay)))
-                    .on_click(cx.listener(move |view, event: &gpui::ClickEvent, _, cx| {
+                    .on_click(cx.listener(move |view, event: &gpui_kit::ClickEvent, _, cx| {
                         view.history_menu = Some((event.position(), menu));
                         cx.notify();
                     }))
@@ -915,7 +915,7 @@ impl MainView {
 
         v_flex()
             .size_full()
-            .child(div().p_2().child(gpui_component::input::Input::new(
+            .child(div().p_2().child(gpui_kit::component::input::Input::new(
                 self.history_input.as_ref().expect("搜索框已创建"),
             )))
             .child(filters)
@@ -936,7 +936,7 @@ impl MainView {
         &mut self,
         kind: HistoryMenu,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let mut col = v_flex()
             .w(px(148.))
@@ -1047,7 +1047,7 @@ impl MainView {
         pinned: bool,
         id_prefix: &str,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let path = object.path.clone();
         let name = path.name.to_string();
@@ -1073,8 +1073,8 @@ impl MainView {
             .rounded(px(5.))
             .hover(|s| s.bg(hex(t.bg_overlay)))
             .on_mouse_down(
-                gpui::MouseButton::Right,
-                cx.listener(move |view, event: &gpui::MouseDownEvent, _, cx| {
+                gpui_kit::MouseButton::Right,
+                cx.listener(move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
                     view.obj_menu = Some(ObjectMenu {
                         path: menu_path.clone(),
                         at: event.position,
@@ -1208,7 +1208,7 @@ impl MainView {
         depth: usize,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::Div {
+    ) -> gpui_kit::Div {
         let t = current(cx);
         let mut rows = v_flex().gap(px(1.)).w_full();
         for (path, is_dir) in sql_dir_entries(dir) {
@@ -1259,7 +1259,7 @@ impl MainView {
             if is_dir {
                 let toggle = path.clone();
                 row = row.on_mouse_down(
-                    gpui::MouseButton::Left,
+                    gpui_kit::MouseButton::Left,
                     cx.listener(move |view, _, _, cx| {
                         if !view.file_expanded.remove(&toggle) {
                             view.file_expanded.insert(toggle.clone());
@@ -1270,7 +1270,7 @@ impl MainView {
             } else {
                 let open = path.clone();
                 row = row.on_mouse_down(
-                    gpui::MouseButton::Left,
+                    gpui_kit::MouseButton::Left,
                     cx.listener(move |view, _, window, cx| {
                         view.open_file_path(open.clone(), window, cx);
                     }),
@@ -1333,7 +1333,7 @@ impl MainView {
     pub(crate) fn render_params_panel(
         &mut self,
         cx: &mut Context<Self>,
-    ) -> Option<gpui::AnyElement> {
+    ) -> Option<gpui_kit::AnyElement> {
         let t = current(cx);
         let panel = self.params_panel.as_ref()?;
         let slots = panel.slots.clone();

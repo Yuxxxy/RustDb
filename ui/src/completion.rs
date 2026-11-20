@@ -4,9 +4,9 @@
 //! 数据源由 `MainView` 在元数据加载后写入 `CompletionCatalog`，
 //! provider 通过共享 cell 读取，避免每次按键重建闭包。
 
-use gpui::{App, Task, Window};
-use gpui_component::input::CompletionProvider;
-use gpui_component::RopeExt as _;
+use gpui_kit::{App, Task, Window};
+use gpui_kit::component::input::CompletionProvider;
+use gpui_kit::component::RopeExt as _;
 use lsp_types::{CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse};
 use ropey::Rope;
 use rustdb_db_api::ObjectKind;

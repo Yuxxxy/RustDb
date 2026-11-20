@@ -1,7 +1,7 @@
 //! 将 core 的 Token 写入 gpui-component 的全局 Theme。
 
-use gpui::{px, rgb, App, Hsla};
-use gpui_component::theme::{
+use gpui_kit::{px, rgb, App, Hsla};
+use gpui_kit::component::theme::{
     Theme, ThemeMode as ComponentThemeMode, ThemeTokens as ComponentThemeTokens,
 };
 use rustdb_core::theme::{ThemeMode, ThemeTokens};
@@ -12,7 +12,7 @@ pub fn to_hsla(hex: u32) -> Hsla {
 
 pub struct CurrentTheme(pub ThemeTokens, pub bool);
 
-impl gpui::Global for CurrentTheme {}
+impl gpui_kit::Global for CurrentTheme {}
 
 pub fn current(cx: &App) -> ThemeTokens {
     cx.try_global::<CurrentTheme>()
@@ -27,7 +27,7 @@ pub fn is_dark(cx: &App) -> bool {
 pub fn apply_theme_mode(cx: &mut App, mode: ThemeMode) {
     let system_dark = matches!(
         cx.window_appearance(),
-        gpui::WindowAppearance::Dark | gpui::WindowAppearance::VibrantDark
+        gpui_kit::WindowAppearance::Dark | gpui_kit::WindowAppearance::VibrantDark
     );
     let t = ThemeTokens::resolved(mode, system_dark);
     let dark = t.bg_base == ThemeTokens::dark().bg_base;
@@ -147,7 +147,7 @@ mod tests {
     use super::*;
 
     fn hex(color: Hsla) -> u32 {
-        let rgba = gpui::Rgba::from(color);
+        let rgba = gpui_kit::Rgba::from(color);
         let byte = |v: f32| (v * 255.).round() as u32;
         (byte(rgba.r) << 16) | (byte(rgba.g) << 8) | byte(rgba.b)
     }
@@ -182,9 +182,9 @@ mod tests {
     /// 护栏：gpui-component 的 ghost 悬停文字色固定取 `accent_foreground`，悬停底色深色为
     /// accent@50%、浅色为实心 accent（button.rs hovered 分支）。深色若映射成 `on_accent`
     /// 就与卡片背景同色，悬停时按钮文字整个消失（P1-④ 实测标签区 1917/1920 px 纯背景）。
-    #[gpui::test]
-    fn ghost_hover_label_keeps_aa_contrast(cx: &mut gpui::TestAppContext) {
-        cx.update(|cx| gpui_component::init(cx));
+    #[gpui_kit::test]
+    fn ghost_hover_label_keeps_aa_contrast(cx: &mut gpui_kit::TestAppContext) {
+        cx.update(|cx| gpui_kit::component::init(cx));
         for mode in [ThemeMode::Dark, ThemeMode::Light] {
             cx.update(|cx| apply_theme_mode(cx, mode));
             let (t, dark, fg) = cx.update(|cx| {

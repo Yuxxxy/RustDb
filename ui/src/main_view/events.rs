@@ -786,7 +786,7 @@ impl MainView {
                     {
                         self.obj_menu = Some(ObjectMenu {
                             path: object.path.clone(),
-                            at: gpui::point(px(150.), px(300.)),
+                            at: gpui_kit::point(px(150.), px(300.)),
                         });
                     }
                 }

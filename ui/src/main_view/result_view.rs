@@ -3,7 +3,7 @@
 use super::*;
 
 impl MainView {
-    pub(crate) fn render_result_body(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_result_body(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let preview_note = self.preview_note.clone();
         let has_many = self
@@ -139,7 +139,7 @@ impl MainView {
                         .flex_1()
                         .min_w_0()
                         .text_size(px(crate::design::TS_CAPTION))
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                         .text_color(hex(if is_new_value { t.accent } else { t.fg_primary }))
                         .text_ellipsis()
                         .child(
@@ -192,7 +192,7 @@ impl MainView {
                         .border_color(hex(t.border_subtle))
                         .hover(|s| s.bg(hex(t.bg_overlay)))
                         .on_click(
-                            cx.listener(move |view, event: &gpui::ClickEvent, window, cx| {
+                            cx.listener(move |view, event: &gpui_kit::ClickEvent, window, cx| {
                                 cx.stop_propagation();
                                 view.open_filter(index, event.position(), window, cx);
                             }),
@@ -214,13 +214,13 @@ impl MainView {
                         .h_full()
                         .flex()
                         .justify_end()
-                        .cursor(gpui::CursorStyle::ResizeLeftRight)
+                        .cursor(gpui_kit::CursorStyle::ResizeLeftRight)
                         .border_b_1()
                         .border_color(hex(t.border_subtle))
                         .hover(|s| s.bg(hex(t.bg_overlay)))
                         .on_mouse_down(
-                            gpui::MouseButton::Left,
-                            cx.listener(move |view, event: &gpui::MouseDownEvent, window, cx| {
+                            gpui_kit::MouseButton::Left,
+                            cx.listener(move |view, event: &gpui_kit::MouseDownEvent, window, cx| {
                                 // 双击分隔线自适应列宽，单击进入拖拽。
                                 if event.click_count >= 2 {
                                     view.fit_column(index, window, cx);
@@ -231,7 +231,7 @@ impl MainView {
                         )
                         // 拖出网格再松手时，靠这个收尾。
                         .on_mouse_up_out(
-                            gpui::MouseButton::Left,
+                            gpui_kit::MouseButton::Left,
                             cx.listener(|view, _, _, cx| view.end_col_resize(cx)),
                         )
                         .child(div().w(px(1.)).h_full().bg(hex(t.border_subtle))),
@@ -332,8 +332,8 @@ impl MainView {
                             })
                             // 按下开始拖拽选区；Shift 点击在 click 里扩选，避免覆盖锚点。
                             .on_mouse_down(
-                                gpui::MouseButton::Left,
-                                cx.listener(move |view, event: &gpui::MouseDownEvent, _, cx| {
+                                gpui_kit::MouseButton::Left,
+                                cx.listener(move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
                                     view.begin_grid_drag(row_index, col, event, cx);
                                 }),
                             )
@@ -342,13 +342,13 @@ impl MainView {
                             }))
                             // 单击复制；Shift 点击扩选；双击进入编辑或打开详情查看器。
                             .on_click(cx.listener(
-                                move |view, event: &gpui::ClickEvent, window, cx| {
+                                move |view, event: &gpui_kit::ClickEvent, window, cx| {
                                     if view.finish_grid_click() {
                                         cx.notify();
                                         return;
                                     }
                                     let (double, shift) = match event {
-                                        gpui::ClickEvent::Mouse(mouse) => (
+                                        gpui_kit::ClickEvent::Mouse(mouse) => (
                                             mouse.down.click_count >= 2,
                                             mouse.down.modifiers.shift,
                                         ),
@@ -698,18 +698,18 @@ impl MainView {
                     .debug_selector(|| "result-scroll".to_string())
                     .flex_1()
                     .min_h_0()
-                    .on_scroll_wheel(cx.listener(|view, event: &gpui::ScrollWheelEvent, _, cx| {
+                    .on_scroll(cx.listener(|view, event: &gpui_kit::ScrollEvent, _, cx| {
                         view.scroll_grid_h(event, cx);
                     }))
-                    .on_mouse_move(cx.listener(|view, event: &gpui::MouseMoveEvent, _, cx| {
+                    .on_mouse_move(cx.listener(|view, event: &gpui_kit::MouseMoveEvent, _, cx| {
                         view.drag_col_resize(event, cx);
                     }))
                     .on_mouse_up(
-                        gpui::MouseButton::Left,
+                        gpui_kit::MouseButton::Left,
                         cx.listener(|view, _, _, cx| view.end_col_resize(cx)),
                     )
                     .on_mouse_up_out(
-                        gpui::MouseButton::Left,
+                        gpui_kit::MouseButton::Left,
                         cx.listener(|view, _, _, cx| view.end_col_resize(cx)),
                     )
                     // 表头：裁剪 + 横向位移，竖向始终贴在顶部。

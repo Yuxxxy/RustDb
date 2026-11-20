@@ -4,8 +4,8 @@ use super::tests_helpers::*;
 use super::*;
 
 /// 导入面板渲染选项、字段映射与执行按钮；映射可循环切换。
-#[gpui::test]
-fn import_panel_renders_options_and_mapping(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn import_panel_renders_options_and_mapping(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -45,7 +45,7 @@ fn import_panel_renders_options_and_mapping(cx: &mut gpui::TestAppContext) {
             .mapping[0]
     });
     let map = vcx.debug_bounds("import-map-0").expect("缺少首个映射按钮");
-    vcx.simulate_click(map.center(), gpui::Modifiers::default());
+    vcx.simulate_click(map.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let after = vcx.update(|_, app| {
         view.read(app)
@@ -58,8 +58,8 @@ fn import_panel_renders_options_and_mapping(cx: &mut gpui::TestAppContext) {
 }
 
 /// 清空模式必须点两次「导入」：第一次只提示，不执行。
-#[gpui::test]
-fn import_truncate_needs_confirmation(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn import_truncate_needs_confirmation(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -77,7 +77,7 @@ fn import_truncate_needs_confirmation(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let run = vcx.debug_bounds("import-run").expect("缺少导入按钮");
-    vcx.simulate_click(run.center(), gpui::Modifiers::default());
+    vcx.simulate_click(run.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (confirm, still_open) = vcx.update(|_, app| {
@@ -99,8 +99,8 @@ fn import_truncate_needs_confirmation(cx: &mut gpui::TestAppContext) {
 }
 
 /// 有告警时结果区多出「消息」页签，点开显示服务端原文。
-#[gpui::test]
-fn messages_tab_shows_warnings(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn messages_tab_shows_warnings(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -135,7 +135,7 @@ fn messages_tab_shows_warnings(cx: &mut gpui::TestAppContext) {
     let tab = vcx
         .debug_bounds("result-tab-messages")
         .expect("缺少消息页签");
-    vcx.simulate_click(tab.center(), gpui::Modifiers::default());
+    vcx.simulate_click(tab.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     assert!(
@@ -146,15 +146,15 @@ fn messages_tab_shows_warnings(cx: &mut gpui::TestAppContext) {
 
     // 切回结果集。
     let first = vcx.debug_bounds("result-tab-0").expect("缺少结果页签");
-    vcx.simulate_click(first.center(), gpui::Modifiers::default());
+    vcx.simulate_click(first.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("cell-0-0").is_some(), "应回到结果网格");
     assert!(vcx.debug_bounds("message-panel").is_none());
 }
 
 /// 自动提交开关可切换；事务活跃时工具栏出现「提交 / 回滚」与语句计数。
-#[gpui::test]
-fn tx_toolbar_toggles_autocommit(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn tx_toolbar_toggles_autocommit(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -173,7 +173,7 @@ fn tx_toolbar_toggles_autocommit(cx: &mut gpui::TestAppContext) {
         "默认应为自动提交"
     );
     let toggle = vcx.debug_bounds("tx-autocommit").expect("缺少自动提交开关");
-    vcx.simulate_click(toggle.center(), gpui::Modifiers::default());
+    vcx.simulate_click(toggle.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         !vcx.update(|_, app| view.read(app).auto_commit),
@@ -199,8 +199,8 @@ fn tx_toolbar_toggles_autocommit(cx: &mut gpui::TestAppContext) {
 }
 
 /// 历史面板：按当前数据源列历史，点条目把 SQL 放回编辑器。
-#[gpui::test]
-fn history_panel_inserts_sql(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn history_panel_inserts_sql(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -227,7 +227,7 @@ fn history_panel_inserts_sql(cx: &mut gpui::TestAppContext) {
 
     // 切到历史面板。
     let rail = vcx.debug_bounds("rail-history").expect("缺少历史入口");
-    vcx.simulate_click(rail.center(), gpui::Modifiers::default());
+    vcx.simulate_click(rail.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     assert!(vcx.debug_bounds("history-list").is_some(), "应渲染历史列表");
@@ -239,15 +239,15 @@ fn history_panel_inserts_sql(cx: &mut gpui::TestAppContext) {
         "其他数据源的历史不应混进来"
     );
 
-    vcx.simulate_click(first.center(), gpui::Modifiers::default());
+    vcx.simulate_click(first.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let text = vcx.update(|_, app| view.read(app).sql_input.read(app).value().to_string());
     assert_eq!(text, "SELECT 42 AS answer", "点历史应把 SQL 放回编辑器");
 }
 
 /// 历史面板：来源筛选只留下所选来源的条目。
-#[gpui::test]
-fn history_source_filter_narrows_list(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn history_source_filter_narrows_list(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -266,7 +266,7 @@ fn history_source_filter_narrows_list(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let rail = vcx.debug_bounds("rail-history").expect("缺少历史入口");
-    vcx.simulate_click(rail.center(), gpui::Modifiers::default());
+    vcx.simulate_click(rail.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx
         .debug_bounds(selector(format!("hist-{manual}")))
@@ -276,10 +276,10 @@ fn history_source_filter_narrows_list(cx: &mut gpui::TestAppContext) {
     let source = vcx
         .debug_bounds("history-source-filter")
         .expect("缺少来源筛选");
-    vcx.simulate_click(source.center(), gpui::Modifiers::default());
+    vcx.simulate_click(source.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let pick = vcx.debug_bounds("history-source-ai").expect("缺少 AI 选项");
-    vcx.simulate_click(pick.center(), gpui::Modifiers::default());
+    vcx.simulate_click(pick.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     assert!(
@@ -318,8 +318,8 @@ fn history_range_starts_at_local_midnight() {
 }
 
 /// 运行记录条：点条目恢复结果、可固定、可关闭。
-#[gpui::test]
-fn run_strip_switches_pins_and_closes(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn run_strip_switches_pins_and_closes(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -358,7 +358,7 @@ fn run_strip_switches_pins_and_closes(cx: &mut gpui::TestAppContext) {
     let chip = vcx
         .debug_bounds(selector(format!("run-chip-{run_id}")))
         .expect("缺少运行记录");
-    vcx.simulate_click(chip.center(), gpui::Modifiers::default());
+    vcx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let (result_id, status) = vcx.update(|_, app| {
         let view = view.read(app);
@@ -374,7 +374,7 @@ fn run_strip_switches_pins_and_closes(cx: &mut gpui::TestAppContext) {
     let pin = vcx
         .debug_bounds(selector(format!("run-pin-{run_id}")))
         .expect("缺少固定按钮");
-    vcx.simulate_click(pin.center(), gpui::Modifiers::default());
+    vcx.simulate_click(pin.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).core.runs().get(run_id).unwrap().pinned),
@@ -384,7 +384,7 @@ fn run_strip_switches_pins_and_closes(cx: &mut gpui::TestAppContext) {
     let close = vcx
         .debug_bounds(selector(format!("run-close-{run_id}")))
         .expect("缺少关闭按钮");
-    vcx.simulate_click(close.center(), gpui::Modifiers::default());
+    vcx.simulate_click(close.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).core.runs().get(run_id).is_none()),
@@ -397,8 +397,8 @@ fn run_strip_switches_pins_and_closes(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-64：打开文件进新标签，同一文件不重复开，保存写回原路径。
-#[gpui::test]
-fn sql_file_opens_in_tab_and_saves_back(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn sql_file_opens_in_tab_and_saves_back(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -467,8 +467,8 @@ fn sql_file_opens_in_tab_and_saves_back(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-64：文件树只列 `.sql` 与子目录，展开子目录后才出现深层文件。
-#[gpui::test]
-fn file_tree_lists_sql_and_expands_folders(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn file_tree_lists_sql_and_expands_folders(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -510,14 +510,14 @@ fn file_tree_lists_sql_and_expands_folders(cx: &mut gpui::TestAppContext) {
     );
 
     let folder = vcx.debug_bounds("file-dir-sub").expect("缺少子目录节点");
-    vcx.simulate_click(folder.center(), gpui::Modifiers::default());
+    vcx.simulate_click(folder.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("file-nested.sql").is_some(),
         "展开后应显示子目录里的 SQL"
     );
 
-    vcx.simulate_click(folder.center(), gpui::Modifiers::default());
+    vcx.simulate_click(folder.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("file-nested.sql").is_none(),
@@ -527,8 +527,8 @@ fn file_tree_lists_sql_and_expands_folders(cx: &mut gpui::TestAppContext) {
 }
 
 /// 批量失败后状态栏出现「继续」：只在失败语句后面还有语句时显示。
-#[gpui::test]
-fn failed_batch_offers_resume(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn failed_batch_offers_resume(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -569,7 +569,7 @@ fn failed_batch_offers_resume(cx: &mut gpui::TestAppContext) {
         "失败后还剩一条可继续"
     );
     let resume = vcx.debug_bounds("resume-batch").expect("缺少继续按钮");
-    vcx.simulate_click(resume.center(), gpui::Modifiers::default());
+    vcx.simulate_click(resume.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).status.contains("请先在")),
@@ -588,8 +588,8 @@ fn failed_batch_offers_resume(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-61：诊断徽标出现，服务端错误入口把光标送到驱动给出的字符位置。
-#[gpui::test]
-fn diagnostics_badge_and_error_jump(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn diagnostics_badge_and_error_jump(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -619,21 +619,21 @@ fn diagnostics_badge_and_error_jump(cx: &mut gpui::TestAppContext) {
         "没有元数据时应提示无法完全校验"
     );
     let goto = vcx.debug_bounds("goto-error").expect("缺少跳到错误入口");
-    vcx.simulate_click(goto.center(), gpui::Modifiers::default());
+    vcx.simulate_click(goto.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let cursor = vcx.update(|_, app| view.read(app).sql_input.read(app).cursor());
     assert_eq!(cursor, 17, "光标应落在错误字符上（多字节按字符换算）");
 
     let badge = vcx.debug_bounds("diag-badge").expect("缺少诊断徽标");
-    vcx.simulate_click(badge.center(), gpui::Modifiers::default());
+    vcx.simulate_click(badge.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let cursor = vcx.update(|_, app| view.read(app).sql_input.read(app).cursor());
     assert_eq!(cursor, 26, "点徽标应跳到第一条语义问题的表名");
 }
 
 /// AC-28：取消后保留已执行结果，并明确标出中断与未执行的语句。
-#[gpui::test]
-fn cancel_marks_unexecuted_statements(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn cancel_marks_unexecuted_statements(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -714,8 +714,8 @@ fn cancel_marks_unexecuted_statements(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-70：分页结果在页脚出现翻页控件，未连接时给出明确提示。
-#[gpui::test]
-fn page_controls_follow_has_more(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn page_controls_follow_has_more(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -741,7 +741,7 @@ fn page_controls_follow_has_more(cx: &mut gpui::TestAppContext) {
     assert!(vcx.debug_bounds("page-next").is_some(), "还有下一页");
     assert!(vcx.debug_bounds("page-size").is_some(), "应能切换页大小");
     let next = vcx.debug_bounds("page-next").expect("缺少下一页按钮");
-    vcx.simulate_click(next.center(), gpui::Modifiers::default());
+    vcx.simulate_click(next.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).status.contains("请先")),
@@ -766,8 +766,8 @@ fn page_controls_follow_has_more(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-62：有占位符先出参数面板；缺值拦截；原始 SQL 需二次确认。
-#[gpui::test]
-fn params_panel_collects_values_and_confirms_raw(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn params_panel_collects_values_and_confirms_raw(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -809,7 +809,7 @@ fn params_panel_collects_values_and_confirms_raw(cx: &mut gpui::TestAppContext) 
 
     // 空值点执行：面板保留并提示。
     let run = vcx.debug_bounds("params-run").expect("缺少执行按钮");
-    vcx.simulate_click(run.center(), gpui::Modifiers::default());
+    vcx.simulate_click(run.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("params-panel").is_some(),
@@ -844,7 +844,7 @@ fn params_panel_collects_values_and_confirms_raw(cx: &mut gpui::TestAppContext) 
 
     // 第一次执行只确认，不提交。
     let run = vcx.debug_bounds("params-run").expect("缺少执行按钮");
-    vcx.simulate_click(run.center(), gpui::Modifiers::default());
+    vcx.simulate_click(run.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("params-panel").is_some(),
@@ -862,7 +862,7 @@ fn params_panel_collects_values_and_confirms_raw(cx: &mut gpui::TestAppContext) 
 
     // 第二次执行才真正提交；会话是假的，因此报连接问题而面板关闭。
     let run = vcx.debug_bounds("params-run").expect("缺少执行按钮");
-    vcx.simulate_click(run.center(), gpui::Modifiers::default());
+    vcx.simulate_click(run.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).params_panel.is_none()),
@@ -875,8 +875,8 @@ fn params_panel_collects_values_and_confirms_raw(cx: &mut gpui::TestAppContext) 
 }
 
 /// F-71：行操作菜单能追加多行，并生成对应数量的 INSERT。
-#[gpui::test]
-fn row_menu_appends_multiple_rows(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn row_menu_appends_multiple_rows(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -892,7 +892,7 @@ fn row_menu_appends_multiple_rows(cx: &mut gpui::TestAppContext) {
     let append = vcx
         .debug_bounds("menu-row-append-10")
         .expect("缺少追加 10 行");
-    vcx.simulate_click(append.center(), gpui::Modifiers::default());
+    vcx.simulate_click(append.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (rows, pending, plan) = vcx.update(|_, app| {
@@ -918,8 +918,8 @@ fn row_menu_appends_multiple_rows(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-71：克隆行时主键交给数据库默认值（INSERT 不带主键列）。
-#[gpui::test]
-fn clone_row_leaves_primary_key_to_database(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn clone_row_leaves_primary_key_to_database(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -933,7 +933,7 @@ fn clone_row_leaves_primary_key_to_database(cx: &mut gpui::TestAppContext) {
 
     assert!(open_row_menu(&mut vcx));
     let clone = vcx.debug_bounds("menu-row-clone").expect("缺少克隆行");
-    vcx.simulate_click(clone.center(), gpui::Modifiers::default());
+    vcx.simulate_click(clone.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (rows, sql) = vcx.update(|_, app| {
@@ -956,8 +956,8 @@ fn clone_row_leaves_primary_key_to_database(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-71：从剪贴板粘贴 TSV，首行表头被跳过，空字段按 NULL 处理。
-#[gpui::test]
-fn paste_tsv_fills_selected_cells(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn paste_tsv_fills_selected_cells(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -984,8 +984,8 @@ fn paste_tsv_fills_selected_cells(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-71：设为数据库默认值 → 单元格标「(默认)」，SQL 用 `SET 列 = DEFAULT`。
-#[gpui::test]
-fn set_cell_default_marks_default_column(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn set_cell_default_marks_default_column(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -1017,8 +1017,8 @@ fn set_cell_default_marks_default_column(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-71：撤销本行变更 → 恢复原值；新增行整行作废。
-#[gpui::test]
-fn revert_row_restores_original_value(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn revert_row_restores_original_value(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -1059,8 +1059,8 @@ fn revert_row_restores_original_value(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-71：数据生成器按表达式新增行，其余列交给数据库默认值。
-#[gpui::test]
-fn generator_appends_generated_rows(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn generator_appends_generated_rows(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -1091,7 +1091,7 @@ fn generator_appends_generated_rows(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let apply = vcx.debug_bounds("generator-apply").expect("缺少生成按钮");
-    vcx.simulate_click(apply.center(), gpui::Modifiers::default());
+    vcx.simulate_click(apply.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (rows, generated, plan) = vcx.update(|_, app| {
@@ -1120,14 +1120,14 @@ fn generator_appends_generated_rows(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-73：批量更新面板可开关、切模式、增删条件；Esc 关闭。
-#[gpui::test]
-fn bulk_panel_toggles_conditions_and_closes_on_escape(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn bulk_panel_toggles_conditions_and_closes_on_escape(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     editable_view(&mut vcx, &holder);
 
     let open = vcx.debug_bounds("bulk-open").expect("缺少批量更新入口");
-    vcx.simulate_click(open.center(), gpui::Modifiers::default());
+    vcx.simulate_click(open.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("bulk-panel").is_some(), "面板应打开");
     assert!(vcx.debug_bounds("bulk-cond-0-op-eq").is_some());
@@ -1139,7 +1139,7 @@ fn bulk_panel_toggles_conditions_and_closes_on_escape(cx: &mut gpui::TestAppCont
     let custom = vcx
         .debug_bounds("bulk-mode-custom")
         .expect("缺少自定义模式");
-    vcx.simulate_click(custom.center(), gpui::Modifiers::default());
+    vcx.simulate_click(custom.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("bulk-custom-where").is_some(),
@@ -1150,13 +1150,13 @@ fn bulk_panel_toggles_conditions_and_closes_on_escape(cx: &mut gpui::TestAppCont
     let structured = vcx
         .debug_bounds("bulk-mode-struct")
         .expect("缺少结构化模式");
-    vcx.simulate_click(structured.center(), gpui::Modifiers::default());
+    vcx.simulate_click(structured.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let add = vcx
         .debug_bounds("bulk-add-condition")
         .expect("缺少添加条件");
-    vcx.simulate_click(add.center(), gpui::Modifiers::default());
+    vcx.simulate_click(add.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("bulk-cond-1-op-eq").is_some(),
@@ -1164,7 +1164,7 @@ fn bulk_panel_toggles_conditions_and_closes_on_escape(cx: &mut gpui::TestAppCont
     );
 
     let remove = vcx.debug_bounds("bulk-remove-1").expect("缺少移除按钮");
-    vcx.simulate_click(remove.center(), gpui::Modifiers::default());
+    vcx.simulate_click(remove.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("bulk-cond-1-op-eq").is_none(),
@@ -1173,7 +1173,7 @@ fn bulk_panel_toggles_conditions_and_closes_on_escape(cx: &mut gpui::TestAppCont
 
     // 没有预览 / 没有连接时点执行，只回填面板错误，不关面板。
     let execute = vcx.debug_bounds("bulk-execute").expect("缺少执行按钮");
-    vcx.simulate_click(execute.center(), gpui::Modifiers::default());
+    vcx.simulate_click(execute.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("bulk-error").is_some(), "应显示面板错误");
 
@@ -1183,8 +1183,8 @@ fn bulk_panel_toggles_conditions_and_closes_on_escape(cx: &mut gpui::TestAppCont
 }
 
 /// F-73：面板输入完整落到请求（SET 列 / 新值 / 条件列与值）。
-#[gpui::test]
-fn bulk_request_reads_panel_inputs(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn bulk_request_reads_panel_inputs(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -1235,8 +1235,8 @@ fn bulk_request_reads_panel_inputs(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-73：外键入口只在驱动声明 `foreign_key_pivot` 时出现。
-#[gpui::test]
-fn foreign_key_jump_requires_capability(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn foreign_key_jump_requires_capability(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -1276,7 +1276,7 @@ fn foreign_key_jump_requires_capability(cx: &mut gpui::TestAppContext) {
     let jump = vcx
         .debug_bounds("fk-jump")
         .expect("能力开启后应显示外键入口");
-    vcx.simulate_click(jump.center(), gpui::Modifiers::default());
+    vcx.simulate_click(jump.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     // 测试环境没有会话：应给出明确提示而不是静默。
     let status = vcx.update(|_, app| view.read(app).status.clone());

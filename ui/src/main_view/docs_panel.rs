@@ -261,7 +261,7 @@ impl MainView {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.docs.clone() else {
             return div().into_any_element();
@@ -280,7 +280,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
                         "数据库文档 · {}",

@@ -32,7 +32,7 @@ impl MainView {
         let support = rustdb_core::routine_support(db_kind, kind);
         let editor = cx.new(|cx| EditorState::new(window, cx).language("sql"));
         let search =
-            cx.new(|cx| gpui_component::input::InputState::new(window, cx).placeholder("搜索源码"));
+            cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("搜索源码"));
         // 搜索框变化 → 同步到编辑器的查找会话。
         cx.subscribe(&search, |view, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
@@ -281,7 +281,7 @@ impl MainView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.routine.clone() else {
             return div().into_any_element();
@@ -329,7 +329,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
                         "{} · {}",
@@ -667,7 +667,7 @@ impl MainView {
     pub(crate) fn render_routine_save_preview(
         &mut self,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(preview) = self.routine_save_preview.as_ref() else {
             return div().into_any_element();
@@ -688,7 +688,7 @@ impl MainView {
             .child(
                 div()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("保存例程源码"),
             )
@@ -745,7 +745,7 @@ impl MainView {
     }
 
     /// F-82：离开脏草稿时的确认框。
-    pub(crate) fn render_routine_discard(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_routine_discard(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         if !self.routine_discard {
             return div().into_any_element();
@@ -763,7 +763,7 @@ impl MainView {
             .child(
                 div()
                     .text_size(px(crate::design::TS_BODY))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("放弃未保存的修改？"),
             )

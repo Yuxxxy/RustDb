@@ -45,11 +45,11 @@ impl MainView {
         }
         let column = self.selected_column().unwrap_or(0);
         let expr = cx.new(|cx| {
-            gpui_component::input::InputState::new(window, cx)
+            gpui_kit::component::input::InputState::new(window, cx)
                 .placeholder("seq:1:1 · int:1:100 · date · uuid · regex:[a-z]{6} · fk:列名")
         });
         let count =
-            cx.new(|cx| gpui_component::input::InputState::new(window, cx).placeholder("生成行数"));
+            cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("生成行数"));
         count.update(cx, |state, cx| {
             state.set_value("10".to_string(), window, cx)
         });
@@ -139,7 +139,7 @@ impl MainView {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.generator.clone() else {
             return div().into_any_element();
@@ -162,7 +162,7 @@ impl MainView {
             .child(
                 div()
                     .text_size(px(crate::design::TS_BODY))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("数据生成器"),
             )
@@ -177,12 +177,12 @@ impl MainView {
             .child(
                 div()
                     .debug_selector(|| "generator-expr".to_string())
-                    .child(gpui_component::input::Input::new(&panel.expr)),
+                    .child(gpui_kit::component::input::Input::new(&panel.expr)),
             )
             .child(
                 div()
                     .debug_selector(|| "generator-count".to_string())
-                    .child(gpui_component::input::Input::new(&panel.count)),
+                    .child(gpui_kit::component::input::Input::new(&panel.count)),
             )
             .when_some(panel.error.clone(), |card, error| {
                 card.child(

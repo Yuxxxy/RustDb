@@ -10,9 +10,9 @@
 //! 诊断只用于编辑器波浪线与悬停，**从不阻止执行**。
 
 use crate::completion::{ColumnHint, CompletionCatalog};
-use gpui::{App, SharedString, Task, Window};
-use gpui_component::input::HoverProvider;
-use gpui_component::RopeExt as _;
+use gpui_kit::{App, SharedString, Task, Window};
+use gpui_kit::component::input::HoverProvider;
+use gpui_kit::component::RopeExt as _;
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 use ropey::Rope;
 use rustdb_sql_lang::{classify, split_statements, tokens, StatementKind, Token, TokenKind};

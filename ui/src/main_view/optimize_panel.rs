@@ -200,7 +200,7 @@ impl MainView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.optimize.as_ref() else {
             return div().into_any_element();
@@ -226,7 +226,7 @@ impl MainView {
                 .is_none()
         {
             let input = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx)
+                gpui_kit::component::input::InputState::new(window, cx)
                     .placeholder("例如：改成分页查询并返回总数")
             });
             if let Some(panel) = self.optimize.as_mut() {
@@ -242,25 +242,14 @@ impl MainView {
         for option in OptimizeKind::ALL {
             let active = option == kind;
             let selector = format!("ai-optimize-kind-{}", option.key());
-            kind_row = kind_row.child(
-                div()
-                    .id(SharedString::from(selector.clone()))
-                    .debug_selector(move || selector.clone())
-                    .h(px(20.))
-                    .px_2()
-                    .rounded(px(4.))
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .cursor_pointer()
-                    .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                    .when(!active, |d| {
-                        d.text_color(hex(t.fg_secondary))
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
-                    })
-                    .on_click(cx.listener(move |view, _, _, cx| {
-                        view.set_optimize_kind(option, cx);
-                    }))
-                    .child(SharedString::from(option.label())),
-            );
+            kind_row = kind_row.child(crate::design::chip(
+                selector,
+                option.label(),
+                active,
+                cx.listener(move |view, _, _, cx| {
+                    view.set_optimize_kind(option, cx);
+                }),
+            ));
         }
         kind_row = kind_row.child(div().flex_1()).child(
             div()
@@ -293,25 +282,14 @@ impl MainView {
             for option in DbKind::ALL.into_iter().filter(|option| *option != source) {
                 let active = option == target;
                 let selector = format!("ai-optimize-target-{}", option.key());
-                target_row = target_row.child(
-                    div()
-                        .id(SharedString::from(selector.clone()))
-                        .debug_selector(move || selector.clone())
-                        .h(px(18.))
-                        .px_2()
-                        .rounded(px(4.))
-                        .text_size(px(crate::design::TS_CAPTION))
-                        .cursor_pointer()
-                        .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                        .when(!active, |d| {
-                            d.text_color(hex(t.fg_secondary))
-                                .hover(|s| s.bg(hex(t.bg_overlay)))
-                        })
-                        .on_click(cx.listener(move |view, _, _, cx| {
-                            view.set_optimize_target(option, cx);
-                        }))
-                        .child(SharedString::from(option.display_name())),
-                );
+                target_row = target_row.child(crate::design::chip(
+                    selector,
+                    option.display_name(),
+                    active,
+                    cx.listener(move |view, _, _, cx| {
+                        view.set_optimize_target(option, cx);
+                    }),
+                ));
             }
         }
 
@@ -322,7 +300,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .debug_selector(|| "ai-optimize-instruction".to_string())
-                    .child(gpui_component::input::Input::new(&input).small()),
+                    .child(gpui_kit::component::input::Input::new(&input).small()),
             );
         }
 
@@ -507,7 +485,7 @@ impl MainView {
                     .child(
                         div()
                             .text_size(px(crate::design::TS_BODY))
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .child("AI 优化"),
                     )
                     .child(

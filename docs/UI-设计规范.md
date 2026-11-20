@@ -229,9 +229,9 @@ cargo test -p rustdb-ui --lib
 | P1 | 命中区 | ✅ 已落地 | 设置关闭 18×18→28×28；导出下拉换 `Button` 并显式 `with_size(px(24.))`（`Size::Small` 实测 22.5px，低于 WCAG 2.2 的 24px 下限）；「更多 ▾」用 `.small().h(px(24.))`（带 label 时 `with_size` 只改内边距） |
 | P1 | 工具栏 < 900px 折叠 | ✅ 已落地 | `TOOLBAR_COMPACT_W = 900`；判定用 `on_prepaint` **实测**工作区宽（侧栏被 flex 压缩且不回写 layout，视口估算偏小 79.9px，会误折叠 vw≈1130–1209）；只读预览 / 打开 / 保存收进「更多 ▾」，复用 `MenuEntry` + 全局按键观察者；库选择器省略号吸收余量、折叠态去掉两条装饰分隔线。**< 1024px 仍会裁切**，见 §11.4 |
 | P1 | 导出触发器 | ✅ 已落地 | 手写 `div + on_mouse_down` 换 `Button`：Idle / Hover / Focus / Open 四态由组件提供，`tooltip` 说明可用格式，`track_focus` + 全局按键观察者打通 Enter / ↑ / ↓ / Home / End / Esc；菜单高亮项与 hover 同底色 |
-| P1 | AI 气泡 | 🟡 部分 | 角色标签 + `border_strong` 描边 + 运行中禁用发送；**长会话虚拟化未做** |
+| P1 | AI 气泡 | ✅ 已落地 | 角色标签 + `border_strong` 描边 + 运行中禁用发送；长会话 ≥50 条走 `VirtualList` 虚拟化（高度估算 + 可见项实测回写 + 贴底跟随），见 §11.5 |
 | P1 | 编辑器可拖拽分隔 | ✅ 已落地 | `core/layout.rs` 新增 `editor_height` + 6 个常量与 `clamp_editor_height`（`#[serde(default)]` 兼容旧配置）；`workspace.rs` 单一 setter 接线拖拽 / 键盘 / 双击 / 设置页复位；拖拽期遮罩防误选字；`layout.json` 只在松手时写一次 |
-| P2 | 命令面板 / 状态栏常驻字段 / 设置搜索 / i18n 全量 | ❌ 未做 | 仅把标题栏品牌名回 15px；其余排期 |
+| P2 | 命令面板 / 状态栏常驻字段 / 设置搜索 / i18n 全量 | 🔶 部分 | 状态栏常驻字段已落地（见 §11.6）；命令面板 / 设置搜索 / i18n 全量排期 |
 
 **本轮改动文件**：`core/{theme,layout,lib}.rs`、`ui/{design,theme,lib}.rs`、
 `ui/main_view.rs` 及 29 个 `ui/src/**` 视图文件（字号收敛）、
@@ -298,8 +298,9 @@ cargo test -p rustdb-ui --lib
 **下一轮起点**（按优先级）：~~① 编辑器 / 结果区拖拽分隔 + 高度持久化~~（已落地，见 §11.1，含遮罩事件转发护栏）；
 ~~② 加载骨架的 400ms 延迟与旧内容保留~~（已落地，见 §11.2）；~~③ 导出下拉换 `Button`~~（已落地，见 §11.3）；
 ~~④ 工具栏 < 900px 折叠~~（已落地，见 §11.4，含「折叠判定必须用实测宽度」护栏）；
-⑤ AI 长会话虚拟化；⑥ P2 命令面板 / 状态栏常驻字段 / 设置搜索 / i18n 全量。
-**当前起点 = ⑤**（AI 长会话虚拟化）。
+~~⑤ AI 长会话虚拟化~~（已落地，见 §11.5，含「首帧 items_count 为 0」「静默帧不碰滚动」护栏）；
+⑥ P2 拆为四小项：~~⑥-a 状态栏常驻字段~~（已落地，见 §11.6）；⑥-b 设置搜索；⑥-c 命令面板；⑥-d i18n 全量。
+**当前起点 = ⑥-b**（设置搜索）。
 
 ### §11.1 P1-① 编辑器分隔条（本轮追加）
 
@@ -505,3 +506,61 @@ AI 开时两者相差 ≤0.1px（AI 列没被压缩），所以问题只在侧�
 
 **验收用例**（+1）：`ui/src/theme.rs` 上述护栏；真机截图对照
 `.tmp/p4shots/` 的 m1 / m3（修复前）与 d1 / d2 / d5（修复后）。
+
+### §11.5 P1-⑤ AI 长会话虚拟化（本轮追加）
+
+| 口径 | 值 |
+| --- | --- |
+| 阈值 | `AI_VIRTUAL_THRESHOLD = 50` 条；以下整段渲染（旧路径不变，短会话零开销） |
+| 组件 | `gpui_kit::component::v_virtual_list`（gpui-base 0.9.1）+ `Scrollbar::vertical`；列表 `gap(6px)` 与整段路径同距 |
+| 高度 | 先估算（`shape_text` 真实排版行数 × 19px 行高 + 气泡 / SQL 卡固定 chrome），可见项在渲染回调里 `layout_as_root` 实测回写缓存，差 >0.5px 才 `notify`，一帧收敛 |
+| 缓存键 | (角色+文本指纹 `DefaultHasher`, 测量时列宽)；条目数 > 2×消息数+64 时按当前指纹集清理（流式追加不断产生新指纹） |
+| 贴底 | 上一帧 `offset − max(viewport−content, 0) ≤ 40px` 判贴底；**仅内容变化**（条数 / 末条指纹 / 内容高）时 `scroll_to_item(len−1, Top)` 跟随 |
+| 选择器 | 气泡 `ai-bubble-{line}`（两条路径都加）；SQL 块沿用 `ai-block-{line}-{ordinal}` 系列 |
+
+**回归记录六（首帧贴底滚到了首条）**：初版用句柄自带 `scroll_to_bottom()`，
+三个贴底用例全红。根因：该方法读句柄内部 `items_count`，而它在**首帧 prepaint
+才写入**，render 阶段调用时还是 0 → `saturating_sub(1)` 滚到 item 0；次帧偏移
+停在顶部、距底 >40px，贴底判定翻 false，永久卡在顶部。修复：改用自维护的
+`len − 1` 调 `scroll_to_item`。
+**护栏**：凡在 render 阶段向 `VirtualListScrollHandle` 发延迟滚动，索引必须用
+视图自己的条目数，不能信 `scroll_to_bottom()`（首帧 items_count 未初始化）。
+
+**回归记录七（每帧跟随会吞掉用户的延迟滚动）**：贴底跟随后改为每帧
+`scroll_to_bottom`，`scroll_to_item(0)` 用例红：用户的延迟滚动请求存在句柄
+state 里，render 阶段的自动跟随把它**覆盖**成末条。修复：只在内容变化帧跟随，
+静默帧不碰滚动；高度回写引起内容高变化也算「内容变化」，保证收敛期不脱底。
+**护栏**：自动跟随必须挂「内容变化」条件，且判定用上一帧几何（offset 在
+prepaint 才更新）；测试滚顶后先断言 bounds、再追加消息断言不跟随。
+
+**验收用例**（+6，`tests_ai.rs`，161/161 全绿）：
+- `ai_long_session_virtualizes_offscreen_bubbles`：80 条 → 末条可见、首条裁剪、可见数 <40；
+- `ai_short_session_renders_all_bubbles`：49 条 → 首末都有 bounds（阈值下旧路径）；
+- `ai_long_session_scroll_top_stops_following`：滚顶后首可见末裁剪，追加消息不拉回；
+- `ai_long_session_new_message_follows_when_stuck`：贴底时新消息 / 流式变长都跟随；
+- `ai_long_session_bubbles_do_not_overlap`：可见气泡连续下标且 bottom ≤ 下一条 top；
+- `ai_long_session_sql_block_apply_works`：虚拟项内「应用」按钮可点击写编辑器。
+
+**未验证项**：真机视觉 / 滚轮手感未测（无头环境只能断言 bounds 与状态）；
+离屏 SQL 卡高度按词 wrap 近似 token 换行，滚动经过时由实测修正，可能有一帧微跳。
+
+### §11.6 P2-⑥a 状态栏常驻字段（本轮追加）
+
+| 口径 | 值 |
+| --- | --- |
+| 字段 | 连接 / 事务 / 行数 / 耗时 常驻，只读徽标按连接配置条件出现；全部 12px（`TS_CAPTION`）、`flex_none` 不被压缩 |
+| 连接 | 显示配置名，`max_w 140px` 超长省略；tooltip 给全量「名 · 驱动 · host:port · 库」；未连接显示「未连接」 |
+| 事务 | 无事务「自动提交」（`fg_muted`）；有事务「事务 · N 条 · MM:SS」（warning 色），计时复用 80ms 轮询里的每秒 tick（`tx_tick`），不新建定时器 |
+| 行数 | 写入优先「影响 N 行」；截断「N 行 · 截断」+ tooltip 说明仅加载前 N 行；普通「N 行」；无结果「无结果」 |
+| 耗时 | <1s 显示「N ms」，≥1s 显示「N.NN s」；无结果「—」 |
+| 压缩策略 | 状态消息文本 `flex_1 + min_w_0 + text_ellipsis` 吸收挤压，常驻字段永远完整 |
+| tooltip | 普通 `div` 用不了组件 `ManagedTooltipExt`（pub(crate)）；走 gpui 原生 `.id().tooltip()` + `component::tooltip::Tooltip::new(...).build(window, cx)` |
+| 可测性 | 文案计算抽成 `status_field_labels() -> StatusFieldLabels` 纯函数，render 与测试共用，文本断言不依赖渲染读字 |
+
+**验收用例**（+3，`tests_layout.rs`）：
+- `status_bar_persistent_fields_defaults`：未连接四字段常驻、默认文案、无只读徽标；
+- `status_bar_persistent_fields_follow_state`：连接名 / tooltip 全量、事务 65s → 01:05、截断、影响行数、2500ms → 2.50 s；
+- `status_bar_readonly_badge_follows_profile`：只读徽标随配置出现 / 消失。
+
+**未验证项**：tooltip 悬停实际弹出未在无头环境断言（原生 tooltip 路径与组件一致，真机待看）；
+窄窗下常驻字段总宽与状态消息的挤压比例未真机量过。

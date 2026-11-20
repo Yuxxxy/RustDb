@@ -121,7 +121,7 @@ impl MainView {
         let next_tab_id = tabs.len() as u64 + 1;
         // 截图钩子：`RUSTDB_DEMO_MENU=1` 直接展开库下拉框（正常由点击触发）。
         let demo_menu = demo_autorun && std::env::var("RUSTDB_DEMO_MENU").as_deref() == Ok("1");
-        let db_menu = demo_menu.then(|| gpui::point(px(505.), px(48.)));
+        let db_menu = demo_menu.then(|| gpui_kit::point(px(505.), px(48.)));
         // 截图钩子：`RUSTDB_DEMO_OBJ_MENU=1` 在对象树加载完后直接展开表菜单。
         let demo_obj_menu =
             demo_autorun && std::env::var("RUSTDB_DEMO_OBJ_MENU").as_deref() == Ok("1");
@@ -225,6 +225,7 @@ impl MainView {
             ns_menu: None,
             conn_menu: None,
             unlock_tick: None,
+            tx_tick: None,
             row_menu: None,
             escape_key: None,
             generator: None,
@@ -275,6 +276,12 @@ impl MainView {
             ai_input: None,
             ai_lines: Vec::new(),
             ai_stream: None,
+            ai_transcript_scroll: gpui_kit::component::VirtualListScrollHandle::new(),
+            ai_bubble_heights: Vec::new(),
+            ai_transcript_stick: true,
+            ai_transcript_len: 0,
+            ai_transcript_tail: 0,
+            ai_transcript_content_h: 0.,
             ai_pending: None,
             ai_running: false,
             ai_context: Vec::new(),
@@ -302,7 +309,7 @@ impl MainView {
             col_resize: None,
             editor_resize: None,
             grid_h: 0.,
-            grid_viewport: gpui::ScrollHandle::new(),
+            grid_viewport: gpui_kit::ScrollHandle::new(),
             tabs,
             active_tab: 0,
             next_tab_id,
@@ -449,6 +456,12 @@ impl MainView {
             .map(|left| left.as_secs());
         if tick != self.unlock_tick {
             self.unlock_tick = tick;
+            changed = true;
+        }
+        // P2：事务计时每秒刷新一次（复用 80ms 轮询，不新建定时器）。
+        let tx_tick = self.tx.as_ref().map(|tx| tx.started.elapsed().as_secs());
+        if tx_tick != self.tx_tick {
+            self.tx_tick = tx_tick;
             changed = true;
         }
         // P1-②：跨过 400ms 时主动补一帧，否则骨架 / 旧内容降透明度不会自己出现。
@@ -666,7 +679,7 @@ impl MainView {
             .find(|kind| *kind != source)
             .unwrap_or(DbKind::Postgres);
         let input = cx.new(|cx| {
-            gpui_component::input::InputState::new(window, cx)
+            gpui_kit::component::input::InputState::new(window, cx)
                 .placeholder("例如：改成分页查询并返回总数")
         });
         input.update(cx, |state, cx| {

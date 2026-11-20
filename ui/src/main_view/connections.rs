@@ -367,7 +367,7 @@ impl MainView {
     }
 
     /// F-02：连接编辑器浮层（新建 / 编辑 + SSH 隧道跳板）。
-    pub(crate) fn render_conn_editor(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_conn_editor(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(editor) = self.conn_editor.as_ref() else {
             return div().into_any_element();
@@ -392,28 +392,17 @@ impl MainView {
         for kind in DbKind::ALL {
             let active = kind == driver;
             let selector = format!("conn-driver-{}", kind.key());
-            driver_row = driver_row.child(
-                div()
-                    .id(SharedString::from(selector.clone()))
-                    .debug_selector(move || selector.clone())
-                    .h(px(20.))
-                    .px_2()
-                    .rounded(px(4.))
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .cursor_pointer()
-                    .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                    .when(!active, |d| {
-                        d.text_color(hex(t.fg_secondary))
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
-                    })
-                    .on_click(cx.listener(move |view, _, _, cx| {
-                        if let Some(editor) = view.conn_editor.as_mut() {
-                            editor.driver = kind;
-                        }
-                        cx.notify();
-                    }))
-                    .child(SharedString::from(kind.display_name())),
-            );
+            driver_row = driver_row.child(crate::design::chip(
+                selector,
+                kind.display_name(),
+                active,
+                cx.listener(move |view, _, _, cx| {
+                    if let Some(editor) = view.conn_editor.as_mut() {
+                        editor.driver = kind;
+                    }
+                    cx.notify();
+                }),
+            ));
         }
         // 跳板编辑行。
         let mut hop_rows = v_flex().gap_2();
@@ -423,32 +412,21 @@ impl MainView {
             for option in HopAuth::ALL {
                 let active = option == auth;
                 let selector = format!("conn-hop-auth-{index}-{}", option.label());
-                auth_row = auth_row.child(
-                    div()
-                        .id(SharedString::from(selector.clone()))
-                        .debug_selector(move || selector.clone())
-                        .h(px(18.))
-                        .px_2()
-                        .rounded(px(4.))
-                        .text_size(px(crate::design::TS_CAPTION))
-                        .cursor_pointer()
-                        .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                        .when(!active, |d| {
-                            d.text_color(hex(t.fg_secondary))
-                                .hover(|s| s.bg(hex(t.bg_overlay)))
-                        })
-                        .on_click(cx.listener(move |view, _, _, cx| {
-                            if let Some(hop) = view
-                                .conn_editor
-                                .as_mut()
-                                .and_then(|editor| editor.hops.get_mut(index))
-                            {
-                                hop.auth = option;
-                            }
-                            cx.notify();
-                        }))
-                        .child(SharedString::from(option.label())),
-                );
+                auth_row = auth_row.child(crate::design::chip(
+                    selector,
+                    option.label(),
+                    active,
+                    cx.listener(move |view, _, _, cx| {
+                        if let Some(hop) = view
+                            .conn_editor
+                            .as_mut()
+                            .and_then(|editor| editor.hops.get_mut(index))
+                        {
+                            hop.auth = option;
+                        }
+                        cx.notify();
+                    }),
+                ));
             }
             let hop_index = index;
             hop_rows = hop_rows.child(
@@ -467,7 +445,7 @@ impl MainView {
                             .child(
                                 div()
                                     .text_size(px(crate::design::TS_CAPTION))
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                                     .text_color(hex(t.fg_secondary))
                                     .child(SharedString::from(format!("第 {} 层", index + 1))),
                             )
@@ -513,28 +491,17 @@ impl MainView {
         for option in rustdb_db_api::ProxyKind::ALL {
             let active = option == proxy_kind;
             let selector = format!("conn-proxy-kind-{}", option.scheme());
-            proxy_kind_row = proxy_kind_row.child(
-                div()
-                    .id(SharedString::from(selector.clone()))
-                    .debug_selector(move || selector.clone())
-                    .h(px(18.))
-                    .px_2()
-                    .rounded(px(4.))
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .cursor_pointer()
-                    .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                    .when(!active, |d| {
-                        d.text_color(hex(t.fg_secondary))
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
-                    })
-                    .on_click(cx.listener(move |view, _, _, cx| {
-                        if let Some(editor) = view.conn_editor.as_mut() {
-                            editor.proxy_kind = option;
-                        }
-                        cx.notify();
-                    }))
-                    .child(SharedString::from(option.label())),
-            );
+            proxy_kind_row = proxy_kind_row.child(crate::design::chip(
+                selector,
+                option.label(),
+                active,
+                cx.listener(move |view, _, _, cx| {
+                    if let Some(editor) = view.conn_editor.as_mut() {
+                        editor.proxy_kind = option;
+                    }
+                    cx.notify();
+                }),
+            ));
         }
         let mut proxy_order_row = h_flex().gap_1().items_center();
         for option in rustdb_db_api::ProxyOrder::ALL {
@@ -544,28 +511,17 @@ impl MainView {
                 rustdb_db_api::ProxyOrder::AfterTunnel => "after",
             };
             let selector = format!("conn-proxy-order-{suffix}");
-            proxy_order_row = proxy_order_row.child(
-                div()
-                    .id(SharedString::from(selector.clone()))
-                    .debug_selector(move || selector.clone())
-                    .h(px(18.))
-                    .px_2()
-                    .rounded(px(4.))
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .cursor_pointer()
-                    .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                    .when(!active, |d| {
-                        d.text_color(hex(t.fg_secondary))
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
-                    })
-                    .on_click(cx.listener(move |view, _, _, cx| {
-                        if let Some(editor) = view.conn_editor.as_mut() {
-                            editor.proxy_order = option;
-                        }
-                        cx.notify();
-                    }))
-                    .child(SharedString::from(option.label())),
-            );
+            proxy_order_row = proxy_order_row.child(crate::design::chip(
+                selector,
+                option.label(),
+                active,
+                cx.listener(move |view, _, _, cx| {
+                    if let Some(editor) = view.conn_editor.as_mut() {
+                        editor.proxy_order = option;
+                    }
+                    cx.notify();
+                }),
+            ));
         }
         let body = v_flex()
             .gap_2()
@@ -878,7 +834,7 @@ impl MainView {
             .child(
                 div()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child(title),
             )

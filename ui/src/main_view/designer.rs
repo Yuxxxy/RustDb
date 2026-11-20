@@ -8,7 +8,7 @@ impl MainView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some((label, detail)) = self.table_panel.clone() else {
             return div().into_any_element();
@@ -80,7 +80,7 @@ impl MainView {
                             .flex_1()
                             .min_w_0()
                             .text_size(px(crate::design::TS_CAPTION))
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .text_ellipsis()
                             .child(SharedString::from(label)),
                     )
@@ -123,7 +123,7 @@ impl MainView {
     }
 
     /// 设计器页签栏。
-    pub(crate) fn render_designer_tabs(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_designer_tabs(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let active = self
             .designer
@@ -174,7 +174,7 @@ impl MainView {
         failure: Option<DesignerFailure>,
         rebuild: bool,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let has_designer = self.designer.is_some();
         let error_count = issues
@@ -281,7 +281,7 @@ impl MainView {
         &mut self,
         detail: &rustdb_db_api::TableDetail,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let mut columns = v_flex().gap(px(1.));
         for column in &detail.columns {
@@ -395,7 +395,7 @@ impl MainView {
     }
 
     /// 设计器「列」页签：草稿可增删、可拖拽排序。
-    pub(crate) fn render_designer_columns(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_designer_columns(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(designer) = self.designer.as_ref() else {
             return div().into_any_element();
@@ -530,12 +530,12 @@ impl MainView {
                     .child(
                         div()
                             .w(px(140.))
-                            .child(gpui_component::input::Input::new(&name_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&name_input).small()),
                     )
                     .child(
                         div()
                             .w(px(120.))
-                            .child(gpui_component::input::Input::new(&type_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&type_input).small()),
                     );
             }
         }
@@ -572,7 +572,7 @@ impl MainView {
     }
 
     /// 设计器「索引」页签。
-    pub(crate) fn render_designer_indexes(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_designer_indexes(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(designer) = self.designer.as_ref() else {
             return div().into_any_element();
@@ -659,12 +659,12 @@ impl MainView {
                     .child(
                         div()
                             .w(px(150.))
-                            .child(gpui_component::input::Input::new(&name_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&name_input).small()),
                     )
                     .child(
                         div()
                             .flex_1()
-                            .child(gpui_component::input::Input::new(&columns_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&columns_input).small()),
                     );
             }
         }
@@ -705,7 +705,7 @@ impl MainView {
     pub(crate) fn render_designer_foreign_keys(
         &mut self,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(designer) = self.designer.as_ref() else {
             return div().into_any_element();
@@ -814,22 +814,22 @@ impl MainView {
                     .child(
                         div()
                             .w(px(110.))
-                            .child(gpui_component::input::Input::new(&name_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&name_input).small()),
                     )
                     .child(
                         div()
                             .w(px(96.))
-                            .child(gpui_component::input::Input::new(&columns_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&columns_input).small()),
                     )
                     .child(
                         div()
                             .w(px(96.))
-                            .child(gpui_component::input::Input::new(&table_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&table_input).small()),
                     )
                     .child(
                         div()
                             .w(px(96.))
-                            .child(gpui_component::input::Input::new(&ref_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&ref_input).small()),
                     );
             }
         }
@@ -867,7 +867,7 @@ impl MainView {
     }
 
     /// 设计器「检查约束」页签。
-    pub(crate) fn render_designer_checks(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_designer_checks(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(designer) = self.designer.as_ref() else {
             return div().into_any_element();
@@ -952,12 +952,12 @@ impl MainView {
                     .child(
                         div()
                             .w(px(130.))
-                            .child(gpui_component::input::Input::new(&name_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&name_input).small()),
                     )
                     .child(
                         div()
                             .flex_1()
-                            .child(gpui_component::input::Input::new(&expr_input).small()),
+                            .child(gpui_kit::component::input::Input::new(&expr_input).small()),
                     );
             }
         }
@@ -995,7 +995,7 @@ impl MainView {
     }
 
     /// 设计器「触发器」页签：只读（触发体编辑归 F-82 例程源码）。
-    pub(crate) fn render_designer_triggers(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_designer_triggers(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(designer) = self.designer.as_ref() else {
             return div().into_any_element();
@@ -1067,7 +1067,7 @@ impl MainView {
 
     /// 设计器「选项」页签：存储引擎 / 排序规则 / 注释。
     /// 设计器「选项」页签：存储引擎 / 排序规则 / 注释（各方言支持度不同）。
-    pub(crate) fn render_designer_options(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_designer_options(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(designer) = self.designer.as_ref() else {
             return div().into_any_element();
@@ -1099,7 +1099,7 @@ impl MainView {
                     )
                     .child(
                         div().flex_1().min_w_0().child(match input {
-                            Some(input) => gpui_component::input::Input::new(input)
+                            Some(input) => gpui_kit::component::input::Input::new(input)
                                 .small()
                                 .into_any_element(),
                             None => div().into_any_element(),
@@ -1481,7 +1481,7 @@ impl MainView {
             return;
         };
         let read =
-            |slot: &Option<gpui::Entity<gpui_component::input::InputState>>| -> Option<String> {
+            |slot: &Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>| -> Option<String> {
                 let text = slot
                     .as_ref()
                     .map(|input| input.read(cx).value().trim().to_string())

@@ -31,7 +31,7 @@ impl MainView {
     pub(crate) fn open_filter(
         &mut self,
         index: usize,
-        at: Point<gpui::Pixels>,
+        at: Point<gpui_kit::Pixels>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -52,7 +52,7 @@ impl MainView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some((index, _)) = self.filter_menu else {
             return div().into_any_element();
@@ -64,7 +64,7 @@ impl MainView {
 
         if self.filter_input.is_none() {
             let input = cx
-                .new(|cx| gpui_component::input::InputState::new(window, cx).placeholder("包含…"));
+                .new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("包含…"));
             let entity = input.clone();
             cx.subscribe(&input, move |view, _, event: &InputEvent, cx| {
                 if let InputEvent::Change = event {
@@ -101,7 +101,7 @@ impl MainView {
                     .child(SharedString::from(format!("筛选「{column}」"))),
             )
             .child(div().debug_selector(|| "filter-input".to_string()).child(
-                gpui_component::input::Input::new(
+                gpui_kit::component::input::Input::new(
                     self.filter_input.as_ref().expect("筛选输入框已创建"),
                 ),
             ))
@@ -163,7 +163,7 @@ impl MainView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(detail) = self.cell_detail.clone() else {
             return div().into_any_element();
@@ -172,7 +172,7 @@ impl MainView {
         // JSON 路径输入按需创建一次。
         if is_json && self.detail_input.is_none() {
             let input = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx).placeholder("路径，如 /a/b/0")
+                gpui_kit::component::input::InputState::new(window, cx).placeholder("路径，如 /a/b/0")
             });
             cx.subscribe(&input, |view, _, event: &InputEvent, cx| {
                 if let InputEvent::Change = event {
@@ -268,7 +268,7 @@ impl MainView {
                             .flex_1()
                             .min_w_0()
                             .text_size(px(crate::design::TS_CAPTION))
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .text_ellipsis()
                             .child(SharedString::from(format!(
                                 "{} · {} · {size_label}",
@@ -342,7 +342,7 @@ impl MainView {
                                     .debug_selector(|| "cell-detail-pointer".to_string())
                                     .flex_1()
                                     .min_w_0()
-                                    .child(gpui_component::input::Input::new(
+                                    .child(gpui_kit::component::input::Input::new(
                                         self.detail_input.as_ref().expect("路径输入已创建"),
                                     )),
                             )

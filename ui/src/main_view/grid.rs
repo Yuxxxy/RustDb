@@ -101,7 +101,7 @@ impl MainView {
         &mut self,
         row: usize,
         col: usize,
-        event: &gpui::MouseDownEvent,
+        event: &gpui_kit::MouseDownEvent,
         cx: &mut Context<Self>,
     ) {
         // 每次按下都重置上一次拖拽的收尾状态：即使上次松手在网格外，也不会吞掉这次点击。
@@ -156,7 +156,7 @@ impl MainView {
     pub(crate) fn begin_col_resize(
         &mut self,
         column: usize,
-        x: gpui::Pixels,
+        x: gpui_kit::Pixels,
         cx: &mut Context<Self>,
     ) {
         let Some(view) = self.active_result() else {
@@ -226,7 +226,7 @@ impl MainView {
     }
 
     /// 拖拽中：左键仍按着就按绝对位移改宽度；已松开说明鼠标离开网格后释放，直接收尾。
-    pub(crate) fn drag_col_resize(&mut self, event: &gpui::MouseMoveEvent, cx: &mut Context<Self>) {
+    pub(crate) fn drag_col_resize(&mut self, event: &gpui_kit::MouseMoveEvent, cx: &mut Context<Self>) {
         let Some(resize) = self.col_resize else {
             return;
         };
@@ -261,7 +261,7 @@ impl MainView {
     }
 
     /// 滚轮在网格上：横向偏移自己算（竖向交给虚拟列表）。
-    pub(crate) fn scroll_grid_h(&mut self, event: &gpui::ScrollWheelEvent, cx: &mut Context<Self>) {
+    pub(crate) fn scroll_grid_h(&mut self, event: &gpui_kit::ScrollEvent, cx: &mut Context<Self>) {
         let delta = event.delta.pixel_delta(px(24.));
         let dx = if event.modifiers.shift {
             delta.y

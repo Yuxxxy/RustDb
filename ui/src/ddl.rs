@@ -2,7 +2,7 @@
 //!
 //! 只做词法切分，不解析 SQL 语义；着色失败也只是「没颜色」，不影响内容。
 
-use gpui::{div, prelude::*, px, rgb, Div, SharedString};
+use gpui_kit::{div, prelude::*, px, rgb, Div, SharedString};
 use rustdb_core::theme::ThemeTokens;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -247,15 +247,15 @@ mod tests {
     }
 
     /// `div()` 默认 block，token 直接挂会竖排——回归到「一行内横排」。
-    #[gpui::test]
-    fn render_sql_keeps_one_line_inline(cx: &mut gpui::TestAppContext) {
+    #[gpui_kit::test]
+    fn render_sql_keeps_one_line_inline(cx: &mut gpui_kit::TestAppContext) {
         struct Probe;
-        impl gpui::Render for Probe {
+        impl gpui_kit::Render for Probe {
             fn render(
                 &mut self,
-                _: &mut gpui::Window,
-                _: &mut gpui::Context<Self>,
-            ) -> impl gpui::IntoElement {
+                _: &mut gpui_kit::Window,
+                _: &mut gpui_kit::Context<Self>,
+            ) -> impl gpui_kit::IntoElement {
                 div()
                     .w(px(600.))
                     .child(render_sql("WHERE o.total > 0", &ThemeTokens::dark()))

@@ -7,8 +7,5 @@ license.workspace = true
 [dependencies]
 rustdb-core.workspace = true
 rustdb-ui.workspace = true
-gpui.workspace = true
-gpui-platform.workspace = true
-gpui-component.workspace = true
-gpui-kit-assets.workspace = true
+gpui-kit.workspace = true
 log.workspace = true

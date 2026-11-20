@@ -97,7 +97,7 @@ impl Render for MainView {
         let split_id = layout_split_id(self.panel, sidebar_visible, ai_visible);
         let panel_key = self.panel.key();
         let me_resize = cx.entity();
-        let mut group = gpui_component::resizable::h_resizable(split_id)
+        let mut group = gpui_kit::component::resizable::h_resizable(split_id)
             // 只换掉画出来的那条线，命中区与拖拽逻辑仍由组件托管。
             .with_handle_appearance(std::rc::Rc::new(|_ctx, _w: &mut Window, _cx: &mut App| {
                 Some(div().into_any_element())
@@ -105,7 +105,7 @@ impl Render for MainView {
         if sidebar_visible {
             let (pl, pr) = pad(0);
             group = group.child(
-                gpui_component::resizable::resizable_panel()
+                gpui_kit::component::resizable::resizable_panel()
                     .size(px(sidebar_w))
                     .size_range(
                         px(rustdb_core::SIDEBAR_WIDTH_MIN)..px(rustdb_core::SIDEBAR_WIDTH_MAX),
@@ -125,7 +125,7 @@ impl Render for MainView {
         {
             let (pl, pr) = pad(lead);
             group = group.child(
-                gpui_component::resizable::resizable_panel()
+                gpui_kit::component::resizable::resizable_panel()
                     .pl(px(pl))
                     .pr(px(pr))
                     .py(px(CARD_GAP))
@@ -140,7 +140,7 @@ impl Render for MainView {
         if ai_visible {
             let (pl, pr) = pad(lead + 1);
             group = group.child(
-                gpui_component::resizable::resizable_panel()
+                gpui_kit::component::resizable::resizable_panel()
                     .size(px(ai_w))
                     .size_range(px(rustdb_core::AI_WIDTH_MIN)..px(rustdb_core::AI_WIDTH_MAX))
                     .flex_none()
@@ -221,7 +221,7 @@ impl Render for MainView {
                     .child(
                         anchored()
                             .position(anchor)
-                            .offset(gpui::point(px(0.), px(6.)))
+                            .offset(gpui_kit::point(px(0.), px(6.)))
                             .child(menu),
                     )
             })
@@ -258,7 +258,7 @@ impl Render for MainView {
                     .child(
                         anchored()
                             .position(at)
-                            .offset(gpui::point(px(0.), px(4.)))
+                            .offset(gpui_kit::point(px(0.), px(4.)))
                             .child(menu),
                     )
             })
@@ -311,7 +311,7 @@ impl Render for MainView {
                     .child(
                         anchored()
                             .position(at)
-                            .offset(gpui::point(px(-190.), px(6.)))
+                            .offset(gpui_kit::point(px(-190.), px(6.)))
                             .child(menu),
                     )
             })
@@ -333,7 +333,7 @@ impl Render for MainView {
                     .child(
                         anchored()
                             .position(at)
-                            .offset(gpui::point(px(0.), px(6.)))
+                            .offset(gpui_kit::point(px(0.), px(6.)))
                             .child(menu),
                     )
             })
@@ -371,7 +371,7 @@ impl Render for MainView {
                     .child(
                         anchored()
                             .position(at)
-                            .offset(gpui::point(px(0.), px(6.)))
+                            .offset(gpui_kit::point(px(0.), px(6.)))
                             .child(menu),
                     )
             })
@@ -385,7 +385,7 @@ impl Render for MainView {
                             .debug_selector(|| "generator-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.generator = None;
                                 cx.notify();
@@ -411,7 +411,7 @@ impl Render for MainView {
                             .debug_selector(|| "bulk-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.bulk = None;
                                 cx.notify();
@@ -437,7 +437,7 @@ impl Render for MainView {
                             .debug_selector(|| "lineage-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.lineage = None;
                                 cx.notify();
@@ -463,7 +463,7 @@ impl Render for MainView {
                             .debug_selector(|| "compare-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.compare = None;
                                 cx.notify();
@@ -489,7 +489,7 @@ impl Render for MainView {
                             .debug_selector(|| "dump-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.dump = None;
                                 cx.notify();
@@ -515,7 +515,7 @@ impl Render for MainView {
                             .debug_selector(|| "transfer-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.transfer = None;
                                 cx.notify();
@@ -541,7 +541,7 @@ impl Render for MainView {
                             .debug_selector(|| "data-compare-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.data_compare = None;
                                 cx.notify();
@@ -567,7 +567,7 @@ impl Render for MainView {
                             .debug_selector(|| "docs-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.docs = None;
                                 cx.notify();
@@ -645,7 +645,7 @@ impl Render for MainView {
                             .debug_selector(|| "settings-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.settings_open = false;
                                 cx.notify();
@@ -676,7 +676,7 @@ impl Render for MainView {
                                 .debug_selector(|| "partition-preview-scrim".to_string())
                                 .absolute()
                                 .inset_0()
-                                .bg(gpui::hsla(0., 0., 0., 0.35))
+                                .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                                 .on_click(cx.listener(|view, _, _, cx| {
                                     if let Some(panel) = view.partition.as_mut() {
                                         panel.preview = None;
@@ -707,7 +707,7 @@ impl Render for MainView {
                                 .debug_selector(|| "routine-save-preview-scrim".to_string())
                                 .absolute()
                                 .inset_0()
-                                .bg(gpui::hsla(0., 0., 0., 0.35))
+                                .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                                 .on_click(cx.listener(|view, _, _, cx| {
                                     view.routine_save_preview = None;
                                     cx.notify();
@@ -734,7 +734,7 @@ impl Render for MainView {
                             .debug_selector(|| "routine-discard-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.routine_discard = false;
                                 cx.notify();
@@ -760,7 +760,7 @@ impl Render for MainView {
                             .debug_selector(|| "conn-editor-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.conn_editor = None;
                                 cx.notify();
@@ -786,7 +786,7 @@ impl Render for MainView {
                             .debug_selector(|| "ai-model-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.ai_model_panel = None;
                                 cx.notify();
@@ -812,7 +812,7 @@ impl Render for MainView {
                             .debug_selector(|| "host-key-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35)),
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35)),
                     )
                     .child(
                         div()
@@ -834,7 +834,7 @@ impl Render for MainView {
                             .debug_selector(|| "cell-detail-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.cell_detail = None;
                                 cx.notify();
@@ -860,7 +860,7 @@ impl Render for MainView {
                             .debug_selector(|| "ai-optimize-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.optimize = None;
                                 cx.notify();
@@ -887,7 +887,7 @@ impl Render for MainView {
                             .debug_selector(|| "edit-preview-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.edit_preview = None;
                                 cx.notify();
@@ -915,7 +915,7 @@ impl Render for MainView {
                                     .child(
                                         div()
                                             .text_size(px(crate::design::TS_CAPTION))
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                                             .text_color(hex(t.fg_primary))
                                             .child("待提交 SQL 预览"),
                                     )
@@ -974,7 +974,7 @@ impl Render for MainView {
                             .debug_selector(|| "danger-scrim".to_string())
                             .absolute()
                             .inset_0()
-                            .bg(gpui::hsla(0., 0., 0., 0.35))
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.danger = None;
                                 cx.notify();

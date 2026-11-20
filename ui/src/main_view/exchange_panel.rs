@@ -6,7 +6,7 @@ impl MainView {
     /// F-90：打开连接配置交换面板（默认停在导出页）。
     pub(crate) fn open_exchange_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let passphrase = cx.new(|cx| {
-            gpui_component::input::InputState::new(window, cx)
+            gpui_kit::component::input::InputState::new(window, cx)
                 .placeholder("口令（留空则明文导出，需二次确认）")
                 .masked(true)
         });
@@ -363,7 +363,7 @@ impl MainView {
 
     /// F-85：分区管理面板（非模态，右上角 ✕ 关闭）。
     /// F-90：连接配置交换面板（导出 / 导入两个页签）。
-    pub(crate) fn render_exchange_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_exchange_panel(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.exchange.clone() else {
             return div().into_any_element();
@@ -384,7 +384,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("导入 / 导出连接"),
             )
@@ -440,7 +440,7 @@ impl MainView {
             }),
         );
 
-        let body: gpui::AnyElement = match panel.tab {
+        let body: gpui_kit::AnyElement = match panel.tab {
             ExchangeTab::Export => self.render_exchange_export(&panel, cx),
             ExchangeTab::Import => self.render_exchange_import(&panel, cx),
         };
@@ -530,7 +530,7 @@ impl MainView {
         &mut self,
         panel: &ExchangePanel,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let selected = panel.export_rows.iter().filter(|row| row.selected).count();
         let all = !panel.export_rows.is_empty() && selected == panel.export_rows.len();
@@ -700,7 +700,7 @@ impl MainView {
         &mut self,
         panel: &ExchangePanel,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let mut actions = h_flex().px_3().py_2().gap_2().items_center().child(
             div().debug_selector(|| "exchange-pick".to_string()).child(

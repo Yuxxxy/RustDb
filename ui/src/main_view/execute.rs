@@ -82,7 +82,7 @@ impl MainView {
                 continue;
             }
             let input = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx)
+                gpui_kit::component::input::InputState::new(window, cx)
                     .placeholder(format!("{} 的值", reference.name))
             });
             cx.subscribe(&input, |view, _, event: &InputEvent, cx| {

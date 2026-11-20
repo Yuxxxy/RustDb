@@ -28,22 +28,22 @@ impl MainView {
             return;
         }
         let name = cx.new(|cx| {
-            gpui_component::input::InputState::new(window, cx).placeholder("分区名 / 已存在的表名")
+            gpui_kit::component::input::InputState::new(window, cx).placeholder("分区名 / 已存在的表名")
         });
         let range_from = cx.new(|cx| {
-            gpui_component::input::InputState::new(window, cx).placeholder("起点，如 '2026-01-01'")
+            gpui_kit::component::input::InputState::new(window, cx).placeholder("起点，如 '2026-01-01'")
         });
         let range_to = cx.new(|cx| {
-            gpui_component::input::InputState::new(window, cx).placeholder("终点，如 '2026-02-01'")
+            gpui_kit::component::input::InputState::new(window, cx).placeholder("终点，如 '2026-02-01'")
         });
         let list_values = cx.new(|cx| {
-            gpui_component::input::InputState::new(window, cx)
+            gpui_kit::component::input::InputState::new(window, cx)
                 .placeholder("逗号分隔，如 'cn', 'us'")
         });
         let modulus =
-            cx.new(|cx| gpui_component::input::InputState::new(window, cx).placeholder("MODULUS"));
+            cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("MODULUS"));
         let remainder = cx
-            .new(|cx| gpui_component::input::InputState::new(window, cx).placeholder("REMAINDER"));
+            .new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("REMAINDER"));
         self.partition = Some(PartitionPanel {
             label: path.display_label(),
             path: path.clone(),
@@ -278,7 +278,7 @@ impl MainView {
             cx.notify();
         }
     }
-    pub(crate) fn render_partition_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_partition_panel(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         use rustdb_core::PartitionStrategy;
         let t = current(cx);
         let Some(panel) = self.partition.clone() else {
@@ -318,7 +318,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!("分区 · {}", panel.label))),
             )
@@ -452,7 +452,7 @@ impl MainView {
                                 .child(
                                     div()
                                         .text_size(px(crate::design::TS_CAPTION))
-                                        .font_weight(gpui::FontWeight::MEDIUM)
+                                        .font_weight(gpui_kit::FontWeight::MEDIUM)
                                         .text_color(hex(t.fg_primary))
                                         .text_ellipsis()
                                         .child(SharedString::from(name)),
@@ -538,7 +538,7 @@ impl MainView {
             form = form.child(
                 div()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child(if attach {
                         "附加已有表"
@@ -760,7 +760,7 @@ impl MainView {
     }
 
     /// F-85：分区 DDL 预览（盖在分区面板之上，执行前必须显式确认）。
-    pub(crate) fn render_partition_preview(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_partition_preview(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(preview) = self
             .partition
@@ -789,7 +789,7 @@ impl MainView {
             .child(
                 div()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("分区变更预览"),
             )

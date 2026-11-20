@@ -291,7 +291,7 @@ impl MainView {
     pub(crate) fn render_import_panel(
         &mut self,
         cx: &mut Context<Self>,
-    ) -> Option<gpui::AnyElement> {
+    ) -> Option<gpui_kit::AnyElement> {
         let t = current(cx);
         let panel = self.import_panel.as_ref()?;
         let file = panel.file_name();

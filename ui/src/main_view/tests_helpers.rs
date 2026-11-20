@@ -12,7 +12,7 @@ pub(crate) fn temp_layout(name: &str) -> PathBuf {
     let _ = std::fs::remove_file(&path);
     path
 }
-pub(crate) fn reset_layout(holder: &Holder, vcx: &mut gpui::VisualTestContext, path: PathBuf) {
+pub(crate) fn reset_layout(holder: &Holder, vcx: &mut gpui_kit::VisualTestContext, path: PathBuf) {
     let view = holder.borrow().clone().expect("view 未创建");
     vcx.update(|_, app| {
         view.update(app, |main, cx| {
@@ -23,17 +23,17 @@ pub(crate) fn reset_layout(holder: &Holder, vcx: &mut gpui::VisualTestContext, p
     });
     vcx.run_until_parked();
 }
-pub(crate) fn click(vcx: &mut gpui::VisualTestContext, selector: &'static str) {
+pub(crate) fn click(vcx: &mut gpui_kit::VisualTestContext, selector: &'static str) {
     let bounds = vcx
         .debug_bounds(selector)
         .unwrap_or_else(|| panic!("找不到 {selector}"));
-    vcx.simulate_click(bounds.center(), gpui::Modifiers::default());
+    vcx.simulate_click(bounds.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 }
-pub(crate) type Holder = std::rc::Rc<std::cell::RefCell<Option<gpui::Entity<MainView>>>>;
-pub(crate) fn test_view(cx: &mut gpui::TestAppContext) -> (&mut gpui::VisualTestContext, Holder) {
+pub(crate) type Holder = std::rc::Rc<std::cell::RefCell<Option<gpui_kit::Entity<MainView>>>>;
+pub(crate) fn test_view(cx: &mut gpui_kit::TestAppContext) -> (&mut gpui_kit::VisualTestContext, Holder) {
     cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::component::init(cx);
         crate::theme::apply_theme_mode(cx, rustdb_core::theme::ThemeMode::Dark);
     });
     let core = rustdb_core::Core::new(rustdb_db_api::DriverRegistry::new());
@@ -46,7 +46,7 @@ pub(crate) fn test_view(cx: &mut gpui::TestAppContext) -> (&mut gpui::VisualTest
     let (_, vcx) = cx.add_window_view(move |window, cx| {
         let view = cx.new(|cx| MainView::new_for_test(window, cx, core, layout_path));
         *slot.borrow_mut() = Some(view.clone());
-        gpui_component::Root::new(view, window, cx)
+        gpui_kit::component::Root::new(view, window, cx)
     });
     (vcx, holder)
 }
@@ -158,8 +158,8 @@ pub(crate) fn editable_result_view() -> ResultView {
 }
 /// 造一个带设计器的视图（列草稿 = id / total）。
 pub(crate) fn open_designer(
-    cx: &mut gpui::TestAppContext,
-) -> (&mut gpui::VisualTestContext, Holder) {
+    cx: &mut gpui_kit::TestAppContext,
+) -> (&mut gpui_kit::VisualTestContext, Holder) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -265,9 +265,9 @@ pub(crate) fn import_panel_fixture() -> ImportPanel {
 }
 /// 造一个带可编辑结果集的视图，并返回视图实体。
 pub(crate) fn editable_view(
-    vcx: &mut &mut gpui::VisualTestContext,
+    vcx: &mut &mut gpui_kit::VisualTestContext,
     holder: &Holder,
-) -> gpui::Entity<MainView> {
+) -> gpui_kit::Entity<MainView> {
     let view = holder.borrow().clone().expect("view 未创建");
     vcx.update(|_, app| {
         view.update(app, |view, cx| {
@@ -279,9 +279,9 @@ pub(crate) fn editable_view(
     view
 }
 /// 打开行操作菜单（返回菜单是否出现）。
-pub(crate) fn open_row_menu(vcx: &mut &mut gpui::VisualTestContext) -> bool {
+pub(crate) fn open_row_menu(vcx: &mut &mut gpui_kit::VisualTestContext) -> bool {
     let trigger = vcx.debug_bounds("edit-row-menu").expect("缺少行操作入口");
-    vcx.simulate_click(trigger.center(), gpui::Modifiers::default());
+    vcx.simulate_click(trigger.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     vcx.debug_bounds("menu-row-append-1").is_some()
 }

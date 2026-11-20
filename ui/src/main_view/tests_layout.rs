@@ -99,25 +99,25 @@ fn export_rows_follow_active_sort() {
     );
 }
 
-#[gpui::test]
-fn export_button_is_clickable(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn export_button_is_clickable(cx: &mut gpui_kit::TestAppContext) {
     cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::component::init(cx);
         crate::theme::apply_theme_mode(cx, rustdb_core::theme::ThemeMode::Dark);
     });
     let core = rustdb_core::Core::new(rustdb_db_api::DriverRegistry::new());
-    let holder: std::rc::Rc<std::cell::RefCell<Option<gpui::Entity<MainView>>>> =
+    let holder: std::rc::Rc<std::cell::RefCell<Option<gpui_kit::Entity<MainView>>>> =
         std::rc::Rc::new(std::cell::RefCell::new(None));
     let slot = holder.clone();
     let (_, vcx) = cx.add_window_view(move |window, cx| {
         let view = cx.new(|cx| MainView::new(window, cx, core));
         *slot.borrow_mut() = Some(view.clone());
-        gpui_component::Root::new(view, window, cx)
+        gpui_kit::component::Root::new(view, window, cx)
     });
     vcx.run_until_parked();
 
     let bounds = vcx.debug_bounds("export-slot").expect("导出按钮缺失");
-    vcx.simulate_click(bounds.center(), gpui::Modifiers::default());
+    vcx.simulate_click(bounds.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let status = vcx.update(|_, app| {
@@ -133,20 +133,20 @@ fn export_button_is_clickable(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-72：格式菜单列出全部格式；没有结果时给出提示而不是静默失败。
-#[gpui::test]
-fn export_format_menu_lists_all_formats(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn export_format_menu_lists_all_formats(cx: &mut gpui_kit::TestAppContext) {
     cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::component::init(cx);
         crate::theme::apply_theme_mode(cx, rustdb_core::theme::ThemeMode::Dark);
     });
     let core = rustdb_core::Core::new(rustdb_db_api::DriverRegistry::new());
-    let holder: std::rc::Rc<std::cell::RefCell<Option<gpui::Entity<MainView>>>> =
+    let holder: std::rc::Rc<std::cell::RefCell<Option<gpui_kit::Entity<MainView>>>> =
         std::rc::Rc::new(std::cell::RefCell::new(None));
     let slot = holder.clone();
     let (_, vcx) = cx.add_window_view(move |window, cx| {
         let view = cx.new(|cx| MainView::new(window, cx, core));
         *slot.borrow_mut() = Some(view.clone());
-        gpui_component::Root::new(view, window, cx)
+        gpui_kit::component::Root::new(view, window, cx)
     });
     vcx.run_until_parked();
 
@@ -166,7 +166,7 @@ fn export_format_menu_lists_all_formats(cx: &mut gpui::TestAppContext) {
         w >= 24.,
         "命中区不能低于 WCAG 2.2 SC 2.5.8 的 24×24（当前 {w}×{h}）"
     );
-    vcx.simulate_click(chevron.center(), gpui::Modifiers::default());
+    vcx.simulate_click(chevron.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     for key in [
@@ -187,7 +187,7 @@ fn export_format_menu_lists_all_formats(cx: &mut gpui::TestAppContext) {
     }
 
     let json = vcx.debug_bounds("menu-fmt-json").expect("缺少 JSON 项");
-    vcx.simulate_click(json.center(), gpui::Modifiers::default());
+    vcx.simulate_click(json.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (status, menu_open) = vcx.update(|_, app| {
@@ -203,12 +203,12 @@ fn export_format_menu_lists_all_formats(cx: &mut gpui::TestAppContext) {
 
     // 「复制为」与导出共用同一编码器：未连接时同样给连接提示。
     let chevron = vcx.debug_bounds("export-format").expect("导出格式按钮缺失");
-    vcx.simulate_click(chevron.center(), gpui::Modifiers::default());
+    vcx.simulate_click(chevron.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let copy = vcx
         .debug_bounds("menu-copy-tsv")
         .expect("缺少「复制为 TSV」");
-    vcx.simulate_click(copy.center(), gpui::Modifiers::default());
+    vcx.simulate_click(copy.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let (status, menu_open) = vcx.update(|_, app| {
         let view = holder.borrow();
@@ -223,20 +223,20 @@ fn export_format_menu_lists_all_formats(cx: &mut gpui::TestAppContext) {
 ///
 /// 鼠标点击不会自动聚焦（Button 在 mouse down 时刻意 `prevent_default`），
 /// 所以这里显式把焦点交给触发器，模拟 Tab 到达之后的状态。
-#[gpui::test]
-fn export_format_menu_is_keyboard_reachable(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn export_format_menu_is_keyboard_reachable(cx: &mut gpui_kit::TestAppContext) {
     cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::component::init(cx);
         crate::theme::apply_theme_mode(cx, rustdb_core::theme::ThemeMode::Dark);
     });
     let core = rustdb_core::Core::new(rustdb_db_api::DriverRegistry::new());
-    let holder: std::rc::Rc<std::cell::RefCell<Option<gpui::Entity<MainView>>>> =
+    let holder: std::rc::Rc<std::cell::RefCell<Option<gpui_kit::Entity<MainView>>>> =
         std::rc::Rc::new(std::cell::RefCell::new(None));
     let slot = holder.clone();
     let (_, vcx) = cx.add_window_view(move |window, cx| {
         let view = cx.new(|cx| MainView::new(window, cx, core));
         *slot.borrow_mut() = Some(view.clone());
-        gpui_component::Root::new(view, window, cx)
+        gpui_kit::component::Root::new(view, window, cx)
     });
     vcx.run_until_parked();
 
@@ -316,17 +316,17 @@ fn server_label_drops_build_noise() {
     assert_eq!(short_server_label("MySQL 8.0.43", Some("")), "MySQL 8.0.43");
 }
 
-#[gpui::test]
-fn connection_tree_groups_and_collapses(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn connection_tree_groups_and_collapses(cx: &mut gpui_kit::TestAppContext) {
     std::env::set_var("RUSTDB_DEV_DB", "1");
     cx.update(|cx| {
-        gpui_component::init(cx);
+        gpui_kit::component::init(cx);
         crate::theme::apply_theme_mode(cx, rustdb_core::theme::ThemeMode::Dark);
     });
     let core = rustdb_core::Core::new(rustdb_db_api::DriverRegistry::new());
     let (_, vcx) = cx.add_window_view(move |window, cx| {
         let view = cx.new(|cx| MainView::new(window, cx, core));
-        gpui_component::Root::new(view, window, cx)
+        gpui_kit::component::Root::new(view, window, cx)
     });
     vcx.run_until_parked();
 
@@ -340,7 +340,7 @@ fn connection_tree_groups_and_collapses(cx: &mut gpui::TestAppContext) {
         "未分组之外的文件夹应同时渲染"
     );
 
-    vcx.simulate_click(folder.center(), gpui::Modifiers::default());
+    vcx.simulate_click(folder.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     assert!(
@@ -353,8 +353,8 @@ fn connection_tree_groups_and_collapses(cx: &mut gpui::TestAppContext) {
     );
 }
 
-#[gpui::test]
-fn cards_fill_the_window(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn cards_fill_the_window(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     // 布局宽度会落盘；测试钉默认值，先清掉本机可能残留的拖拽结果。
     let view = holder.borrow().clone().expect("view 未创建");
@@ -406,8 +406,8 @@ fn cards_fill_the_window(cx: &mut gpui::TestAppContext) {
     assert!(f32::from(workspace.size.height) > 100.);
 }
 
-#[gpui::test]
-fn rail_toggles_sidebar_without_losing_width(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn rail_toggles_sidebar_without_losing_width(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     reset_layout(&holder, vcx, temp_layout("sidebar"));
 
@@ -425,8 +425,8 @@ fn rail_toggles_sidebar_without_losing_width(cx: &mut gpui::TestAppContext) {
     );
 }
 
-#[gpui::test]
-fn ai_close_and_rail_toggle_the_ai_column(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn ai_close_and_rail_toggle_the_ai_column(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     reset_layout(&holder, vcx, temp_layout("ai"));
 
@@ -446,8 +446,8 @@ fn ai_close_and_rail_toggle_the_ai_column(cx: &mut gpui::TestAppContext) {
     );
 }
 
-#[gpui::test]
-fn switching_panels_uses_that_panels_own_width(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn switching_panels_uses_that_panels_own_width(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     reset_layout(&holder, vcx, temp_layout("per-panel"));
     let view = holder.borrow().clone().expect("view 未创建");
@@ -459,7 +459,7 @@ fn switching_panels_uses_that_panels_own_width(cx: &mut gpui::TestAppContext) {
     });
     vcx.run_until_parked();
 
-    let card_w = |vcx: &mut gpui::VisualTestContext| -> f32 {
+    let card_w = |vcx: &mut gpui_kit::VisualTestContext| -> f32 {
         f32::from(
             vcx.debug_bounds("sidebar-card")
                 .expect("侧栏卡片缺失")
@@ -522,8 +522,8 @@ fn objects_group_in_kind_order() {
 }
 
 /// 库下拉框能打开、列出全部分组，并在选中后关闭。
-#[gpui::test]
-fn db_menu_lists_namespaces(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn db_menu_lists_namespaces(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -539,14 +539,14 @@ fn db_menu_lists_namespaces(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let picker = vcx.debug_bounds("db-picker").expect("缺少库下拉框");
-    vcx.simulate_click(picker.center(), gpui::Modifiers::default());
+    vcx.simulate_click(picker.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     assert!(vcx.debug_bounds("db-scrim").is_some(), "应出现关闭遮罩");
     assert!(vcx.debug_bounds("db-option-main").is_some());
     let shop = vcx.debug_bounds("db-option-shop").expect("缺少 shop 选项");
 
-    vcx.simulate_click(shop.center(), gpui::Modifiers::default());
+    vcx.simulate_click(shop.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     assert!(vcx.debug_bounds("db-option-shop").is_none(), "选中后应关闭");
@@ -562,8 +562,8 @@ fn db_menu_lists_namespaces(cx: &mut gpui::TestAppContext) {
 }
 
 /// 标签页切换会恢复各自的 SQL；关闭按钮不会顺手切页。
-#[gpui::test]
-fn tabs_switch_and_close(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn tabs_switch_and_close(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -586,14 +586,14 @@ fn tabs_switch_and_close(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let second = vcx.debug_bounds("tab-2").expect("缺少第二个标签页");
-    vcx.simulate_click(second.center(), gpui::Modifiers::default());
+    vcx.simulate_click(second.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let text = vcx.update(|_, app| view.read(app).sql_input.read(app).value().to_string());
     assert_eq!(text, "select 2", "切页后编辑器应显示该页内容");
 
     let close = vcx.debug_bounds("tab-close-2").expect("缺少关闭按钮");
-    vcx.simulate_click(close.center(), gpui::Modifiers::default());
+    vcx.simulate_click(close.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     assert!(vcx.debug_bounds("tab-2").is_none(), "标签页应关闭");
@@ -602,8 +602,8 @@ fn tabs_switch_and_close(cx: &mut gpui::TestAppContext) {
 }
 
 /// 双击列分隔线：列宽收缩到内容宽度（不再均分剩余空间）。
-#[gpui::test]
-fn double_click_fits_column(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn double_click_fits_column(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -619,14 +619,14 @@ fn double_click_fits_column(cx: &mut gpui::TestAppContext) {
     let handle = vcx.debug_bounds("col-handle-1").expect("缺少列宽把手");
     vcx.simulate_mouse_down(
         handle.center(),
-        gpui::MouseButton::Left,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Left,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     vcx.simulate_mouse_up(
         handle.center(),
-        gpui::MouseButton::Left,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Left,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     assert!(
@@ -658,8 +658,8 @@ fn double_click_fits_column(cx: &mut gpui::TestAppContext) {
 }
 
 /// 库节点：单击展开、双击开页；右键出库菜单。
-#[gpui::test]
-fn namespace_click_and_double_click(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn namespace_click_and_double_click(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -676,7 +676,7 @@ fn namespace_click_and_double_click(cx: &mut gpui::TestAppContext) {
 
     let db = vcx.debug_bounds("db-main").expect("缺少库节点");
     // 单击：展开，不开标签页。
-    vcx.simulate_click(db.center(), gpui::Modifiers::default());
+    vcx.simulate_click(db.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).expanded_ns.contains("main")),
@@ -689,17 +689,17 @@ fn namespace_click_and_double_click(cx: &mut gpui::TestAppContext) {
 
     // 双击：开标签页。
     let db = vcx.debug_bounds("db-main").expect("缺少库节点");
-    vcx.simulate_event(gpui::MouseDownEvent {
+    vcx.simulate_event(gpui_kit::MouseDownEvent {
         position: db.center(),
-        button: gpui::MouseButton::Left,
-        modifiers: gpui::Modifiers::default(),
+        button: gpui_kit::MouseButton::Left,
+        modifiers: gpui_kit::Modifiers::default(),
         click_count: 2,
         first_mouse: false,
     });
-    vcx.simulate_event(gpui::MouseUpEvent {
+    vcx.simulate_event(gpui_kit::MouseUpEvent {
         position: db.center(),
-        button: gpui::MouseButton::Left,
-        modifiers: gpui::Modifiers::default(),
+        button: gpui_kit::MouseButton::Left,
+        modifiers: gpui_kit::Modifiers::default(),
         click_count: 2,
     });
     vcx.run_until_parked();
@@ -712,8 +712,8 @@ fn namespace_click_and_double_click(cx: &mut gpui::TestAppContext) {
     // 右键：库菜单。
     vcx.simulate_mouse_down(
         db.center(),
-        gpui::MouseButton::Right,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("ns-scrim").is_some(), "应出现库菜单遮罩");
@@ -722,14 +722,14 @@ fn namespace_click_and_double_click(cx: &mut gpui::TestAppContext) {
     assert!(vcx.debug_bounds("menu-ns-copy").is_some());
 
     let scrim = vcx.debug_bounds("ns-scrim").expect("缺少遮罩");
-    vcx.simulate_click(scrim.center(), gpui::Modifiers::default());
+    vcx.simulate_click(scrim.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("menu-ns-open").is_none());
 }
 
 /// 删除前的确认框：名字不匹配不执行，取消则关闭。
-#[gpui::test]
-fn drop_confirmation_requires_name(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn drop_confirmation_requires_name(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -753,7 +753,7 @@ fn drop_confirmation_requires_name(cx: &mut gpui::TestAppContext) {
     );
 
     let cancel = vcx.debug_bounds("danger-cancel").expect("缺少取消按钮");
-    vcx.simulate_click(cancel.center(), gpui::Modifiers::default());
+    vcx.simulate_click(cancel.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).danger.is_none()),
@@ -801,8 +801,8 @@ fn danger_accepts_only_exact_name() {
 }
 
 /// 「设计表」面板：列与索引都渲染出来，关闭按钮生效。
-#[gpui::test]
-fn table_panel_shows_columns(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn table_panel_shows_columns(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -861,7 +861,7 @@ fn table_panel_shows_columns(cx: &mut gpui::TestAppContext) {
         "设计表面板不应有遮罩"
     );
     let close = vcx.debug_bounds("table-panel-close").expect("缺少关闭按钮");
-    vcx.simulate_click(close.center(), gpui::Modifiers::default());
+    vcx.simulate_click(close.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).table_panel.is_none()),
@@ -870,8 +870,8 @@ fn table_panel_shows_columns(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-82：源码入口只对例程出现，且要求驱动开了 `routine_source_edit`。
-#[gpui::test]
-fn routine_source_entry_follows_capability(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn routine_source_entry_follows_capability(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -886,7 +886,7 @@ fn routine_source_entry_follows_capability(cx: &mut gpui::TestAppContext) {
                 view.capabilities = Some(caps);
                 view.obj_menu = Some(ObjectMenu {
                     path,
-                    at: gpui::point(px(10.), px(10.)),
+                    at: gpui_kit::point(px(10.), px(10.)),
                 });
                 view.object_menu_groups()
                     .iter()
@@ -939,8 +939,8 @@ fn routine_kind_maps_only_routine_objects() {
 }
 
 /// F-82：源码面板能渲染；脏草稿关闭前要先确认。
-#[gpui::test]
-fn routine_panel_renders_and_guards_dirty_draft(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn routine_panel_renders_and_guards_dirty_draft(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -952,7 +952,7 @@ fn routine_panel_renders_and_guards_dirty_draft(cx: &mut gpui::TestAppContext) {
         view.update(app, |view, cx| {
             let editor = cx.new(|cx| EditorState::new(window, cx).language("sql"));
             let search = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx).placeholder("搜索源码")
+                gpui_kit::component::input::InputState::new(window, cx).placeholder("搜索源码")
             });
             view.routine = Some(RoutinePanel {
                 path: path.clone(),
@@ -1001,7 +1001,7 @@ fn routine_panel_renders_and_guards_dirty_draft(cx: &mut gpui::TestAppContext) {
     let close = vcx
         .debug_bounds("routine-panel-close")
         .expect("缺少关闭按钮");
-    vcx.simulate_click(close.center(), gpui::Modifiers::default());
+    vcx.simulate_click(close.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("routine-discard").is_some(),
@@ -1015,7 +1015,7 @@ fn routine_panel_renders_and_guards_dirty_draft(cx: &mut gpui::TestAppContext) {
     let discard = vcx
         .debug_bounds("routine-discard-confirm")
         .expect("缺少放弃按钮");
-    vcx.simulate_click(discard.center(), gpui::Modifiers::default());
+    vcx.simulate_click(discard.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).routine.is_none()),
@@ -1024,8 +1024,8 @@ fn routine_panel_renders_and_guards_dirty_draft(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-83：依赖区展示加载 / 结果，并在「依赖 / 被依赖」间切换。
-#[gpui::test]
-fn routine_dependency_strip_and_tabs(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn routine_dependency_strip_and_tabs(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1045,7 +1045,7 @@ fn routine_dependency_strip_and_tabs(cx: &mut gpui::TestAppContext) {
         view.update(app, |view, cx| {
             let editor = cx.new(|cx| EditorState::new(window, cx).language("sql"));
             let search = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx).placeholder("搜索源码")
+                gpui_kit::component::input::InputState::new(window, cx).placeholder("搜索源码")
             });
             view.routine = Some(RoutinePanel {
                 path: path.clone(),
@@ -1086,7 +1086,7 @@ fn routine_dependency_strip_and_tabs(cx: &mut gpui::TestAppContext) {
     let rev = vcx
         .debug_bounds("routine-deps-tab-rev")
         .expect("缺少被依赖页签");
-    vcx.simulate_click(rev.center(), gpui::Modifiers::default());
+    vcx.simulate_click(rev.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert_eq!(
         vcx.update(|_, app| view.read(app).routine.as_ref().map(|p| p.deps.tab)),
@@ -1117,8 +1117,8 @@ fn routine_dependency_strip_and_tabs(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-83：草稿未保存时，点依赖里的例程不应直接切走。
-#[gpui::test]
-fn routine_dependency_jump_guards_dirty_draft(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn routine_dependency_jump_guards_dirty_draft(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1133,7 +1133,7 @@ fn routine_dependency_jump_guards_dirty_draft(cx: &mut gpui::TestAppContext) {
         view.update(app, |view, cx| {
             let editor = cx.new(|cx| EditorState::new(window, cx).language("sql"));
             let search = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx).placeholder("搜索源码")
+                gpui_kit::component::input::InputState::new(window, cx).placeholder("搜索源码")
             });
             editor.update(cx, |state, cx| {
                 state.set_value("CREATE VIEW v_orders AS SELECT 2;".to_string(), window, cx);
@@ -1171,8 +1171,8 @@ fn routine_dependency_jump_guards_dirty_draft(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-85：分区入口只对表出现，且要求驱动开了 `partition_admin`。
-#[gpui::test]
-fn partition_entry_follows_capability(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn partition_entry_follows_capability(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1187,7 +1187,7 @@ fn partition_entry_follows_capability(cx: &mut gpui::TestAppContext) {
                 view.capabilities = Some(caps);
                 view.obj_menu = Some(ObjectMenu {
                     path,
-                    at: gpui::point(px(10.), px(10.)),
+                    at: gpui_kit::point(px(10.), px(10.)),
                 });
                 view.object_menu_groups()
                     .iter()
@@ -1203,8 +1203,8 @@ fn partition_entry_follows_capability(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-85：分区面板渲染列表与表单入口；预览浮层先于面板被 Esc 关闭。
-#[gpui::test]
-fn partition_panel_lists_partitions_and_previews_ddl(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn partition_panel_lists_partitions_and_previews_ddl(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1237,22 +1237,22 @@ fn partition_panel_lists_partitions_and_previews_ddl(cx: &mut gpui::TestAppConte
                 list: Some(list),
                 form: PartitionForm::None,
                 name: cx.new(|cx| {
-                    gpui_component::input::InputState::new(window, cx).placeholder("分区名")
+                    gpui_kit::component::input::InputState::new(window, cx).placeholder("分区名")
                 }),
                 range_from: cx.new(|cx| {
-                    gpui_component::input::InputState::new(window, cx).placeholder("起点")
+                    gpui_kit::component::input::InputState::new(window, cx).placeholder("起点")
                 }),
                 range_to: cx.new(|cx| {
-                    gpui_component::input::InputState::new(window, cx).placeholder("终点")
+                    gpui_kit::component::input::InputState::new(window, cx).placeholder("终点")
                 }),
                 list_values: cx.new(|cx| {
-                    gpui_component::input::InputState::new(window, cx).placeholder("列表值")
+                    gpui_kit::component::input::InputState::new(window, cx).placeholder("列表值")
                 }),
                 modulus: cx.new(|cx| {
-                    gpui_component::input::InputState::new(window, cx).placeholder("MODULUS")
+                    gpui_kit::component::input::InputState::new(window, cx).placeholder("MODULUS")
                 }),
                 remainder: cx.new(|cx| {
-                    gpui_component::input::InputState::new(window, cx).placeholder("REMAINDER")
+                    gpui_kit::component::input::InputState::new(window, cx).placeholder("REMAINDER")
                 }),
                 is_default: false,
                 detach_concurrently: false,
@@ -1307,7 +1307,7 @@ fn partition_panel_lists_partitions_and_previews_ddl(cx: &mut gpui::TestAppConte
 
     // 打开新建表单：范围策略给起点 / 终点，并允许 DEFAULT。
     let create = vcx.debug_bounds("partition-create").expect("缺少新建按钮");
-    vcx.simulate_click(create.center(), gpui::Modifiers::default());
+    vcx.simulate_click(create.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("partition-form-preview").is_some());
     assert!(vcx.debug_bounds("partition-default-toggle").is_some());
@@ -1373,8 +1373,8 @@ fn partition_panel_lists_partitions_and_previews_ddl(cx: &mut gpui::TestAppConte
 }
 
 /// F-90：导出页渲染勾选列表；导入预览按名称+主机+端口标冲突并跳过。
-#[gpui::test]
-fn exchange_panel_exports_and_imports_with_dedupe(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn exchange_panel_exports_and_imports_with_dedupe(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1390,7 +1390,7 @@ fn exchange_panel_exports_and_imports_with_dedupe(cx: &mut gpui::TestAppContext)
     let entry = vcx
         .debug_bounds("settings-exchange")
         .expect("缺少导入/导出入口");
-    vcx.simulate_click(entry.center(), gpui::Modifiers::default());
+    vcx.simulate_click(entry.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("exchange-panel").is_some(),
@@ -1407,7 +1407,7 @@ fn exchange_panel_exports_and_imports_with_dedupe(cx: &mut gpui::TestAppContext)
     let import_tab = vcx
         .debug_bounds("exchange-tab-import")
         .expect("缺少导入页签");
-    vcx.simulate_click(import_tab.center(), gpui::Modifiers::default());
+    vcx.simulate_click(import_tab.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("exchange-pick").is_some());
     assert!(
@@ -1461,7 +1461,7 @@ fn exchange_panel_exports_and_imports_with_dedupe(cx: &mut gpui::TestAppContext)
 
     let before = vcx.update(|_, app| view.read(app).profiles.len());
     let import = vcx.debug_bounds("exchange-import").expect("缺少导入按钮");
-    vcx.simulate_click(import.center(), gpui::Modifiers::default());
+    vcx.simulate_click(import.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| view.read(app).exchange.is_none()),
@@ -1478,8 +1478,8 @@ fn exchange_panel_exports_and_imports_with_dedupe(cx: &mut gpui::TestAppContext)
 }
 
 /// F-90：空白口令导出先要求二次确认；Esc 关闭面板。
-#[gpui::test]
-fn exchange_panel_guards_plaintext_export_and_escape(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn exchange_panel_guards_plaintext_export_and_escape(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1493,10 +1493,10 @@ fn exchange_panel_guards_plaintext_export_and_escape(cx: &mut gpui::TestAppConte
     vcx.run_until_parked();
 
     let entry = vcx.debug_bounds("settings-exchange").expect("缺少入口");
-    vcx.simulate_click(entry.center(), gpui::Modifiers::default());
+    vcx.simulate_click(entry.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let export = vcx.debug_bounds("exchange-export").expect("缺少导出按钮");
-    vcx.simulate_click(export.center(), gpui::Modifiers::default());
+    vcx.simulate_click(export.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let guarded = vcx.update(|_, app| {
         view.read(app)
@@ -1516,8 +1516,8 @@ fn exchange_panel_guards_plaintext_export_and_escape(cx: &mut gpui::TestAppConte
 }
 
 /// 连接节点右键：出连接菜单（未连接时是「打开连接」）。
-#[gpui::test]
-fn connection_context_menu(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn connection_context_menu(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1535,8 +1535,8 @@ fn connection_context_menu(cx: &mut gpui::TestAppContext) {
     let conn = vcx.debug_bounds("conn-demo-sqlite").expect("缺少连接节点");
     vcx.simulate_mouse_down(
         conn.center(),
-        gpui::MouseButton::Right,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
 
@@ -1548,8 +1548,8 @@ fn connection_context_menu(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-89：生产标记常驻徽标；右键可临时解锁 / 回锁。
-#[gpui::test]
-fn production_badge_and_unlock_flow(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn production_badge_and_unlock_flow(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1580,8 +1580,8 @@ fn production_badge_and_unlock_flow(cx: &mut gpui::TestAppContext) {
     let conn = vcx.debug_bounds("conn-demo-sqlite").expect("缺少连接节点");
     vcx.simulate_mouse_down(
         conn.center(),
-        gpui::MouseButton::Right,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("menu-conn-prod-clear").is_some());
@@ -1594,7 +1594,7 @@ fn production_badge_and_unlock_flow(cx: &mut gpui::TestAppContext) {
         "未解锁时不应出现回锁"
     );
 
-    vcx.simulate_click(unlock.center(), gpui::Modifiers::default());
+    vcx.simulate_click(unlock.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let unlocked = vcx.update(|_, app| {
         view.read(app)
@@ -1615,8 +1615,8 @@ fn production_badge_and_unlock_flow(cx: &mut gpui::TestAppContext) {
     let conn = vcx.debug_bounds("conn-demo-sqlite").expect("缺少连接节点");
     vcx.simulate_mouse_down(
         conn.center(),
-        gpui::MouseButton::Right,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     assert!(
@@ -1625,7 +1625,7 @@ fn production_badge_and_unlock_flow(cx: &mut gpui::TestAppContext) {
     );
     assert!(vcx.debug_bounds("menu-conn-unlock-1").is_none());
     let lock = vcx.debug_bounds("menu-conn-lock").unwrap();
-    vcx.simulate_click(lock.center(), gpui::Modifiers::default());
+    vcx.simulate_click(lock.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let (locked, status) = vcx.update(|_, app| {
         let view = view.read(app);
@@ -1642,14 +1642,14 @@ fn production_badge_and_unlock_flow(cx: &mut gpui::TestAppContext) {
     let conn = vcx.debug_bounds("conn-demo-sqlite").expect("缺少连接节点");
     vcx.simulate_mouse_down(
         conn.center(),
-        gpui::MouseButton::Right,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     let clear = vcx
         .debug_bounds("menu-conn-prod-clear")
         .expect("缺少取消生产标记");
-    vcx.simulate_click(clear.center(), gpui::Modifiers::default());
+    vcx.simulate_click(clear.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let production = vcx.update(|_, app| {
         view.read(app)
@@ -1665,8 +1665,8 @@ fn production_badge_and_unlock_flow(cx: &mut gpui::TestAppContext) {
 }
 
 /// 点菜单项必须真的派发动作：清空 → 确认框；复制 → 剪贴板。
-#[gpui::test]
-fn menu_click_dispatches_actions(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn menu_click_dispatches_actions(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -1696,14 +1696,14 @@ fn menu_click_dispatches_actions(cx: &mut gpui::TestAppContext) {
         .expect("缺少 orders 节点");
     vcx.simulate_mouse_down(
         orders.center(),
-        gpui::MouseButton::Right,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
 
     // 复制名称 → 菜单关闭 + 状态栏提示（剪贴板在无头测试里不保证可用）。
     let copy = vcx.debug_bounds("menu-obj-copy").expect("缺少复制名称");
-    vcx.simulate_click(copy.center(), gpui::Modifiers::default());
+    vcx.simulate_click(copy.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let (closed, status) = vcx.update(|_, app| {
         let view = view.read(app);
@@ -1718,12 +1718,12 @@ fn menu_click_dispatches_actions(cx: &mut gpui::TestAppContext) {
         .expect("缺少 orders 节点");
     vcx.simulate_mouse_down(
         orders.center(),
-        gpui::MouseButton::Right,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     let truncate = vcx.debug_bounds("menu-obj-truncate").expect("缺少清空表");
-    vcx.simulate_click(truncate.center(), gpui::Modifiers::default());
+    vcx.simulate_click(truncate.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.update(|_, app| matches!(view.read(app).danger, Some(DangerAction::Truncate { .. }))),
@@ -1745,12 +1745,12 @@ fn menu_click_dispatches_actions(cx: &mut gpui::TestAppContext) {
         .expect("缺少 orders 节点");
     vcx.simulate_mouse_down(
         orders.center(),
-        gpui::MouseButton::Right,
-        gpui::Modifiers::default(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     let ddl = vcx.debug_bounds("menu-obj-ddl").expect("缺少查看 DDL");
-    vcx.simulate_click(ddl.center(), gpui::Modifiers::default());
+    vcx.simulate_click(ddl.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let status = vcx.update(|_, app| view.read(app).status.clone());
     assert!(
@@ -1760,8 +1760,8 @@ fn menu_click_dispatches_actions(cx: &mut gpui::TestAppContext) {
 }
 
 /// P1-①：拖动分隔条改编辑器高度，松手后写进 layout.json。
-#[gpui::test]
-fn editor_splitter_drag_persists_height(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn editor_splitter_drag_persists_height(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let layout_path = temp_layout("editor-drag");
     reset_layout(&holder, vcx, layout_path.clone());
@@ -1784,20 +1784,20 @@ fn editor_splitter_drag_persists_height(cx: &mut gpui::TestAppContext) {
         .debug_bounds("editor-splitter")
         .expect("缺少分隔条")
         .center();
-    let end = gpui::Point {
+    let end = gpui_kit::Point {
         x: start.x,
         y: start.y + px(64.),
     };
-    let further = gpui::Point {
+    let further = gpui_kit::Point {
         x: start.x,
         y: start.y + px(80.),
     };
-    vcx.simulate_mouse_down(start, gpui::MouseButton::Left, gpui::Modifiers::default());
+    vcx.simulate_mouse_down(start, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     vcx.simulate_mouse_move(
         end,
-        Some(gpui::MouseButton::Left),
-        gpui::Modifiers::default(),
+        Some(gpui_kit::MouseButton::Left),
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
     assert!(
@@ -1808,11 +1808,11 @@ fn editor_splitter_drag_persists_height(cx: &mut gpui::TestAppContext) {
     // 否则真实拖拽会在第一帧后卡住。
     vcx.simulate_mouse_move(
         further,
-        Some(gpui::MouseButton::Left),
-        gpui::Modifiers::default(),
+        Some(gpui_kit::MouseButton::Left),
+        gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
-    vcx.simulate_mouse_up(further, gpui::MouseButton::Left, gpui::Modifiers::default());
+    vcx.simulate_mouse_up(further, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let after = f32::from(
@@ -1839,8 +1839,8 @@ fn editor_splitter_drag_persists_height(cx: &mut gpui::TestAppContext) {
 }
 
 /// P1-①：键盘微调与复位（全局按键观察者，不依赖分隔条焦点）。
-#[gpui::test]
-fn editor_height_keyboard_nudge_and_reset(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn editor_height_keyboard_nudge_and_reset(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let layout_path = temp_layout("editor-keys");
     reset_layout(&holder, vcx, layout_path.clone());
@@ -1867,8 +1867,8 @@ fn editor_height_keyboard_nudge_and_reset(cx: &mut gpui::TestAppContext) {
 }
 
 /// P1-①：双击分隔条复位；缺省配置下分隔条与编辑器都存在。
-#[gpui::test]
-fn editor_splitter_double_click_resets(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn editor_splitter_double_click_resets(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let layout_path = temp_layout("editor-dblclick");
     reset_layout(&holder, vcx, layout_path.clone());
@@ -1886,17 +1886,17 @@ fn editor_splitter_double_click_resets(cx: &mut gpui::TestAppContext) {
         .debug_bounds("editor-splitter")
         .expect("缺少分隔条")
         .center();
-    vcx.simulate_event(gpui::MouseDownEvent {
+    vcx.simulate_event(gpui_kit::MouseDownEvent {
         position: handle,
-        button: gpui::MouseButton::Left,
-        modifiers: gpui::Modifiers::default(),
+        button: gpui_kit::MouseButton::Left,
+        modifiers: gpui_kit::Modifiers::default(),
         click_count: 2,
         first_mouse: false,
     });
-    vcx.simulate_event(gpui::MouseUpEvent {
+    vcx.simulate_event(gpui_kit::MouseUpEvent {
         position: handle,
-        button: gpui::MouseButton::Left,
-        modifiers: gpui::Modifiers::default(),
+        button: gpui_kit::MouseButton::Left,
+        modifiers: gpui_kit::Modifiers::default(),
         click_count: 2,
     });
     vcx.run_until_parked();
@@ -1906,8 +1906,8 @@ fn editor_splitter_double_click_resets(cx: &mut gpui::TestAppContext) {
 }
 
 /// P1-②：加载相位由既有轮询同步，起手不显骨架、结束即回收。
-#[gpui::test]
-fn loading_phase_sync_follows_loading_state(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn loading_phase_sync_follows_loading_state(cx: &mut gpui_kit::TestAppContext) {
     let (_vcx, holder) = test_view(cx);
     let view = holder.borrow().clone().expect("view 未创建");
     _vcx.update(|_, app| {
@@ -1932,8 +1932,8 @@ fn loading_phase_sync_follows_loading_state(cx: &mut gpui::TestAppContext) {
 }
 
 /// P1-②：结果区骨架 400ms 内不可见，超时后才出现。
-#[gpui::test]
-fn result_skeleton_waits_for_400ms(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn result_skeleton_waits_for_400ms(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let view = holder.borrow().clone().expect("view 未创建");
     vcx.update(|_, app| {
@@ -1972,8 +1972,8 @@ fn result_skeleton_waits_for_400ms(cx: &mut gpui::TestAppContext) {
 }
 
 /// P1-②：长查询且已有旧结果时只降透明度，不铺骨架、不清空内容。
-#[gpui::test]
-fn result_opacity_dims_stale_content(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn result_opacity_dims_stale_content(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let view = holder.borrow().clone().expect("view 未创建");
     vcx.update(|_, app| {
@@ -2005,13 +2005,13 @@ fn result_opacity_dims_stale_content(cx: &mut gpui::TestAppContext) {
 
 /// P1-④：把视口调到指定宽度并让实测宽度收敛（prepaint 回调补一帧）。
 fn resize_toolbar_view(
-    vcx: &mut gpui::VisualTestContext,
-    view: &gpui::Entity<MainView>,
+    vcx: &mut gpui_kit::VisualTestContext,
+    view: &gpui_kit::Entity<MainView>,
     width: f32,
     ai_open: bool,
 ) {
     vcx.update(|window, app| {
-        window.resize(gpui::size(gpui::px(width), gpui::px(800.)));
+        window.resize(gpui_kit::size(gpui_kit::px(width), gpui_kit::px(800.)));
         window.bounds_changed(app);
         view.update(app, |main, cx| {
             main.layout.ai_open = ai_open;
@@ -2028,8 +2028,8 @@ fn resize_toolbar_view(
 /// P1-④：工具栏 ≥900px 时次要动作平铺，<900px 时收进「更多 ▾」。
 /// 判定必须用实测宽度——窗口缩放会把定宽面板 flex 压缩且不回写 layout，
 /// 纯视口估算会偏小并在 900 边界附近误折叠。
-#[gpui::test]
-fn toolbar_collapses_secondary_actions_below_900(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn toolbar_collapses_secondary_actions_below_900(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let view = holder.borrow().clone().expect("view 未创建");
 
@@ -2088,8 +2088,8 @@ fn toolbar_collapses_secondary_actions_below_900(cx: &mut gpui::TestAppContext) 
 
 /// P1-④：折叠阈值严格是 900（半开半闭：<900 折叠，=900 不折叠）。
 /// 直接钉实测宽度，避免依赖「视口 → 面板 flex 压缩」的历史相关映射。
-#[gpui::test]
-fn toolbar_compact_threshold_is_900(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn toolbar_compact_threshold_is_900(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let view = holder.borrow().clone().expect("view 未创建");
     assert_eq!(rustdb_core::TOOLBAR_COMPACT_W, 900., "阈值口径见规范 §8");
@@ -2106,14 +2106,14 @@ fn toolbar_compact_threshold_is_900(cx: &mut gpui::TestAppContext) {
 }
 
 /// P1-④：「更多 ▾」鼠标闭环 —— 三个折叠项齐全、执行后关闭、点遮罩也能收起。
-#[gpui::test]
-fn toolbar_more_menu_executes_and_closes(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn toolbar_more_menu_executes_and_closes(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let view = holder.borrow().clone().expect("view 未创建");
     resize_toolbar_view(vcx, &view, 1280., true);
 
     let more = vcx.debug_bounds("toolbar-more").expect("缺少「更多 ▾」");
-    vcx.simulate_click(more.center(), gpui::Modifiers::default());
+    vcx.simulate_click(more.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     for key in [
         "menu-more-preview-dml",
@@ -2124,7 +2124,7 @@ fn toolbar_more_menu_executes_and_closes(cx: &mut gpui::TestAppContext) {
     }
 
     let save = vcx.debug_bounds("menu-more-save-sql").expect("缺少保存项");
-    vcx.simulate_click(save.center(), gpui::Modifiers::default());
+    vcx.simulate_click(save.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let (open, hover) = vcx.update(|_, app| {
         let main = view.read(app);
@@ -2134,12 +2134,12 @@ fn toolbar_more_menu_executes_and_closes(cx: &mut gpui::TestAppContext) {
     assert_eq!(hover, None, "关闭时高亮位必须一起清掉");
 
     let more = vcx.debug_bounds("toolbar-more").expect("缺少「更多 ▾」");
-    vcx.simulate_click(more.center(), gpui::Modifiers::default());
+    vcx.simulate_click(more.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let scrim = vcx
         .debug_bounds("toolbar-more-scrim")
         .expect("打开时应有遮罩");
-    vcx.simulate_click(scrim.center(), gpui::Modifiers::default());
+    vcx.simulate_click(scrim.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let open = vcx.update(|_, app| view.read(app).toolbar_menu.is_some());
     assert!(!open, "点遮罩应收起菜单");
@@ -2147,8 +2147,8 @@ fn toolbar_more_menu_executes_and_closes(cx: &mut gpui::TestAppContext) {
 
 /// P1-④：「更多 ▾」键盘闭环 —— Enter 打开、↓ 移高亮、Enter 执行、Esc 收起。
 /// 与导出菜单同口径走全局观察者，不依赖组件的键盘 ClickEvent 合成。
-#[gpui::test]
-fn toolbar_more_menu_is_keyboard_reachable(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn toolbar_more_menu_is_keyboard_reachable(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     let view = holder.borrow().clone().expect("view 未创建");
     resize_toolbar_view(vcx, &view, 1280., true);
@@ -2211,8 +2211,8 @@ fn toolbar_more_menu_is_keyboard_reachable(cx: &mut gpui::TestAppContext) {
 /// 压缩后的宽度，可用宽偏大，裁切会被历史状态掩盖（实测 700px 共用 370.5 / 新建 290.5）。
 /// 宽度 ≥NARROW_WINDOW 时可用宽随视口单调递增，所以 1024 是最紧的约束点；
 /// 1280 / 1920 分别覆盖折叠态与平铺态。
-#[gpui::test]
-fn toolbar_never_clips_in_supported_window_range(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn toolbar_never_clips_in_supported_window_range(cx: &mut gpui_kit::TestAppContext) {
     for ai in [false, true] {
         for w in [1024., 1280., 1920.] {
             let (vcx, holder) = test_view(cx);
@@ -2268,5 +2268,146 @@ fn menu_hover_move_wraps_and_handles_empty() {
         menu_hover_move("down", Some(0), 1),
         Some(0),
         "单项菜单原地不动"
+    );
+}
+
+/// P2-⑥a：未连接时状态栏常驻字段给出默认文案，只读徽标不出现。
+#[gpui_kit::test]
+fn status_bar_persistent_fields_defaults(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+
+    for selector in ["status-conn", "status-tx", "status-rows", "status-elapsed"] {
+        assert!(
+            vcx.debug_bounds(selector).is_some(),
+            "常驻字段 {selector} 应始终渲染"
+        );
+    }
+    assert!(
+        vcx.debug_bounds("status-readonly").is_none(),
+        "未连接时不应出现只读徽标"
+    );
+
+    let labels = vcx.update(|_, app| view.read(app).status_field_labels());
+    assert_eq!(labels.conn, "未连接");
+    assert_eq!(labels.tx, "自动提交");
+    assert!(!labels.tx_active);
+    assert_eq!(labels.rows, "无结果");
+    assert_eq!(labels.elapsed, "—");
+    assert!(!labels.read_only);
+}
+
+/// P2-⑥a：连接 / 结果 / 事务变化时常驻字段文案跟随，截断与耗时口径正确。
+#[gpui_kit::test]
+fn status_bar_persistent_fields_follow_state(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.session = Some(SessionId::new());
+            view.active_profile = Some("demo-sqlite".to_string());
+            view.profiles = view.core.profiles();
+            push_result(view, 3, 2);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    let labels = vcx.update(|_, app| view.read(app).status_field_labels());
+    assert_eq!(labels.conn, "本地示例");
+    assert_eq!(labels.conn_tip, "本地示例 · SQLite · :memory:");
+    assert_eq!(labels.rows, "3 行");
+    assert_eq!(labels.elapsed, "12 ms");
+    assert_eq!(labels.tx, "自动提交");
+
+    // 事务：65 秒前开始、4 条语句 → 01:05。
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.tx = Some(TxView {
+                started: Instant::now() - Duration::from_secs(65),
+                statements: 4,
+                read_only: false,
+            });
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    let labels = vcx.update(|_, app| view.read(app).status_field_labels());
+    assert_eq!(labels.tx, "事务 · 4 条 · 01:05");
+    assert!(labels.tx_active);
+    assert!(labels.tx_tip.contains("不会自动提交"));
+
+    // 截断 → 「N 行 · 截断」；写入影响行数优先；≥1s 用秒。
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            let tab = view.tabs.get_mut(view.active_tab).expect("应有活动标签");
+            let rv = tab.results.get_mut(tab.active_result).expect("应有结果");
+            rv.truncated = true;
+            rv.elapsed_ms = 2500;
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    let labels = vcx.update(|_, app| view.read(app).status_field_labels());
+    assert_eq!(labels.rows, "3 行 · 截断");
+    assert!(labels.rows_tip.contains("仅加载前 3 行"));
+    assert_eq!(labels.elapsed, "2.50 s");
+
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            let tab = view.tabs.get_mut(view.active_tab).expect("应有活动标签");
+            let rv = tab.results.get_mut(tab.active_result).expect("应有结果");
+            rv.affected = Some(5);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    let labels = vcx.update(|_, app| view.read(app).status_field_labels());
+    assert_eq!(labels.rows, "影响 5 行");
+}
+
+/// P2-⑥a：只读徽标跟随连接配置出现 / 消失。
+#[gpui_kit::test]
+fn status_bar_readonly_badge_follows_profile(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.session = Some(SessionId::new());
+            view.active_profile = Some("demo-sqlite".to_string());
+            view.profiles = view.core.profiles();
+            for p in view.profiles.iter_mut() {
+                if p.id == "demo-sqlite" {
+                    p.read_only = true;
+                }
+            }
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("status-readonly").is_some(),
+        "只读连接应常驻只读徽标"
+    );
+    let read_only = vcx.update(|_, app| view.read(app).status_field_labels().read_only);
+    assert!(read_only);
+
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            for p in view.profiles.iter_mut() {
+                if p.id == "demo-sqlite" {
+                    p.read_only = false;
+                }
+            }
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("status-readonly").is_none(),
+        "取消只读后徽标应消失"
     );
 }

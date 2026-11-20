@@ -1,6 +1,14 @@
 //! AI 侧栏：对话气泡、工具调用与上下文芯片。
 
 use super::*;
+use gpui_kit::component::scroll::ScrollbarHandle as _;
+
+/// P1-⑤：转录虚拟化的消息数阈值；以下保持整段渲染（短会话无滚动开销，测试路径不变）。
+const AI_VIRTUAL_THRESHOLD: usize = 50;
+/// P1-⑤：贴底判定容差，吸收高度回写带来的一帧抖动。
+const AI_STICK_SLACK: f32 = 40.;
+/// P1-⑤：首帧拿不到实测列宽时的估算兜底。
+const AI_FALLBACK_WIDTH: f32 = 300.;
 
 impl MainView {
     pub(crate) fn render_ai_column(
@@ -12,73 +20,38 @@ impl MainView {
         // 输入框懒创建。
         if self.ai_input.is_none() {
             let input = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx)
+                gpui_kit::component::input::InputState::new(window, cx)
                     .placeholder("描述需求，如：上周各渠道 GMV")
             });
             self.ai_input = Some(input);
         }
         let input = self.ai_input.clone().expect("刚刚创建");
 
-        let mut transcript = v_flex().gap(px(6.));
-        if self.ai_lines.is_empty() {
-            transcript = transcript.child(crate::design::empty_state(
-                cx,
-                IconName::Bot,
-                "描述需求，让 AI 生成 SQL",
-                "示例：统计上周各渠道 GMV",
-            ));
-        }
-        for (line_index, (role, text)) in self.ai_lines.clone().into_iter().enumerate() {
-            let (fg, bg, role_label) = match role.as_str() {
-                "user" => (t.fg_primary, t.bg_overlay, "我"),
-                "assistant" => (t.fg_primary, t.bg_base, "AI 助手"),
-                "error" => (t.danger, t.bg_base, "错误"),
-                _ => (t.fg_muted, t.bg_base, "工具"),
-            };
-            let mut bubble = v_flex()
-                .gap(px(2.))
-                .p_2()
-                .rounded(px(6.))
-                .bg(hex(bg))
-                .border_1()
-                .border_color(hex(t.border_strong))
-                .child(
-                    div()
-                        .text_size(px(crate::design::TS_CAPTION))
-                        .text_color(hex(t.fg_muted))
-                        .child(role_label),
-                );
-            // 助手回答：SQL 围栏块单独成卡（应用 / 试跑 / 执行），其余仍按文本渲染。
-            let blocks = if role == "assistant" {
-                rustdb_core::answer_blocks(&text)
+        // 转录：短会话整段渲染；长会话走虚拟列表，只画可见气泡（P1-⑤）。
+        let transcript: gpui_kit::AnyElement =
+            if self.ai_lines.len() >= AI_VIRTUAL_THRESHOLD {
+                self.render_ai_transcript_virtual(window, cx)
             } else {
-                vec![rustdb_core::AnswerBlock::Text(text)]
-            };
-            let mut ordinal = 0usize;
-            for block in blocks {
-                match block {
-                    rustdb_core::AnswerBlock::Text(part) => {
-                        if part.trim().is_empty() {
-                            continue;
-                        }
-                        bubble = bubble.child(
-                            div()
-                                .text_size(px(crate::design::TS_CAPTION))
-                                .text_color(hex(fg))
-                                .whitespace_normal()
-                                .child(SharedString::from(part)),
-                        );
-                    }
-                    rustdb_core::AnswerBlock::Sql { sql, language } => {
-                        bubble = bubble.child(
-                            self.render_ai_sql_block(line_index, ordinal, &sql, &language, cx),
-                        );
-                        ordinal += 1;
-                    }
+                let mut body = v_flex().gap(px(6.));
+                if self.ai_lines.is_empty() {
+                    body = body.child(crate::design::empty_state(
+                        cx,
+                        IconName::Bot,
+                        "描述需求，让 AI 生成 SQL",
+                        "示例：统计上周各渠道 GMV",
+                    ));
                 }
-            }
-            transcript = transcript.child(bubble);
-        }
+                for (line_index, (role, text)) in self.ai_lines.clone().into_iter().enumerate() {
+                    body = body.child(self.render_ai_bubble(line_index, &role, &text, cx));
+                }
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scrollbar()
+                    .scroll_bounce(false)
+                    .child(body)
+                    .into_any_element()
+            };
 
         // 历史面板：会话列表 + 重命名输入行。
         let mut history_panel = div().into_any_element();
@@ -169,7 +142,7 @@ impl MainView {
                                 .flex_1()
                                 .min_w_0()
                                 .debug_selector(|| "ai-rename-input".to_string())
-                                .child(gpui_component::input::Input::new(&input).small()),
+                                .child(gpui_kit::component::input::Input::new(&input).small()),
                         )
                         .child(
                             Button::new("ai-rename-commit")
@@ -469,7 +442,7 @@ impl MainView {
                     .child(
                         div()
                             .text_size(px(crate::design::TS_BODY))
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .child("AI 助手"),
                     )
                     .child(div().flex_1())
@@ -532,14 +505,7 @@ impl MainView {
                     .p_2()
                     .gap_2()
                     .child(history_panel)
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scrollbar()
-                            .scroll_bounce(false)
-                            .child(transcript),
-                    )
+                    .child(transcript)
                     .child(confirm_card)
                     .child(ctx_row)
                     .child(ctx_menu)
@@ -557,7 +523,7 @@ impl MainView {
                                     .flex_1()
                                     .min_w_0()
                                     .debug_selector(|| "ai-input".to_string())
-                                    .child(gpui_component::input::Input::new(&input).small()),
+                                    .child(gpui_kit::component::input::Input::new(&input).small()),
                             )
                             .child(
                                 div().debug_selector(|| "ai-send".to_string()).child(
@@ -578,4 +544,271 @@ impl MainView {
                     ),
             )
     }
+
+    /// 单条消息气泡（整段渲染与虚拟列表共用）。
+    pub(crate) fn render_ai_bubble(
+        &self,
+        line_index: usize,
+        role: &str,
+        text: &str,
+        cx: &mut Context<Self>,
+    ) -> gpui_kit::Stateful<gpui_kit::Div> {
+        let t = current(cx);
+        let (fg, bg, role_label) = match role {
+            "user" => (t.fg_primary, t.bg_overlay, "我"),
+            "assistant" => (t.fg_primary, t.bg_base, "AI 助手"),
+            "error" => (t.danger, t.bg_base, "错误"),
+            _ => (t.fg_muted, t.bg_base, "工具"),
+        };
+        let mut bubble = v_flex()
+            .id(SharedString::from(format!("ai-bubble-{line_index}")))
+            .debug_selector(move || format!("ai-bubble-{line_index}"))
+            .gap(px(2.))
+            .p_2()
+            .rounded(px(6.))
+            .bg(hex(bg))
+            .border_1()
+            .border_color(hex(t.border_strong))
+            .child(
+                div()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .text_color(hex(t.fg_muted))
+                    .child(role_label),
+            );
+        // 助手回答：SQL 围栏块单独成卡（应用 / 试跑 / 执行），其余仍按文本渲染。
+        let blocks = if role == "assistant" {
+            rustdb_core::answer_blocks(text)
+        } else {
+            vec![rustdb_core::AnswerBlock::Text(text.to_string())]
+        };
+        let mut ordinal = 0usize;
+        for block in blocks {
+            match block {
+                rustdb_core::AnswerBlock::Text(part) => {
+                    if part.trim().is_empty() {
+                        continue;
+                    }
+                    bubble = bubble.child(
+                        div()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(fg))
+                            .whitespace_normal()
+                            .child(SharedString::from(part)),
+                    );
+                }
+                rustdb_core::AnswerBlock::Sql { sql, language } => {
+                    bubble = bubble
+                        .child(self.render_ai_sql_block(line_index, ordinal, &sql, &language, cx));
+                    ordinal += 1;
+                }
+            }
+        }
+        bubble
+    }
+
+    /// P1-⑤：长会话转录。VirtualList 只渲染可见气泡；高度先估算、可见项实测回写，
+    /// 贴底时新消息 / 流式增长自动跟随滚动。
+    fn render_ai_transcript_virtual(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui_kit::AnyElement {
+        // 贴底判定用上一帧的视口 / 内容尺寸：用户上滑超过容差即停止跟随。
+        let viewport_h = f32::from(self.ai_transcript_scroll.bounds().size.height);
+        let content_h = f32::from(self.ai_transcript_scroll.content_size().height);
+        let bottom = (viewport_h - content_h).min(0.);
+        self.ai_transcript_stick =
+            f32::from(self.ai_transcript_scroll.offset().y) - bottom <= AI_STICK_SLACK;
+        // 只在内容变化（新消息 / 流式追加 / 高度回写）时跟随；静默帧不碰滚动，
+        // 免得覆盖用户刚发起的延迟 scroll_to_item。
+        let len = self.ai_lines.len();
+        let tail = self
+            .ai_lines
+            .last()
+            .map(|(role, text)| ai_bubble_key(role, text))
+            .unwrap_or(0);
+        let content_changed = len != self.ai_transcript_len
+            || tail != self.ai_transcript_tail
+            || (content_h - self.ai_transcript_content_h).abs() > 0.5;
+        self.ai_transcript_len = len;
+        self.ai_transcript_tail = tail;
+        self.ai_transcript_content_h = content_h;
+        if content_changed && self.ai_transcript_stick {
+            // 不用 scroll_to_bottom：首帧句柄内 items_count 还是 0，会滚到首条。
+            self.ai_transcript_scroll
+                .scroll_to_item(len - 1, gpui_kit::ScrollStrategy::Top);
+        }
+
+        // 流式追加会不断产生新指纹，定期清掉不再命中的缓存条目。
+        if self.ai_bubble_heights.len() > self.ai_lines.len() * 2 + 64 {
+            let keys: HashSet<u64> = self
+                .ai_lines
+                .iter()
+                .map(|(role, text)| ai_bubble_key(role, text))
+                .collect();
+            self.ai_bubble_heights.retain(|(key, _, _)| keys.contains(key));
+        }
+
+        let width = self.ai_transcript_width();
+        let sizes: Vec<gpui_kit::Size<gpui_kit::Pixels>> = self
+            .ai_lines
+            .iter()
+            .map(|(role, text)| {
+                let height = self
+                    .ai_bubble_heights
+                    .iter()
+                    .find(|(key, w, _)| {
+                        *key == ai_bubble_key(role, text) && (*w - width).abs() < 0.5
+                    })
+                    .map(|(_, _, h)| *h)
+                    .unwrap_or_else(|| estimate_ai_bubble_height(window, role, text, width));
+                gpui_kit::size(px(width), px(height))
+            })
+            .collect();
+
+        let entity = cx.entity();
+        let list = gpui_kit::component::v_virtual_list(
+            entity,
+            "ai-transcript",
+            std::rc::Rc::new(sizes),
+            move |view, range: std::ops::Range<usize>, window, cx| {
+                // prepaint 阶段句柄 bounds 已是本帧视口，实测宽度以此为准。
+                let measured_width = f32::from(view.ai_transcript_scroll.bounds().size.width);
+                let width = if measured_width > 0. {
+                    measured_width
+                } else {
+                    AI_FALLBACK_WIDTH
+                };
+                let mut changed = false;
+                let mut items = Vec::with_capacity(range.len());
+                for index in range {
+                    let (role, text) = view.ai_lines[index].clone();
+                    let key = ai_bubble_key(&role, &text);
+                    let cached = view
+                        .ai_bubble_heights
+                        .iter()
+                        .find(|(k, w, _)| *k == key && (*w - width).abs() < 0.5)
+                        .map(|(_, _, h)| *h);
+                    let mut bubble = view
+                        .render_ai_bubble(index, &role, &text, cx)
+                        .into_any_element();
+                    if cached.is_none() {
+                        let estimate = estimate_ai_bubble_height(window, &role, &text, width);
+                        let actual = f32::from(
+                            bubble
+                                .layout_as_root(
+                                    gpui_kit::size(
+                                        gpui_kit::AvailableSpace::Definite(px(width)),
+                                        gpui_kit::AvailableSpace::MinContent,
+                                    ),
+                                    window,
+                                    cx,
+                                )
+                                .height,
+                        );
+                        view.ai_bubble_heights.push((key, width, actual));
+                        changed |= (actual - estimate).abs() > 0.5;
+                    }
+                    items.push(bubble);
+                }
+                if changed {
+                    cx.notify();
+                }
+                items
+            },
+        )
+        .gap(px(6.))
+        .track_scroll(&self.ai_transcript_scroll);
+
+        div()
+            .relative()
+            .flex_1()
+            .min_h_0()
+            .child(list)
+            .child(gpui_kit::component::scroll::Scrollbar::vertical(
+                &self.ai_transcript_scroll,
+            ))
+            .into_any_element()
+    }
+
+    /// P1-⑤：转录视口宽（上一帧实测；首帧兜底）。
+    fn ai_transcript_width(&self) -> f32 {
+        let width = f32::from(self.ai_transcript_scroll.bounds().size.width);
+        if width > 0. {
+            width
+        } else {
+            AI_FALLBACK_WIDTH
+        }
+    }
+}
+
+/// P1-⑤：气泡内容指纹（角色 + 文本），用于高度缓存键。
+fn ai_bubble_key(role: &str, text: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    role.hash(&mut hasher);
+    text.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// P1-⑤：按宽度估算气泡高度（离屏项用）。文本按真实排版行数；SQL 卡按词 wrap
+/// 近似 token 换行，可见后由实测修正。
+fn estimate_ai_bubble_height(window: &mut Window, role: &str, text: &str, width: f32) -> f32 {
+    // TS_CAPTION 12px × phi() 行高，gpui 逐行取整 = 19px。
+    const LINE: f32 = 19.;
+    let inner = (width - 18.).max(20.);
+    // 气泡 padding 16 + border 2 + 角色标签一行。
+    let mut height = 18. + LINE;
+    let mut children = 1usize;
+    let blocks = if role == "assistant" {
+        rustdb_core::answer_blocks(text)
+    } else {
+        vec![rustdb_core::AnswerBlock::Text(text.to_string())]
+    };
+    for block in blocks {
+        match block {
+            rustdb_core::AnswerBlock::Text(part) => {
+                if part.trim().is_empty() {
+                    continue;
+                }
+                height += wrapped_line_count(window, &part, inner) as f32 * LINE;
+                children += 1;
+            }
+            rustdb_core::AnswerBlock::Sql { sql, .. } => {
+                let code = (wrapped_line_count(window, &sql, (inner - 18.).max(20.)) as f32
+                    * LINE)
+                    .min(150.);
+                // SQL 卡：padding+border 18 + 头 18 + 两道 gap 8 + 按钮行 22.5。
+                height += 66.5 + code;
+                children += 1;
+            }
+        }
+    }
+    height + 2. * children.saturating_sub(1) as f32
+}
+
+/// P1-⑤：文本在给定宽度内的排版行数（含换行符）。
+fn wrapped_line_count(window: &mut Window, text: &str, wrap_width: f32) -> usize {
+    if text.is_empty() {
+        return 1;
+    }
+    let run = gpui_kit::TextRun {
+        len: text.len(),
+        font: gpui_kit::Font::default(),
+        color: gpui_kit::Hsla::default(),
+        background_color: None,
+        underline: None,
+        strikethrough: None,
+    };
+    window
+        .text_system()
+        .shape_text(
+            SharedString::from(text.to_string()),
+            px(crate::design::TS_CAPTION),
+            &[run],
+            Some(px(wrap_width)),
+            None,
+        )
+        .map(|lines| lines.len().max(1))
+        .unwrap_or(1)
 }

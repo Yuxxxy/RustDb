@@ -15,13 +15,13 @@ pub const TS_TITLE: f32 = 18.;
 
 /// 统一空态：32px 图标区 + 13px 说明 + 12px 快捷键提示（规范 §5）。
 pub fn empty_state(
-    cx: &gpui::App,
-    icon: gpui_kit_assets::IconName,
-    message: impl Into<gpui::SharedString>,
-    hint: impl Into<gpui::SharedString>,
-) -> gpui::AnyElement {
-    use gpui::{div, px, IntoElement as _, ParentElement as _, Styled as _};
-    use gpui_component::{v_flex, Icon, Sizable as _, Size};
+    cx: &gpui_kit::App,
+    icon: gpui_kit::assets::IconName,
+    message: impl Into<gpui_kit::SharedString>,
+    hint: impl Into<gpui_kit::SharedString>,
+) -> gpui_kit::AnyElement {
+    use gpui_kit::{div, px, IntoElement as _, ParentElement as _, Styled as _};
+    use gpui_kit::component::{v_flex, Icon, Sizable as _, Size};
 
     let t = crate::theme::current(cx);
     v_flex()
@@ -58,9 +58,39 @@ pub fn empty_state(
         .into_any_element()
 }
 
+/// 单选 chip（驱动 / 认证 / 条件运算符等）：选中 accent 底 + on_accent 字，未选中 ghost。
+/// 四态与 Tab 焦点由 Button 提供（规范 §7：所有交互可 Tab 到达）。
+pub fn chip(
+    selector: impl Into<gpui_kit::SharedString>,
+    label: impl Into<gpui_kit::SharedString>,
+    active: bool,
+    on_click: impl Fn(&gpui_kit::ClickEvent, &mut gpui_kit::Window, &mut gpui_kit::App) + 'static,
+) -> gpui_kit::AnyElement {
+    use gpui_kit::prelude::FluentBuilder as _;
+    use gpui_kit::{div, InteractiveElement as _, IntoElement as _, ParentElement as _};
+    use gpui_kit::component::button::{Button, ButtonVariants as _};
+    use gpui_kit::component::Sizable as _;
+
+    let selector = selector.into();
+    div()
+        .debug_selector({
+            let selector = selector.clone();
+            move || selector.to_string()
+        })
+        .child(
+            Button::new(selector.clone())
+                .small()
+                .ghost()
+                .when(active, |button| button.primary())
+                .label(label)
+                .on_click(on_click),
+        )
+        .into_any_element()
+}
+
 /// 骨架条：用低对比中性色，不做循环动画（规范 §5 / §7）。
-pub fn skeleton_bar(cx: &gpui::App, width: f32, height: f32) -> gpui::AnyElement {
-    use gpui::{div, px, IntoElement as _, Styled as _};
+pub fn skeleton_bar(cx: &gpui_kit::App, width: f32, height: f32) -> gpui_kit::AnyElement {
+    use gpui_kit::{div, px, IntoElement as _, Styled as _};
 
     let t = crate::theme::current(cx);
     div()
@@ -72,9 +102,9 @@ pub fn skeleton_bar(cx: &gpui::App, width: f32, height: f32) -> gpui::AnyElement
 }
 
 /// 列表骨架：默认 3 行（网格可传 8 行）。
-pub fn skeleton_rows(cx: &gpui::App, count: usize, row_h: f32) -> gpui::AnyElement {
-    use gpui::{div, px, IntoElement as _, ParentElement as _, Styled as _};
-    use gpui_component::v_flex;
+pub fn skeleton_rows(cx: &gpui_kit::App, count: usize, row_h: f32) -> gpui_kit::AnyElement {
+    use gpui_kit::{div, px, IntoElement as _, ParentElement as _, Styled as _};
+    use gpui_kit::component::v_flex;
 
     let t = crate::theme::current(cx);
     let mut list = v_flex().w_full().gap_2().p_2();

@@ -316,7 +316,7 @@ impl MainView {
     }
 
     /// 单元格编辑条：列名 + 输入框 + 设为 NULL / 确定 / 取消。
-    pub(crate) fn render_edit_bar(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_edit_bar(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some((_, _, column)) = self.edit_cell.clone() else {
             return div().into_any_element();
@@ -347,7 +347,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .debug_selector(|| "edit-input".to_string())
-                    .child(gpui_component::input::Input::new(&input).small()),
+                    .child(gpui_kit::component::input::Input::new(&input).small()),
             )
             .child(
                 Button::new("edit-null-btn")
@@ -378,7 +378,7 @@ impl MainView {
     }
 
     /// 结果区：顶部运行记录条 + 结果网格 / 消息。
-    pub(crate) fn render_result(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_result(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let strip = self.render_run_strip(cx);
         let body = self.render_result_body(cx);
         // P1-②：长查询保留旧结果并降透明度，不用遮罩、不清空内容。
@@ -401,7 +401,7 @@ impl MainView {
     }
 
     /// 运行记录条（F-65）：最近几次执行，可切换查看 / 固定 / 关闭。
-    pub(crate) fn render_run_strip(&mut self, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
+    pub(crate) fn render_run_strip(&mut self, cx: &mut Context<Self>) -> Option<gpui_kit::AnyElement> {
         let t = current(cx);
         let profile = self.active_profile.clone();
         let all = self.core.runs().list();

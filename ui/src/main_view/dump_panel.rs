@@ -142,7 +142,7 @@ impl MainView {
     }
 
     /// F-76：逻辑导出面板（居中模态）。
-    pub(crate) fn render_dump_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_dump_panel(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.dump.clone() else {
             return div().into_any_element();
@@ -161,7 +161,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
                         "逻辑导出 · {} · {}",
@@ -384,7 +384,7 @@ impl MainView {
                     ),
             );
         }
-        let selection: gpui::AnyElement = if panel.export_all {
+        let selection: gpui_kit::AnyElement = if panel.export_all {
             div()
                 .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(t.fg_muted))

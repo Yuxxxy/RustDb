@@ -337,7 +337,7 @@ impl MainView {
         cx: &App,
     ) -> Option<(rustdb_core::AiProfile, String, Vec<String>)> {
         let panel = self.ai_model_panel.as_ref()?;
-        let text = |input: &gpui::Entity<gpui_component::input::InputState>| {
+        let text = |input: &gpui_kit::Entity<gpui_kit::component::input::InputState>| {
             input.read(cx).value().trim().to_string()
         };
         let mut errors = Vec::new();
@@ -662,7 +662,7 @@ impl MainView {
             .map(|item| item.title.clone())
             .unwrap_or_default();
         let input =
-            cx.new(|cx| gpui_component::input::InputState::new(window, cx).placeholder("会话标题"));
+            cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("会话标题"));
         input.update(cx, |state, cx| state.set_value(title, window, cx));
         self.ai_rename = Some((id.to_string(), input));
         cx.notify();
@@ -908,7 +908,7 @@ impl MainView {
         sql: &str,
         language: &str,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let status = self.ai_block_status(line, ordinal, &t);
         let can_open = self

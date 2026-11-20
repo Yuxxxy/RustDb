@@ -150,7 +150,7 @@ impl MainView {
         let import_panel = self.render_import_panel(cx);
         let available_h = self.available_workspace_height(window);
         let editor_h = self.layout.clamped_editor_height(available_h);
-        let body: gpui::AnyElement = if has_tab {
+        let body: gpui_kit::AnyElement = if has_tab {
             let params_panel = self.render_params_panel(cx);
             let editor = v_flex()
                 .id("sql-editor")
@@ -174,16 +174,16 @@ impl MainView {
                 .child(result_area)
                 // 拖拽全程由 body 收 mouse 事件：指针移出 9px 分隔条也能继续改高度。
                 .on_mouse_move(
-                    cx.listener(|view, event: &gpui::MouseMoveEvent, window, cx| {
+                    cx.listener(|view, event: &gpui_kit::MouseMoveEvent, window, cx| {
                         view.drag_editor_resize(event, window, cx);
                     }),
                 )
                 .on_mouse_up(
-                    gpui::MouseButton::Left,
+                    gpui_kit::MouseButton::Left,
                     cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
                 )
                 .on_mouse_up_out(
-                    gpui::MouseButton::Left,
+                    gpui_kit::MouseButton::Left,
                     cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
                 )
                 // 真拖起来之后盖一层透明遮罩，吃掉编辑器选字 / 网格列拖拽等下层交互。
@@ -197,20 +197,20 @@ impl MainView {
                                 .absolute()
                                 .inset_0()
                                 .occlude()
-                                .cursor(gpui::CursorStyle::ResizeUpDown)
+                                .cursor(gpui_kit::CursorStyle::ResizeUpDown)
                                 // 遮罩是最上层 hitbox，会截断 body 的 mouse_move：
                                 // 必须自己转发同一套 handler，否则拖拽只会生效第一帧（实测回归）。
                                 .on_mouse_move(cx.listener(
-                                    |view, event: &gpui::MouseMoveEvent, window, cx| {
+                                    |view, event: &gpui_kit::MouseMoveEvent, window, cx| {
                                         view.drag_editor_resize(event, window, cx);
                                     },
                                 ))
                                 .on_mouse_up(
-                                    gpui::MouseButton::Left,
+                                    gpui_kit::MouseButton::Left,
                                     cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
                                 )
                                 .on_mouse_up_out(
-                                    gpui::MouseButton::Left,
+                                    gpui_kit::MouseButton::Left,
                                     cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
                                 ),
                         )
@@ -397,11 +397,11 @@ impl MainView {
     /// 鼠标点击「更多 ▾」：打开菜单并接管焦点（Button 在 mouse down 时不抢焦点）。
     pub(crate) fn on_toolbar_trigger(
         &mut self,
-        event: &gpui::ClickEvent,
+        event: &gpui_kit::ClickEvent,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if matches!(event, gpui::ClickEvent::Keyboard(_)) {
+        if matches!(event, gpui_kit::ClickEvent::Keyboard(_)) {
             return;
         }
         self.toolbar_menu = Some(event.position());
@@ -413,7 +413,7 @@ impl MainView {
     /// 「更多 ▾」的键盘闭环，与导出菜单同口径：走全局观察者，不用元素级按键。
     pub(crate) fn toolbar_menu_handle_key(
         &mut self,
-        keystroke: &gpui::Keystroke,
+        keystroke: &gpui_kit::Keystroke,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -445,14 +445,14 @@ impl MainView {
 
     /// 键盘打开时的菜单锚点：工具栏内容区左缘、工具栏正下方。
     /// 不估算「执行 / 取消」的实测宽度——菜单 204px 宽，从左缘展开必然覆盖触发器。
-    pub(crate) fn toolbar_more_anchor(&self, window: &Window) -> gpui::Point<gpui::Pixels> {
+    pub(crate) fn toolbar_more_anchor(&self, window: &Window) -> gpui_kit::Point<gpui_kit::Pixels> {
         let viewport_w = f32::from(window.viewport_size().width);
         let (sidebar_visible, _) = self.shell_visibility(viewport_w);
         let mut x = RAIL_W + CARD_GAP + 1. + 8.;
         if sidebar_visible {
             x += self.layout.sidebar_width(self.panel.key()) - CARD_GAP * 0.5;
         }
-        gpui::point(px(x), px(TOOLBAR_BOTTOM_Y))
+        gpui_kit::point(px(x), px(TOOLBAR_BOTTOM_Y))
     }
 
     /// 执行当前高亮的折叠动作。
@@ -481,12 +481,12 @@ impl MainView {
             .flex()
             .items_center()
             .justify_center()
-            .cursor(gpui::CursorStyle::ResizeUpDown)
+            .cursor(gpui_kit::CursorStyle::ResizeUpDown)
             .hover(|s| s.bg(hex(t.bg_overlay)))
             .when(dragging, |s| s.bg(hex(t.bg_overlay)))
             .on_mouse_down(
-                gpui::MouseButton::Left,
-                cx.listener(|view, event: &gpui::MouseDownEvent, window, cx| {
+                gpui_kit::MouseButton::Left,
+                cx.listener(|view, event: &gpui_kit::MouseDownEvent, window, cx| {
                     let available = view.available_workspace_height(window);
                     if event.click_count >= 2 {
                         view.reset_editor_height(available, cx);
@@ -496,7 +496,7 @@ impl MainView {
                 }),
             )
             .on_mouse_up(
-                gpui::MouseButton::Left,
+                gpui_kit::MouseButton::Left,
                 cx.listener(|view, _, _, cx| view.end_editor_resize(cx)),
             )
             .child(div().h(px(1.)).w_full().bg(hex(if dragging {
@@ -529,7 +529,7 @@ impl MainView {
     /// 拖拽中：按绝对位移改高度，不写盘；松手时由 `end_editor_resize` 统一落盘一次。
     pub(crate) fn drag_editor_resize(
         &mut self,
-        event: &gpui::MouseMoveEvent,
+        event: &gpui_kit::MouseMoveEvent,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -712,7 +712,7 @@ impl MainView {
                 .bg(hex(t.bg_elevated))
                 .when(enabled, |el| el.cursor_pointer())
                 .hover(|s| s.bg(hex(t.bg_overlay)))
-                .on_click(cx.listener(move |view, event: &gpui::ClickEvent, _, cx| {
+                .on_click(cx.listener(move |view, event: &gpui_kit::ClickEvent, _, cx| {
                     if view.namespaces.is_empty() {
                         return;
                     }
@@ -818,7 +818,7 @@ impl MainView {
         &mut self,
         groups: Vec<Vec<MenuEntry>>,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let mut col = v_flex()
             .w(px(204.))
@@ -1265,7 +1265,7 @@ impl MainView {
     }
 
     /// F-91：主机密钥确认浮层（首次连接 / 密钥变更）。
-    pub(crate) fn render_host_key_prompt(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_host_key_prompt(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(prompt) = self.host_key_prompt.as_ref() else {
             return div().into_any_element();
@@ -1304,7 +1304,7 @@ impl MainView {
             .child(
                 div()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(if prompt.changed {
                         t.danger
                     } else {
@@ -1427,11 +1427,11 @@ impl MainView {
     /// 两条链路分开，避免一次 Enter 被两边各 toggle 一次。
     pub(crate) fn on_export_trigger(
         &mut self,
-        event: &gpui::ClickEvent,
+        event: &gpui_kit::ClickEvent,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if matches!(event, gpui::ClickEvent::Keyboard(_)) {
+        if matches!(event, gpui_kit::ClickEvent::Keyboard(_)) {
             return;
         }
         self.export_menu = Some(event.position());
@@ -1450,7 +1450,7 @@ impl MainView {
     /// 菜单时这条映射并不存在，方向键会静默丢失（实测回归）。
     pub(crate) fn export_menu_handle_key(
         &mut self,
-        keystroke: &gpui::Keystroke,
+        keystroke: &gpui_kit::Keystroke,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -1465,7 +1465,7 @@ impl MainView {
             }
             // 键盘没有指针坐标：锚到右上角、工具栏正下方，与触发按钮同片区域。
             let width = f32::from(window.viewport_size().width);
-            self.export_menu = Some(gpui::point(px(width - 24.), px(WORKSPACE_CHROME_H)));
+            self.export_menu = Some(gpui_kit::point(px(width - 24.), px(WORKSPACE_CHROME_H)));
             self.export_hover = Some(0);
             cx.notify();
             return;
@@ -1787,7 +1787,7 @@ impl MainView {
 
         if needs_name && self.danger_input.is_none() {
             let input = cx.new(|cx| {
-                gpui_component::input::InputState::new(window, cx).placeholder(placeholder)
+                gpui_kit::component::input::InputState::new(window, cx).placeholder(placeholder)
             });
             self.danger_input = Some(input);
         }
@@ -1803,7 +1803,7 @@ impl MainView {
             .child(
                 div()
                     .text_size(px(crate::design::TS_BODY))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child(SharedString::from(title)),
             )
@@ -1816,7 +1816,7 @@ impl MainView {
 
         if needs_name {
             card = card.child(div().debug_selector(|| "danger-input".to_string()).child(
-                gpui_component::input::Input::new(
+                gpui_kit::component::input::Input::new(
                     self.danger_input.as_ref().expect("确认输入框已创建"),
                 ),
             ));

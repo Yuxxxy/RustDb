@@ -391,7 +391,7 @@ impl MainView {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.bulk.clone() else {
             return div().into_any_element();
@@ -424,28 +424,17 @@ impl MainView {
         ] {
             let active = panel.custom == custom;
             let selector = format!("bulk-mode-{key}");
-            mode_row = mode_row.child(
-                div()
-                    .id(SharedString::from(selector.clone()))
-                    .debug_selector(move || selector.clone())
-                    .h(px(18.))
-                    .px_2()
-                    .rounded(px(4.))
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .cursor_pointer()
-                    .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                    .when(!active, |d| {
-                        d.text_color(hex(t.fg_secondary))
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
-                    })
-                    .on_click(cx.listener(move |view, _, _, cx| {
-                        if let Some(panel) = view.bulk.as_mut() {
-                            panel.custom = custom;
-                        }
-                        cx.notify();
-                    }))
-                    .child(SharedString::from(label)),
-            );
+            mode_row = mode_row.child(crate::design::chip(
+                selector,
+                label,
+                active,
+                cx.listener(move |view, _, _, cx| {
+                    if let Some(panel) = view.bulk.as_mut() {
+                        panel.custom = custom;
+                    }
+                    cx.notify();
+                }),
+            ));
         }
         body = body.child(mode_row);
 
@@ -469,28 +458,17 @@ impl MainView {
                     rustdb_core::BulkJoin::Or => "or",
                 };
                 let selector = format!("bulk-join-{key}");
-                join_row = join_row.child(
-                    div()
-                        .id(SharedString::from(selector.clone()))
-                        .debug_selector(move || selector.clone())
-                        .h(px(18.))
-                        .px_2()
-                        .rounded(px(4.))
-                        .text_size(px(crate::design::TS_CAPTION))
-                        .cursor_pointer()
-                        .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                        .when(!active, |d| {
-                            d.text_color(hex(t.fg_secondary))
-                                .hover(|s| s.bg(hex(t.bg_overlay)))
-                        })
-                        .on_click(cx.listener(move |view, _, _, cx| {
-                            if let Some(panel) = view.bulk.as_mut() {
-                                panel.join = option;
-                            }
-                            cx.notify();
-                        }))
-                        .child(SharedString::from(option.label())),
-                );
+                join_row = join_row.child(crate::design::chip(
+                    selector,
+                    option.label(),
+                    active,
+                    cx.listener(move |view, _, _, cx| {
+                        if let Some(panel) = view.bulk.as_mut() {
+                            panel.join = option;
+                        }
+                        cx.notify();
+                    }),
+                ));
             }
             body = body.child(join_row);
 
@@ -500,32 +478,21 @@ impl MainView {
                 for option in rustdb_core::BulkOp::ALL {
                     let active = option == row.op;
                     let selector = format!("bulk-cond-{index}-op-{}", option.slug());
-                    ops = ops.child(
-                        div()
-                            .id(SharedString::from(selector.clone()))
-                            .debug_selector(move || selector.clone())
-                            .h(px(16.))
-                            .px_1()
-                            .rounded(px(4.))
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .cursor_pointer()
-                            .when(active, |d| d.bg(hex(t.accent)).text_color(hex(t.on_accent)))
-                            .when(!active, |d| {
-                                d.text_color(hex(t.fg_secondary))
-                                    .hover(|s| s.bg(hex(t.bg_overlay)))
-                            })
-                            .on_click(cx.listener(move |view, _, _, cx| {
-                                if let Some(row) = view
-                                    .bulk
-                                    .as_mut()
-                                    .and_then(|panel| panel.conditions.get_mut(index))
-                                {
-                                    row.op = option;
-                                }
-                                cx.notify();
-                            }))
-                            .child(SharedString::from(option.label())),
-                    );
+                    ops = ops.child(crate::design::chip(
+                        selector,
+                        option.label(),
+                        active,
+                        cx.listener(move |view, _, _, cx| {
+                            if let Some(row) = view
+                                .bulk
+                                .as_mut()
+                                .and_then(|panel| panel.conditions.get_mut(index))
+                            {
+                                row.op = option;
+                            }
+                            cx.notify();
+                        }),
+                    ));
                 }
                 let column_selector = format!("bulk-cond-{index}-column");
                 let value_selector = format!("bulk-cond-{index}-value");
@@ -661,7 +628,7 @@ impl MainView {
                     .child(
                         div()
                             .text_size(px(crate::design::TS_BODY))
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .text_color(hex(t.fg_primary))
                             .child("按条件批量更新"),
                     )

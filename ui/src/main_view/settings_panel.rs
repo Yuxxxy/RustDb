@@ -4,7 +4,7 @@
 //! 只有工具入口用 `SettingField::render` 放一个「打开」按钮。
 
 use super::*;
-use gpui_component::setting::{SettingField, SettingGroup, SettingItem, SettingPage, Settings};
+use gpui_kit::component::setting::{SettingField, SettingGroup, SettingItem, SettingPage, Settings};
 
 impl MainView {
     pub(crate) fn open_settings(&mut self, cx: &mut Context<Self>) {
@@ -68,7 +68,7 @@ impl MainView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         // 对话框按视口夹取：740 是 Settings 组件不裁剪内容的最小宽度，
         // 只在视口不足以容纳时才缩小，避免在 1024×640 下撑满整个窗口。
@@ -336,7 +336,7 @@ impl MainView {
                 div()
                     .flex_1()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(hex(t.fg_primary))
                     .child("设置"),
             )

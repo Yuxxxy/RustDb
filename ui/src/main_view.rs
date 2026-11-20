@@ -3,21 +3,21 @@
 //! 布局参数与 RustShell 对齐：标题栏 28px、活动栏 38.4px、卡片间距 6px、圆角 8px。
 
 use crate::theme::{current, to_hsla as hex};
-use gpui::prelude::FluentBuilder as _;
-use gpui::{
+use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::{
     anchored, div, px, uniform_list, App, AppContext as _, ClipboardItem, Context, FocusHandle,
     Focusable, InteractiveElement as _, IntoElement, ParentElement as _, PathPromptOptions, Point,
     Render, SharedString, StatefulInteractiveElement as _, Styled as _, Window,
 };
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::input::{Editor, EditorState, Input, InputEvent};
-use gpui_component::scroll::ScrollableElement as _;
-use gpui_component::Disableable as _;
-use gpui_component::ElementExt as _;
-use gpui_component::RopeExt as _;
-use gpui_component::Selectable as _;
-use gpui_component::{h_flex, v_flex, Icon, Sizable as _, Size, TitleBar};
-use gpui_kit_assets::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent};
+use gpui_kit::component::scroll::ScrollableElement as _;
+use gpui_kit::component::Disableable as _;
+use gpui_kit::component::ElementExt as _;
+use gpui_kit::component::RopeExt as _;
+use gpui_kit::component::Selectable as _;
+use gpui_kit::component::{h_flex, v_flex, Icon, Sizable as _, Size, TitleBar};
+use gpui_kit::assets::IconName;
 use rustdb_core::docs::DocInput;
 use rustdb_core::history::{HistoryFilter, HistorySource};
 use rustdb_core::import::{self, ImportOptions, ImportPlan, ParsedData};
@@ -191,8 +191,8 @@ impl PanelKind {
 /// `resizable_panel().size(..)` 只在首次布局生效，同一个 id 下换面板会共用旧宽度；
 /// 而面板组的 slot 是按位置存的，列数一变就会张冠李戴。两个维度都进 key，
 /// 换面板或折叠列时新 state 首帧直接按当前配置布局。
-fn layout_split_id(panel: PanelKind, sidebar_visible: bool, ai_visible: bool) -> gpui::ElementId {
-    gpui::ElementId::Name(SharedString::from(format!(
+fn layout_split_id(panel: PanelKind, sidebar_visible: bool, ai_visible: bool) -> gpui_kit::ElementId {
+    gpui_kit::ElementId::Name(SharedString::from(format!(
         "main-split:{}:{}{}",
         panel.key(),
         if sidebar_visible { "s" } else { "-" },
@@ -361,9 +361,9 @@ pub(crate) struct RoutinePanel {
     /// 当前草稿（与编辑器同步，事件回调里没有窗口也能取到）。
     draft: String,
     /// 源码编辑器。
-    editor: gpui::Entity<EditorState>,
+    editor: gpui_kit::Entity<EditorState>,
     /// 搜索框。
-    search: gpui::Entity<gpui_component::input::InputState>,
+    search: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 上次保存失败：明细 + 恢复建议。
     failure: Option<DesignerFailure>,
     /// 正在保存的语句 id。
@@ -403,15 +403,15 @@ pub(crate) struct PartitionPanel {
     /// 表单动作（新建 / 附加 / 收起）。
     form: PartitionForm,
     /// 分区名，或待附加的表名。
-    name: gpui::Entity<gpui_component::input::InputState>,
+    name: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 范围边界（起点 / 终点）。
-    range_from: gpui::Entity<gpui_component::input::InputState>,
-    range_to: gpui::Entity<gpui_component::input::InputState>,
+    range_from: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    range_to: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 列表边界（逗号分隔，原样拼入 SQL）。
-    list_values: gpui::Entity<gpui_component::input::InputState>,
+    list_values: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 哈希边界。
-    modulus: gpui::Entity<gpui_component::input::InputState>,
-    remainder: gpui::Entity<gpui_component::input::InputState>,
+    modulus: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    remainder: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 新建 / 附加为 DEFAULT 分区（哈希策略不支持）。
     is_default: bool,
     /// 分离时使用 CONCURRENTLY（PostgreSQL 14+）。
@@ -454,7 +454,7 @@ pub(crate) struct ExchangePanel {
     /// 导出时是否带上 SSH 隧道（只保留主机 / 用户名 / 认证方式，不含口令）。
     include_tunnels: bool,
     /// 加密口令；留空表示明文导出（需二次确认）。
-    passphrase: gpui::Entity<gpui_component::input::InputState>,
+    passphrase: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 明文导出的风险确认已点过一次。
     confirm_plain: bool,
     /// 导入页：解密后的预览。
@@ -475,15 +475,15 @@ pub(crate) struct ExchangePanel {
 struct ConnEditor {
     /// 正在编辑的配置 id；`None` 表示新建。
     id: Option<String>,
-    name: gpui::Entity<gpui_component::input::InputState>,
-    folder: gpui::Entity<gpui_component::input::InputState>,
+    name: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    folder: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     driver: DbKind,
-    host: gpui::Entity<gpui_component::input::InputState>,
-    port: gpui::Entity<gpui_component::input::InputState>,
-    database: gpui::Entity<gpui_component::input::InputState>,
-    username: gpui::Entity<gpui_component::input::InputState>,
-    password: gpui::Entity<gpui_component::input::InputState>,
-    ssl_mode: gpui::Entity<gpui_component::input::InputState>,
+    host: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    port: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    database: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    username: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    password: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    ssl_mode: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     read_only: bool,
     production: bool,
     /// F-91：是否走 SSH 隧道。
@@ -493,11 +493,11 @@ struct ConnEditor {
     /// F-91a：是否走代理。
     proxy: bool,
     proxy_kind: rustdb_db_api::ProxyKind,
-    proxy_host: gpui::Entity<gpui_component::input::InputState>,
-    proxy_port: gpui::Entity<gpui_component::input::InputState>,
-    proxy_username: gpui::Entity<gpui_component::input::InputState>,
+    proxy_host: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    proxy_port: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    proxy_username: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 代理口令（**只留在内存**，不落盘）。
-    proxy_password: gpui::Entity<gpui_component::input::InputState>,
+    proxy_password: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// SOCKS5：域名交给代理解析。
     proxy_remote_dns: bool,
     /// 代理相对 SSH 跳板的位置。
@@ -510,14 +510,14 @@ struct ConnEditor {
 
 /// F-91：一层跳板的编辑状态。
 struct HopEditor {
-    host: gpui::Entity<gpui_component::input::InputState>,
-    port: gpui::Entity<gpui_component::input::InputState>,
-    user: gpui::Entity<gpui_component::input::InputState>,
+    host: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    port: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    user: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     auth: HopAuth,
     /// 私钥路径（`HopAuth::Key` / `KeyPassphrase` 时有效）。
-    key_path: gpui::Entity<gpui_component::input::InputState>,
+    key_path: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 私钥口令或 SSH 口令（**只留在内存**，不落盘）。
-    secret: gpui::Entity<gpui_component::input::InputState>,
+    secret: gpui_kit::Entity<gpui_kit::component::input::InputState>,
 }
 
 /// F-91：跳板的认证方式（界面选项）。
@@ -564,19 +564,19 @@ struct HostKeyPrompt {
 /// 设计器各页签的输入框（按当前页签懒创建，避免一次造十三个输入框）。
 #[derive(Default)]
 struct DesignerInputs {
-    column_name: Option<gpui::Entity<gpui_component::input::InputState>>,
-    column_type: Option<gpui::Entity<gpui_component::input::InputState>>,
-    index_name: Option<gpui::Entity<gpui_component::input::InputState>>,
-    index_columns: Option<gpui::Entity<gpui_component::input::InputState>>,
-    fk_name: Option<gpui::Entity<gpui_component::input::InputState>>,
-    fk_columns: Option<gpui::Entity<gpui_component::input::InputState>>,
-    fk_ref_table: Option<gpui::Entity<gpui_component::input::InputState>>,
-    fk_ref_columns: Option<gpui::Entity<gpui_component::input::InputState>>,
-    check_name: Option<gpui::Entity<gpui_component::input::InputState>>,
-    check_expr: Option<gpui::Entity<gpui_component::input::InputState>>,
-    engine: Option<gpui::Entity<gpui_component::input::InputState>>,
-    collation: Option<gpui::Entity<gpui_component::input::InputState>>,
-    comment: Option<gpui::Entity<gpui_component::input::InputState>>,
+    column_name: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    column_type: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    index_name: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    index_columns: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    fk_name: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    fk_columns: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    fk_ref_table: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    fk_ref_columns: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    check_name: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    check_expr: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    engine: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    collation: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    comment: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
 }
 
 impl DesignerInputs {
@@ -665,9 +665,9 @@ fn designer_input(
     cx: &mut Context<MainView>,
     placeholder: &str,
     initial: Option<&str>,
-) -> gpui::Entity<gpui_component::input::InputState> {
+) -> gpui_kit::Entity<gpui_kit::component::input::InputState> {
     let entity = cx.new(|cx| {
-        gpui_component::input::InputState::new(window, cx).placeholder(placeholder.to_string())
+        gpui_kit::component::input::InputState::new(window, cx).placeholder(placeholder.to_string())
     });
     if let Some(initial) = initial.filter(|text| !text.is_empty()) {
         entity.update(cx, |state, cx| {
@@ -683,7 +683,7 @@ fn conn_input(
     cx: &mut Context<MainView>,
     placeholder: &str,
     initial: Option<&str>,
-) -> gpui::Entity<gpui_component::input::InputState> {
+) -> gpui_kit::Entity<gpui_kit::component::input::InputState> {
     designer_input(window, cx, placeholder, initial)
 }
 
@@ -719,7 +719,7 @@ fn parse_rename_pairs(text: &str) -> Vec<rustdb_core::RenamePair> {
 }
 
 /// F-90：交换面板里的勾选框（纯展示，点击由整行处理）。
-fn exchange_check(checked: bool, t: &rustdb_core::theme::ThemeTokens) -> gpui::AnyElement {
+fn exchange_check(checked: bool, t: &rustdb_core::theme::ThemeTokens) -> gpui_kit::AnyElement {
     div()
         .w(px(13.))
         .h(px(13.))
@@ -745,9 +745,9 @@ fn exchange_check(checked: bool, t: &rustdb_core::theme::ThemeTokens) -> gpui::A
 fn conn_field(
     t: &rustdb_core::theme::ThemeTokens,
     label: &str,
-    input: &gpui::Entity<gpui_component::input::InputState>,
-    width: gpui::Pixels,
-) -> gpui::AnyElement {
+    input: &gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    width: gpui_kit::Pixels,
+) -> gpui_kit::AnyElement {
     h_flex()
         .items_center()
         .gap_2()
@@ -761,13 +761,13 @@ fn conn_field(
         .child(
             div()
                 .w(width)
-                .child(gpui_component::input::Input::new(input)),
+                .child(gpui_kit::component::input::Input::new(input)),
         )
         .into_any_element()
 }
 
 /// 连接编辑器里的开关方块（选中时高亮）。
-fn toggle_box(t: &rustdb_core::theme::ThemeTokens, checked: bool) -> gpui::AnyElement {
+fn toggle_box(t: &rustdb_core::theme::ThemeTokens, checked: bool) -> gpui_kit::AnyElement {
     div()
         .w(px(12.))
         .h(px(12.))
@@ -890,14 +890,14 @@ impl CellDetail {
 struct ObjectMenu {
     path: rustdb_db_api::ObjectPath,
     /// 菜单左上角（窗口坐标）。
-    at: Point<gpui::Pixels>,
+    at: Point<gpui_kit::Pixels>,
 }
 
 /// 连接树里右键库节点时弹出的菜单状态。
 #[derive(Clone)]
 struct NamespaceMenu {
     ns: Namespace,
-    at: Point<gpui::Pixels>,
+    at: Point<gpui_kit::Pixels>,
 }
 
 /// 需要二次确认的破坏性动作。
@@ -1420,7 +1420,7 @@ struct ParamsPanel {
 struct ParamSlot {
     name: String,
     style: PlaceholderStyle,
-    input: gpui::Entity<gpui_component::input::InputState>,
+    input: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// `None` 表示按输入自动推断；显式类型会覆盖推断。
     kind: Option<ParamKind>,
 }
@@ -1489,9 +1489,9 @@ struct GeneratorPanel {
     /// 目标列下标（结果集列）。
     column: usize,
     /// 生成表达式（`seq:1:1` / `int:1:100` / `date` / `uuid` / `regex:…` / `fk:列名`）。
-    expr: gpui::Entity<gpui_component::input::InputState>,
+    expr: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 生成行数。
-    count: gpui::Entity<gpui_component::input::InputState>,
+    count: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 上一次的错误提示。
     error: Option<String>,
 }
@@ -1499,9 +1499,9 @@ struct GeneratorPanel {
 /// F-73：批量更新的一条条件（字段 / 运算符 / 值）。
 #[derive(Clone)]
 struct BulkConditionRow {
-    column: gpui::Entity<gpui_component::input::InputState>,
+    column: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     op: rustdb_core::BulkOp,
-    value: gpui::Entity<gpui_component::input::InputState>,
+    value: gpui_kit::Entity<gpui_kit::component::input::InputState>,
 }
 
 /// F-73：按条件批量更新面板（SET 单列 + 结构化条件或自定义 WHERE）。
@@ -1510,13 +1510,13 @@ struct BulkPanel {
     target: rustdb_db_api::ObjectPath,
     /// 目标表列名（占位提示用）。
     columns: Vec<String>,
-    set_column: gpui::Entity<gpui_component::input::InputState>,
-    set_value: gpui::Entity<gpui_component::input::InputState>,
+    set_column: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    set_value: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     conditions: Vec<BulkConditionRow>,
     join: rustdb_core::BulkJoin,
     /// true = 使用自定义 WHERE。
     custom: bool,
-    custom_where: gpui::Entity<gpui_component::input::InputState>,
+    custom_where: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 最近一次校验通过的预览计划。
     plan: Option<rustdb_core::BulkUpdatePlan>,
     /// 行数预览查询（结果不进标签页）。
@@ -1535,9 +1535,9 @@ struct DocsPanel {
     loading: bool,
     input: Option<DocInput>,
     notes: rustdb_core::DocNotes,
-    project_note: gpui::Entity<gpui_component::input::InputState>,
-    table_note: gpui::Entity<gpui_component::input::InputState>,
-    column_note: gpui::Entity<gpui_component::input::InputState>,
+    project_note: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    table_note: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    column_note: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     selected_table: Option<usize>,
     selected_column: Option<String>,
     preview: Option<rustdb_core::Documentation>,
@@ -1582,7 +1582,7 @@ struct LineagePanel {
     table: ObjectPath,
     columns: Vec<String>,
     selected: Option<String>,
-    filter: gpui::Entity<gpui_component::input::InputState>,
+    filter: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 展示的最低置信度。
     min: rustdb_core::Confidence,
     report: Option<rustdb_core::LineageReport>,
@@ -1604,8 +1604,8 @@ struct ComparePanel {
     error: [Option<String>; 2],
     config: rustdb_core::CompareConfig,
     report: Option<rustdb_core::CompareReport>,
-    ignore_input: gpui::Entity<gpui_component::input::InputState>,
-    rename_input: gpui::Entity<gpui_component::input::InputState>,
+    ignore_input: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    rename_input: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     drop_tables: bool,
     drop_columns: bool,
     show_rollback: bool,
@@ -1744,7 +1744,7 @@ pub(crate) struct DataComparePanel {
     targets: Vec<(String, String)>,
     target: Option<String>,
     /// 关键字段（逗号分隔，空 = 源表主键）；应用到所有选中表。
-    keys: gpui::Entity<gpui_component::input::InputState>,
+    keys: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     options: DataCompareOptions,
     previewing: bool,
     preview_ready: bool,
@@ -1799,7 +1799,7 @@ impl DataComparePanel {
         self.config_note = None;
     }
 
-    fn parse_keys(&self, cx: &gpui::App) -> Vec<String> {
+    fn parse_keys(&self, cx: &gpui_kit::App) -> Vec<String> {
         self.keys
             .read(cx)
             .value()
@@ -1819,7 +1819,7 @@ struct OptimizePanel {
     /// 目标方言（仅「转换」使用）。
     target: DbKind,
     /// 改写要求（仅「改写」使用，按需创建）。
-    instruction: Option<gpui::Entity<gpui_component::input::InputState>>,
+    instruction: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     /// 打开面板时的原文；diff 与「拒绝」都以它为基准。
     original: String,
     running: bool,
@@ -1853,23 +1853,23 @@ pub(crate) struct AiModelPanel {
     editing_id: Option<String>,
     kind: rustdb_core::AiKind,
     auth: rustdb_core::AuthKind,
-    name: gpui::Entity<gpui_component::input::InputState>,
-    base_url: gpui::Entity<gpui_component::input::InputState>,
-    model: gpui::Entity<gpui_component::input::InputState>,
+    name: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    base_url: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    model: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 本次会话的密钥（不落盘）。
-    key: gpui::Entity<gpui_component::input::InputState>,
-    key_ref: gpui::Entity<gpui_component::input::InputState>,
+    key: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    key_ref: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 自定义认证头的名称（`auth = Header` 时生效）。
-    auth_header: gpui::Entity<gpui_component::input::InputState>,
-    temperature: gpui::Entity<gpui_component::input::InputState>,
-    context_window: gpui::Entity<gpui_component::input::InputState>,
-    max_turns: gpui::Entity<gpui_component::input::InputState>,
-    retries: gpui::Entity<gpui_component::input::InputState>,
-    proxy: gpui::Entity<gpui_component::input::InputState>,
+    auth_header: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    temperature: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    context_window: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    max_turns: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    retries: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    proxy: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     /// 每行一个 `Name=Value`。
-    headers: gpui::Entity<gpui_component::input::InputState>,
-    instruction: gpui::Entity<gpui_component::input::InputState>,
-    cli_command: gpui::Entity<gpui_component::input::InputState>,
+    headers: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    instruction: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    cli_command: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     errors: Vec<String>,
     report: Option<rustdb_core::ConnectivityReport>,
     /// 发现到的模型（点击即填入模型名）。
@@ -1889,8 +1889,8 @@ fn import_option_chip(
     id: &'static str,
     label: String,
     tip: &'static str,
-    on_click: impl Fn(&gpui::ClickEvent, &mut Window, &mut gpui::App) + 'static,
-) -> gpui::Div {
+    on_click: impl Fn(&gpui_kit::ClickEvent, &mut Window, &mut gpui_kit::App) + 'static,
+) -> gpui_kit::Div {
     div().debug_selector(move || id.to_string()).child(
         Button::new(SharedString::from(id))
             .small()
@@ -2188,9 +2188,9 @@ pub struct MainView {
     /// 历史面板的时间范围。
     history_range: HistoryRange,
     /// 历史筛选下拉：当前打开的类型 + 窗口坐标。
-    history_menu: Option<(Point<gpui::Pixels>, HistoryMenu)>,
+    history_menu: Option<(Point<gpui_kit::Pixels>, HistoryMenu)>,
     /// 历史搜索框的输入态。
-    history_input: Option<gpui::Entity<gpui_component::input::InputState>>,
+    history_input: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     /// SQL 补全候选项（元数据加载后刷新）。
     completion: std::rc::Rc<std::cell::RefCell<crate::completion::CompletionCatalog>>,
     /// 当前编辑器内容的语义诊断（含服务端错误）；`diag_dirty` 时在渲染前重算。
@@ -2224,25 +2224,27 @@ pub struct MainView {
     /// F-84：对象面板搜索关键字（名称 + 注释）。
     object_filter: String,
     /// 对象面板搜索框（按需创建）。
-    object_input: Option<gpui::Entity<gpui_component::input::InputState>>,
+    object_input: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     /// 置顶 / 最近访问 / 分组展开的按连接持久化状态。
     object_state: rustdb_platform::object_state::ObjectState,
     /// F-80：详情面板的 JSON 路径输入（按需创建）。
-    detail_input: Option<gpui::Entity<gpui_component::input::InputState>>,
+    detail_input: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     /// 库下拉框打开位置（窗口坐标）；`None` 为关闭。
-    db_menu: Option<Point<gpui::Pixels>>,
+    db_menu: Option<Point<gpui_kit::Pixels>>,
     /// 对象右键菜单：目标对象 + 打开位置（窗口坐标）。
     obj_menu: Option<ObjectMenu>,
     /// 库节点右键菜单。
     ns_menu: Option<NamespaceMenu>,
     /// 连接节点右键菜单（profile_id、连接名、位置）。
-    conn_menu: Option<(String, String, Point<gpui::Pixels>)>,
+    conn_menu: Option<(String, String, Point<gpui_kit::Pixels>)>,
     /// F-89：当前生产连接写解锁的剩余秒数（每秒变化一次，驱动倒计时刷新）。
     unlock_tick: Option<u64>,
+    /// P2：事务已持续秒数（每秒变化一次，驱动状态栏事务计时刷新）。
+    tx_tick: Option<u64>,
     /// F-71：结果网格「行操作」菜单的打开位置。
-    row_menu: Option<Point<gpui::Pixels>>,
+    row_menu: Option<Point<gpui_kit::Pixels>>,
     /// F-71：Esc 全局按键订阅（视图存活期间有效）。
-    escape_key: Option<gpui::Subscription>,
+    escape_key: Option<gpui_kit::Subscription>,
     /// F-71：数据生成器面板（列、位置与两个输入框）。
     generator: Option<GeneratorPanel>,
     /// F-73：按表缓存外键（键 = 表路径展示名）。
@@ -2274,13 +2276,13 @@ pub struct MainView {
     layout: rustdb_core::LayoutSettings,
     layout_path: PathBuf,
     /// 结果区「导出格式」菜单：打开位置（窗口坐标）；`None` 为关闭。
-    export_menu: Option<Point<gpui::Pixels>>,
+    export_menu: Option<Point<gpui_kit::Pixels>>,
     /// P1-③：导出触发按钮的自有焦点句柄 —— Tab 可停留、Enter / Space 可开菜单。
     export_focus: FocusHandle,
     /// P1-③：导出菜单键盘高亮项（跨分组展平后的序号）。
     export_hover: Option<usize>,
     /// P1-④：工具栏「更多 ▾」菜单的打开位置（窗口坐标）；`None` 为关闭。
-    toolbar_menu: Option<Point<gpui::Pixels>>,
+    toolbar_menu: Option<Point<gpui_kit::Pixels>>,
     /// P1-④：「更多 ▾」触发按钮的自有焦点句柄。
     toolbar_focus: FocusHandle,
     /// P1-④：「更多 ▾」菜单键盘高亮项（跨分组展平后的序号）。
@@ -2291,15 +2293,15 @@ pub struct MainView {
     /// 「设计表」面板：对象名 + 表详情。
     table_panel: Option<(String, rustdb_db_api::TableDetail)>,
     /// 列筛选面板：列下标 + 打开位置。
-    filter_menu: Option<(usize, Point<gpui::Pixels>)>,
+    filter_menu: Option<(usize, Point<gpui_kit::Pixels>)>,
     /// 筛选输入框（每列共用，打开时重置内容）。
-    filter_input: Option<gpui::Entity<gpui_component::input::InputState>>,
+    filter_input: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     /// 单元格详情：列名 + 类型 + 全文内容 + 渲染分类。
     cell_detail: Option<CellDetail>,
     /// 单元格编辑状态：(行, 列, 列名)。
     edit_cell: Option<(usize, usize, String)>,
     /// 单元格编辑输入框。
-    edit_input: Option<gpui::Entity<gpui_component::input::InputState>>,
+    edit_input: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     /// 「打开表」后的编辑目标（主键列异步取回）。
     table_edit: Option<TableEditTarget>,
     /// 变更集 SQL 预览浮层内容。
@@ -2311,11 +2313,22 @@ pub struct MainView {
     /// AI Agent 引擎（离线脚本 / OpenAI 兼容端点）。
     agent: std::sync::Arc<rustdb_core::AgentEngine>,
     /// AI 输入框。
-    ai_input: Option<gpui::Entity<gpui_component::input::InputState>>,
+    ai_input: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     /// AI 对话记录：(角色, 文本)；角色 = user / assistant / tool / error。
     ai_lines: Vec<(String, String)>,
     /// 正在流式追加的助手消息下标。
     ai_stream: Option<usize>,
+    /// P1-⑤：AI 转录虚拟滚动句柄（消息数达到阈值后启用）。
+    ai_transcript_scroll: gpui_kit::component::VirtualListScrollHandle,
+    /// P1-⑤：气泡实测高度缓存：(内容指纹, 测量时列宽, 高度)。
+    ai_bubble_heights: Vec<(u64, f32, f32)>,
+    /// P1-⑤：转录是否贴底（新消息 / 流式增长时自动跟随滚动）。
+    ai_transcript_stick: bool,
+    /// P1-⑤：上一帧的消息数 / 末条指纹 / 内容高，用于识别「内容变了」才触发跟随，
+    /// 避免每帧 scroll_to_bottom 覆盖用户发起的延迟滚动。
+    ai_transcript_len: usize,
+    ai_transcript_tail: u64,
+    ai_transcript_content_h: f32,
     /// 本次启动是否恢复了上次会话（状态栏提示一次）。
     recovered: bool,
     /// 当前 AI 会话 id（持久化用）。
@@ -2325,7 +2338,7 @@ pub struct MainView {
     /// 历史面板是否展开。
     ai_history_open: bool,
     /// 重命名会话：(会话 id, 输入框)。
-    ai_rename: Option<(String, gpui::Entity<gpui_component::input::InputState>)>,
+    ai_rename: Option<(String, gpui_kit::Entity<gpui_kit::component::input::InputState>)>,
     /// 待确认的工具调用：(run_id, call_id, tool, summary)。
     ai_pending: Option<(String, String, String, String)>,
     ai_running: bool,
@@ -2383,7 +2396,7 @@ pub struct MainView {
     /// 「查看 DDL」请求对应的命名空间（用来决定写进哪个标签）。
     pending_ddl_ns: Option<Namespace>,
     /// 删除对象时要求输入的确认文本（表名）。
-    danger_input: Option<gpui::Entity<gpui_component::input::InputState>>,
+    danger_input: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     /// 待确认的破坏性动作。
     danger: Option<DangerAction>,
     /// 表头列宽拖拽中的状态。
@@ -2393,14 +2406,14 @@ pub struct MainView {
     /// 结果网格横向滚动偏移（像素，≥ 0）。
     grid_h: f32,
     /// 绑在行体容器上只用于量测视口宽度（自身不滚动）。
-    grid_viewport: gpui::ScrollHandle,
+    grid_viewport: gpui_kit::ScrollHandle,
 
     /// SQL 标签页：只能由连接树里的库节点打开。
     tabs: Vec<SqlTab>,
     active_tab: usize,
     next_tab_id: u64,
 
-    sql_input: gpui::Entity<EditorState>,
+    sql_input: gpui_kit::Entity<EditorState>,
 
     status: String,
     status_kind: StatusKind,
@@ -2459,7 +2472,7 @@ fn doc_table_separator(cells: &[String]) -> bool {
             .all(|cell| !cell.is_empty() && cell.chars().all(|ch| matches!(ch, '-' | ':')))
 }
 
-fn render_doc_table(rows: &[Vec<String>], t: &rustdb_core::theme::ThemeTokens) -> gpui::AnyElement {
+fn render_doc_table(rows: &[Vec<String>], t: &rustdb_core::theme::ThemeTokens) -> gpui_kit::AnyElement {
     let columns = rows.iter().map(Vec::len).max().unwrap_or(0);
     let mut table = v_flex()
         .w_full()
@@ -2486,7 +2499,7 @@ fn render_doc_table(rows: &[Vec<String>], t: &rustdb_core::theme::ThemeTokens) -
                     .text_size(px(crate::design::TS_CAPTION))
                     .text_ellipsis()
                     .when(header, |cell| {
-                        cell.font_weight(gpui::FontWeight::SEMIBOLD)
+                        cell.font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .text_color(hex(t.fg_primary))
                     })
                     .when(!header, |cell| cell.text_color(hex(t.fg_secondary)))
@@ -2498,7 +2511,7 @@ fn render_doc_table(rows: &[Vec<String>], t: &rustdb_core::theme::ThemeTokens) -
     table.into_any_element()
 }
 
-fn render_doc_markdown(markdown: &str, t: &rustdb_core::theme::ThemeTokens) -> gpui::AnyElement {
+fn render_doc_markdown(markdown: &str, t: &rustdb_core::theme::ThemeTokens) -> gpui_kit::AnyElement {
     let mut body = v_flex().gap(px(1.));
     let lines: Vec<&str> = markdown.lines().collect();
     let mut index = 0;
@@ -2527,37 +2540,37 @@ fn render_doc_markdown(markdown: &str, t: &rustdb_core::theme::ThemeTokens) -> g
             (
                 rest.to_string(),
                 11.,
-                gpui::FontWeight::SEMIBOLD,
+                gpui_kit::FontWeight::SEMIBOLD,
                 t.fg_primary,
             )
         } else if let Some(rest) = trimmed.strip_prefix("## ") {
             (
                 rest.to_string(),
                 12.5,
-                gpui::FontWeight::SEMIBOLD,
+                gpui_kit::FontWeight::SEMIBOLD,
                 t.fg_primary,
             )
         } else if let Some(rest) = trimmed.strip_prefix("# ") {
-            (rest.to_string(), 14., gpui::FontWeight::BOLD, t.fg_primary)
+            (rest.to_string(), 14., gpui_kit::FontWeight::BOLD, t.fg_primary)
         } else if let Some(rest) = trimmed.strip_prefix("> ") {
             (
                 format!("│ {rest}"),
                 10.,
-                gpui::FontWeight::NORMAL,
+                gpui_kit::FontWeight::NORMAL,
                 t.fg_muted,
             )
         } else if let Some(rest) = trimmed.strip_prefix("- ") {
             (
                 format!("• {rest}"),
                 10.5,
-                gpui::FontWeight::NORMAL,
+                gpui_kit::FontWeight::NORMAL,
                 t.fg_secondary,
             )
         } else {
             (
                 trimmed.to_string(),
                 10.5,
-                gpui::FontWeight::NORMAL,
+                gpui_kit::FontWeight::NORMAL,
                 t.fg_secondary,
             )
         };
@@ -2573,7 +2586,7 @@ fn render_doc_markdown(markdown: &str, t: &rustdb_core::theme::ThemeTokens) -> g
     body.into_any_element()
 }
 
-fn card_shell(bg: u32, cx: &App) -> gpui::Div {
+fn card_shell(bg: u32, cx: &App) -> gpui_kit::Div {
     let t = current(cx);
     v_flex()
         .min_h_0()
@@ -2590,10 +2603,10 @@ fn text_width(window: &mut Window, text: &str, font_size: f32) -> f32 {
     if text.is_empty() {
         return 0.;
     }
-    let run = gpui::TextRun {
+    let run = gpui_kit::TextRun {
         len: text.len(),
-        font: gpui::Font::default(),
-        color: gpui::Hsla::default(),
+        font: gpui_kit::Font::default(),
+        color: gpui_kit::Hsla::default(),
         background_color: None,
         underline: None,
         strikethrough: None,
@@ -2660,7 +2673,7 @@ fn ensure_result(tab: &mut SqlTab, store: &ResultStore, set_id: ResultSetId) -> 
 }
 
 /// F-92：diff 里的一行（`prefix` 为 `-` 或空；上下文行用弱化色）。
-fn diff_line(line: &str, prefix: Option<&'static str>, color: u32) -> gpui::Div {
+fn diff_line(line: &str, prefix: Option<&'static str>, color: u32) -> gpui_kit::Div {
     h_flex()
         .items_start()
         .gap_1()
@@ -2703,9 +2716,9 @@ fn ai_profile_id(name: &str) -> String {
 fn ai_field(
     t: &rustdb_core::theme::ThemeTokens,
     label: &str,
-    input: &gpui::Entity<gpui_component::input::InputState>,
-    width: gpui::Pixels,
-) -> gpui::AnyElement {
+    input: &gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    width: gpui_kit::Pixels,
+) -> gpui_kit::AnyElement {
     h_flex()
         .items_center()
         .gap_2()
@@ -2719,7 +2732,7 @@ fn ai_field(
         .child(
             div()
                 .w(width)
-                .child(gpui_component::input::Input::new(input).small()),
+                .child(gpui_kit::component::input::Input::new(input).small()),
         )
         .into_any_element()
 }

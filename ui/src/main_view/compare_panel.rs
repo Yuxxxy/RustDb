@@ -325,7 +325,7 @@ impl MainView {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         if self.compare.as_ref().is_some_and(|panel| panel.dirty) {
             self.recompute_compare(cx);
@@ -355,7 +355,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!("结构对比 · {}", panel.profile))),
             )
@@ -845,7 +845,7 @@ impl MainView {
         &mut self,
         source: bool,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.compare.clone() else {
             return div().into_any_element();

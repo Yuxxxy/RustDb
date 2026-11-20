@@ -77,7 +77,7 @@ impl MainView {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
+    ) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.lineage.clone() else {
             return div().into_any_element();
@@ -96,7 +96,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
                         "字段血缘 · {}",
@@ -282,7 +282,7 @@ impl MainView {
                         div()
                             .debug_selector(move || format!("lineage-{direction}-count"))
                             .text_size(px(crate::design::TS_CAPTION))
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .text_color(hex(t.fg_secondary))
                             .child(SharedString::from(format!(
                                 "{title} · {} 条",

@@ -4,8 +4,8 @@ use super::tests_helpers::*;
 use super::*;
 
 /// F-87：文档面板渲染表清单与导出入口，Esc 关闭。
-#[gpui::test]
-fn docs_panel_lists_tables_and_closes_on_escape(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn docs_panel_lists_tables_and_closes_on_escape(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -61,8 +61,8 @@ fn docs_panel_lists_tables_and_closes_on_escape(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-87：保存笔记会合并项目 / 表笔记、刷新预览并原子落盘。
-#[gpui::test]
-fn docs_notes_save_merges_inputs_and_persists(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn docs_notes_save_merges_inputs_and_persists(cx: &mut gpui_kit::TestAppContext) {
     let state_path = std::env::temp_dir().join(format!(
         "rustdb-ui-docs-{}-{}.json",
         std::process::id(),
@@ -99,7 +99,7 @@ fn docs_notes_save_merges_inputs_and_persists(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let table = vcx.debug_bounds("doc-table-0").expect("缺少表条目");
-    vcx.simulate_click(table.center(), gpui::Modifiers::default());
+    vcx.simulate_click(table.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let panel = vcx
@@ -115,7 +115,7 @@ fn docs_notes_save_merges_inputs_and_persists(cx: &mut gpui::TestAppContext) {
     });
 
     let save = vcx.debug_bounds("doc-save").expect("缺少保存按钮");
-    vcx.simulate_click(save.center(), gpui::Modifiers::default());
+    vcx.simulate_click(save.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let path = ObjectPath::new(ns("main"), "orders", ObjectKind::Table);
@@ -143,8 +143,8 @@ fn docs_notes_save_merges_inputs_and_persists(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-88：血缘面板按置信度过滤，Esc 关闭。
-#[gpui::test]
-fn lineage_panel_filters_by_confidence_and_closes(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn lineage_panel_filters_by_confidence_and_closes(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -174,7 +174,7 @@ fn lineage_panel_filters_by_confidence_and_closes(cx: &mut gpui::TestAppContext)
     let chip = vcx
         .debug_bounds("lineage-min-certain")
         .expect("缺少置信度筛选");
-    vcx.simulate_click(chip.center(), gpui::Modifiers::default());
+    vcx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("lineage-edge-up-0").is_some());
     assert!(
@@ -191,8 +191,8 @@ fn lineage_panel_filters_by_confidence_and_closes(cx: &mut gpui::TestAppContext)
 }
 
 /// F-86：面板列出差异，执行要二次确认；Esc 先撤确认再关面板。
-#[gpui::test]
-fn compare_panel_requires_second_click_and_closes(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn compare_panel_requires_second_click_and_closes(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -210,7 +210,7 @@ fn compare_panel_requires_second_click_and_closes(cx: &mut gpui::TestAppContext)
     assert!(vcx.debug_bounds("compare-toggle-rollback").is_some());
 
     let execute = vcx.debug_bounds("compare-execute").expect("缺少执行按钮");
-    vcx.simulate_click(execute.center(), gpui::Modifiers::default());
+    vcx.simulate_click(execute.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let confirming = vcx.update(|_, app| {
         view.read(app)
@@ -235,8 +235,8 @@ fn compare_panel_requires_second_click_and_closes(cx: &mut gpui::TestAppContext)
 }
 
 /// F-86：勾选「允许 DROP 多余表」后重算差异并把配置写回磁盘。
-#[gpui::test]
-fn compare_drop_chip_recomputes_and_persists_config(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn compare_drop_chip_recomputes_and_persists_config(cx: &mut gpui_kit::TestAppContext) {
     let state_path = std::env::temp_dir().join(format!(
         "rustdb-ui-compare-{}-{}.json",
         std::process::id(),
@@ -262,7 +262,7 @@ fn compare_drop_chip_recomputes_and_persists_config(cx: &mut gpui::TestAppContex
     let chip = vcx
         .debug_bounds("compare-drop-tables")
         .expect("缺少 DROP 表开关");
-    vcx.simulate_click(chip.center(), gpui::Modifiers::default());
+    vcx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (drop_tables, removed) = vcx.update(|_, app| {
@@ -283,8 +283,8 @@ fn compare_drop_chip_recomputes_and_persists_config(cx: &mut gpui::TestAppContex
 }
 
 /// F-76：默认全选；可全不选、单表切换；空选时拒绝提交；Esc 关闭。
-#[gpui::test]
-fn dump_panel_toggles_tables_and_requires_selection(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn dump_panel_toggles_tables_and_requires_selection(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -300,7 +300,7 @@ fn dump_panel_toggles_tables_and_requires_selection(cx: &mut gpui::TestAppContex
     assert!(vcx.debug_bounds("dump-table-1").is_some());
 
     let all = vcx.debug_bounds("dump-toggle-all").expect("缺少全选开关");
-    vcx.simulate_click(all.center(), gpui::Modifiers::default());
+    vcx.simulate_click(all.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let count = vcx.update(|_, app| {
         view.read(app)
@@ -311,7 +311,7 @@ fn dump_panel_toggles_tables_and_requires_selection(cx: &mut gpui::TestAppContex
     assert_eq!(count, Some(0), "全不选应清空选择");
 
     let first = vcx.debug_bounds("dump-table-0").expect("缺少表条目");
-    vcx.simulate_click(first.center(), gpui::Modifiers::default());
+    vcx.simulate_click(first.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let selected =
         vcx.update(|_, app| view.read(app).dump.as_ref().map(DumpPanel::selected_tables));
@@ -319,10 +319,10 @@ fn dump_panel_toggles_tables_and_requires_selection(cx: &mut gpui::TestAppContex
 
     // 再取消这张表，空选提交应被拦下，不发起导出。
     let first = vcx.debug_bounds("dump-table-0").expect("缺少表条目");
-    vcx.simulate_click(first.center(), gpui::Modifiers::default());
+    vcx.simulate_click(first.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let run = vcx.debug_bounds("dump-run").expect("缺少导出按钮");
-    vcx.simulate_click(run.center(), gpui::Modifiers::default());
+    vcx.simulate_click(run.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let error = vcx.update(|_, app| {
         view.read(app)
@@ -338,8 +338,8 @@ fn dump_panel_toggles_tables_and_requires_selection(cx: &mut gpui::TestAppContex
 }
 
 /// F-76：结构 / 数据 / gzip / 中止都是独立开关，默认不压不删；多库可切分文件。
-#[gpui::test]
-fn dump_panel_options_toggle_independently(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn dump_panel_options_toggle_independently(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -366,7 +366,7 @@ fn dump_panel_options_toggle_independently(cx: &mut gpui::TestAppContext) {
 
     for selector in ["dump-structure", "dump-gzip", "dump-drops", "dump-abort"] {
         let bound = vcx.debug_bounds(selector).expect("缺少选项开关");
-        vcx.simulate_click(bound.center(), gpui::Modifiers::default());
+        vcx.simulate_click(bound.center(), gpui_kit::Modifiers::default());
         vcx.run_until_parked();
     }
     let options = vcx.update(|_, app| {
@@ -384,7 +384,7 @@ fn dump_panel_options_toggle_independently(cx: &mut gpui::TestAppContext) {
     let scope = vcx
         .debug_bounds("dump-scope-all")
         .expect("多库时应出现「全部库」开关");
-    vcx.simulate_click(scope.center(), gpui::Modifiers::default());
+    vcx.simulate_click(scope.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let export_all = vcx.update(|_, app| {
         view.read(app)
@@ -400,8 +400,8 @@ fn dump_panel_options_toggle_independently(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-75：未预览不能执行；预览后选项 / 表选择 / 目标变化一律失效；Esc 关闭。
-#[gpui::test]
-fn transfer_panel_requires_preview_before_run(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn transfer_panel_requires_preview_before_run(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -419,7 +419,7 @@ fn transfer_panel_requires_preview_before_run(cx: &mut gpui::TestAppContext) {
 
     // 未预览时执行按钮禁用，点它不应产生请求或错误。
     let run = vcx.debug_bounds("transfer-run").expect("缺少执行按钮");
-    vcx.simulate_click(run.center(), gpui::Modifiers::default());
+    vcx.simulate_click(run.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let error = vcx.update(|_, app| {
         view.read(app)
@@ -448,7 +448,7 @@ fn transfer_panel_requires_preview_before_run(cx: &mut gpui::TestAppContext) {
     assert_eq!(lines, 1);
 
     let run = vcx.debug_bounds("transfer-run").expect("缺少执行按钮");
-    vcx.simulate_click(run.center(), gpui::Modifiers::default());
+    vcx.simulate_click(run.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let error = vcx.update(|_, app| {
         view.read(app)
@@ -466,7 +466,7 @@ fn transfer_panel_requires_preview_before_run(cx: &mut gpui::TestAppContext) {
         "transfer-target-1",
     ] {
         let bound = vcx.debug_bounds(selector).expect("缺少选项开关");
-        vcx.simulate_click(bound.center(), gpui::Modifiers::default());
+        vcx.simulate_click(bound.center(), gpui_kit::Modifiers::default());
         vcx.run_until_parked();
     }
     let (ready, mode) = vcx.update(|_, app| {
@@ -477,7 +477,7 @@ fn transfer_panel_requires_preview_before_run(cx: &mut gpui::TestAppContext) {
     assert_eq!(mode, TransferMode::Recreate, "模式应在四种之间循环");
 
     let table = vcx.debug_bounds("transfer-table-0").expect("缺少表条目");
-    vcx.simulate_click(table.center(), gpui::Modifiers::default());
+    vcx.simulate_click(table.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let selected = vcx.update(|_, app| {
         view.read(app)
@@ -496,8 +496,8 @@ fn transfer_panel_requires_preview_before_run(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-75：传输事件驱动进度、备份提示与失败清单。
-#[gpui::test]
-fn transfer_events_track_progress_and_failures(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn transfer_events_track_progress_and_failures(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -571,8 +571,8 @@ fn transfer_events_track_progress_and_failures(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-78：未预览不能同步；预览后目标 / 选项 / 表选择变化一律失效；Esc 关闭。
-#[gpui::test]
-fn data_compare_panel_requires_preview_before_sync(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn data_compare_panel_requires_preview_before_sync(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -596,7 +596,7 @@ fn data_compare_panel_requires_preview_before_sync(cx: &mut gpui::TestAppContext
 
     // 未预览时执行按钮禁用，点它不应产生请求或错误。
     let sync = vcx.debug_bounds("dc-sync").expect("缺少执行同步按钮");
-    vcx.simulate_click(sync.center(), gpui::Modifiers::default());
+    vcx.simulate_click(sync.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let error = vcx.update(|_, app| {
         view.read(app)
@@ -629,7 +629,7 @@ fn data_compare_panel_requires_preview_before_sync(cx: &mut gpui::TestAppContext
     assert_eq!(insert, 1);
 
     let sync = vcx.debug_bounds("dc-sync").expect("缺少执行同步按钮");
-    vcx.simulate_click(sync.center(), gpui::Modifiers::default());
+    vcx.simulate_click(sync.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let error = vcx.update(|_, app| {
         view.read(app)
@@ -642,7 +642,7 @@ fn data_compare_panel_requires_preview_before_sync(cx: &mut gpui::TestAppContext
     // 选项 / 目标 / 表选择变化都会让旧预览失效。
     for selector in ["dc-update", "dc-case", "dc-batch", "dc-target-1"] {
         let bound = vcx.debug_bounds(selector).expect("缺少选项开关");
-        vcx.simulate_click(bound.center(), gpui::Modifiers::default());
+        vcx.simulate_click(bound.center(), gpui_kit::Modifiers::default());
         vcx.run_until_parked();
     }
     let (ready, update, target) = vcx.update(|_, app| {
@@ -654,7 +654,7 @@ fn data_compare_panel_requires_preview_before_sync(cx: &mut gpui::TestAppContext
     assert_eq!(target.as_deref(), Some("t2"));
 
     let table = vcx.debug_bounds("dc-table-0").expect("缺少表条目");
-    vcx.simulate_click(table.center(), gpui::Modifiers::default());
+    vcx.simulate_click(table.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let selected = vcx.update(|_, app| {
         view.read(app)
@@ -673,8 +673,8 @@ fn data_compare_panel_requires_preview_before_sync(cx: &mut gpui::TestAppContext
 }
 
 /// F-78：对比事件累计差异计数、警告与失败清单；同步结束后旧脚本失效。
-#[gpui::test]
-fn data_compare_events_track_progress_and_failures(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn data_compare_events_track_progress_and_failures(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -792,8 +792,8 @@ fn data_compare_events_track_progress_and_failures(cx: &mut gpui::TestAppContext
 }
 
 /// F-88：切换字段会按新列重算上游 / 下游。
-#[gpui::test]
-fn lineage_column_select_recomputes_report(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn lineage_column_select_recomputes_report(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -809,7 +809,7 @@ fn lineage_column_select_recomputes_report(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let second = vcx.debug_bounds("lineage-col-1").expect("缺少字段条目");
-    vcx.simulate_click(second.center(), gpui::Modifiers::default());
+    vcx.simulate_click(second.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (selected, upstream) = vcx.update(|_, app| {

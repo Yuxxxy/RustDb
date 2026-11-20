@@ -4,8 +4,8 @@ use super::tests_helpers::*;
 use super::*;
 
 /// F-71：Esc 撤销未填写的新增行；已填写的行不会被自动丢弃。
-#[gpui::test]
-fn escape_undoes_unfilled_new_row(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn escape_undoes_unfilled_new_row(cx: &mut gpui_kit::TestAppContext) {
     let (mut vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = editable_view(&mut vcx, &holder);
@@ -57,8 +57,8 @@ fn foreign_key_generator_uses_result_values() {
 }
 
 /// F-02：连接面板的「+」打开编辑器，填完保存后连接出现在列表里。
-#[gpui::test]
-fn conn_editor_creates_a_profile(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn conn_editor_creates_a_profile(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -71,7 +71,7 @@ fn conn_editor_creates_a_profile(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let plus = vcx.debug_bounds("conn-new").expect("缺少新建连接按钮");
-    vcx.simulate_click(plus.center(), gpui::Modifiers::default());
+    vcx.simulate_click(plus.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("conn-editor").is_some(),
@@ -95,7 +95,7 @@ fn conn_editor_creates_a_profile(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let save = vcx.debug_bounds("conn-editor-save").expect("缺少保存按钮");
-    vcx.simulate_click(save.center(), gpui::Modifiers::default());
+    vcx.simulate_click(save.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (names, editor_open) = vcx.update(|_, app| {
@@ -113,8 +113,8 @@ fn conn_editor_creates_a_profile(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-02：必填项缺失时留在编辑器并给出原因，不写入连接列表。
-#[gpui::test]
-fn conn_editor_reports_missing_name(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn conn_editor_reports_missing_name(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -128,7 +128,7 @@ fn conn_editor_reports_missing_name(cx: &mut gpui::TestAppContext) {
 
     let save = vcx.debug_bounds("conn-editor-save").expect("缺少保存按钮");
     let before = vcx.update(|_, app| view.read(app).profiles.len());
-    vcx.simulate_click(save.center(), gpui::Modifiers::default());
+    vcx.simulate_click(save.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (error, count) = vcx.update(|_, app| {
@@ -143,8 +143,8 @@ fn conn_editor_reports_missing_name(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-91a：代理段可开关，类型 / 远程 DNS / 局域网都落到保存后的配置里。
-#[gpui::test]
-fn conn_editor_proxy_section_round_trips(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn conn_editor_proxy_section_round_trips(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -161,7 +161,7 @@ fn conn_editor_proxy_section_round_trips(cx: &mut gpui::TestAppContext) {
         "默认不显示代理表单"
     );
     let toggle = vcx.debug_bounds("conn-toggle-proxy").expect("缺少代理开关");
-    vcx.simulate_click(toggle.center(), gpui::Modifiers::default());
+    vcx.simulate_click(toggle.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("conn-proxy-kind-socks5").is_some(),
@@ -203,11 +203,11 @@ fn conn_editor_proxy_section_round_trips(cx: &mut gpui::TestAppContext) {
     let dns = vcx
         .debug_bounds("conn-toggle-remote-dns")
         .expect("缺少远程 DNS 开关");
-    vcx.simulate_click(dns.center(), gpui::Modifiers::default());
+    vcx.simulate_click(dns.center(), gpui_kit::Modifiers::default());
     let http = vcx
         .debug_bounds("conn-proxy-kind-http")
         .expect("缺少 HTTP 类型");
-    vcx.simulate_click(http.center(), gpui::Modifiers::default());
+    vcx.simulate_click(http.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("conn-toggle-remote-dns").is_none(),
@@ -215,11 +215,11 @@ fn conn_editor_proxy_section_round_trips(cx: &mut gpui::TestAppContext) {
     );
 
     let lan = vcx.debug_bounds("conn-toggle-lan").expect("缺少局域网开关");
-    vcx.simulate_click(lan.center(), gpui::Modifiers::default());
+    vcx.simulate_click(lan.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let save = vcx.debug_bounds("conn-editor-save").expect("缺少保存按钮");
-    vcx.simulate_click(save.center(), gpui::Modifiers::default());
+    vcx.simulate_click(save.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (profile, editor_open) = vcx.update(|_, app| {
@@ -243,8 +243,8 @@ fn conn_editor_proxy_section_round_trips(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-91：隧道段可开可关，跳板能加能删，顺序即建链顺序。
-#[gpui::test]
-fn conn_editor_tunnel_hops_add_and_remove(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn conn_editor_tunnel_hops_add_and_remove(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -259,7 +259,7 @@ fn conn_editor_tunnel_hops_add_and_remove(cx: &mut gpui::TestAppContext) {
     let toggle = vcx
         .debug_bounds("conn-toggle-tunnel")
         .expect("缺少隧道开关");
-    vcx.simulate_click(toggle.center(), gpui::Modifiers::default());
+    vcx.simulate_click(toggle.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("conn-hop-add").is_some(),
@@ -267,17 +267,17 @@ fn conn_editor_tunnel_hops_add_and_remove(cx: &mut gpui::TestAppContext) {
     );
 
     let add = vcx.debug_bounds("conn-hop-add").expect("缺少添加跳板");
-    vcx.simulate_click(add.center(), gpui::Modifiers::default());
+    vcx.simulate_click(add.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("conn-hop-0").is_some(), "应有第 1 层跳板");
 
     let add = vcx.debug_bounds("conn-hop-add").expect("缺少添加跳板");
-    vcx.simulate_click(add.center(), gpui::Modifiers::default());
+    vcx.simulate_click(add.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("conn-hop-1").is_some(), "应有第 2 层跳板");
 
     let remove = vcx.debug_bounds("conn-hop-remove-0").expect("缺少移除跳板");
-    vcx.simulate_click(remove.center(), gpui::Modifiers::default());
+    vcx.simulate_click(remove.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("conn-hop-1").is_none(),
@@ -286,8 +286,8 @@ fn conn_editor_tunnel_hops_add_and_remove(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-91：主机密钥待确认时弹窗；拒绝后弹窗消失且不重连。
-#[gpui::test]
-fn host_key_prompt_requires_explicit_decision(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn host_key_prompt_requires_explicit_decision(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -319,7 +319,7 @@ fn host_key_prompt_requires_explicit_decision(cx: &mut gpui::TestAppContext) {
         "应弹出主机密钥确认"
     );
     let reject = vcx.debug_bounds("host-key-reject").expect("缺少拒绝按钮");
-    vcx.simulate_click(reject.center(), gpui::Modifiers::default());
+    vcx.simulate_click(reject.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (prompt, status) = vcx.update(|_, app| {
@@ -331,8 +331,8 @@ fn host_key_prompt_requires_explicit_decision(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-92：工具栏入口打开面板；转换才显示目标方言；Esc 关闭。
-#[gpui::test]
-fn optimize_panel_opens_from_toolbar(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn optimize_panel_opens_from_toolbar(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -353,7 +353,7 @@ fn optimize_panel_opens_from_toolbar(cx: &mut gpui::TestAppContext) {
     let button = vcx
         .debug_bounds("settings-tool-optimize")
         .expect("缺少优化入口");
-    vcx.simulate_click(button.center(), gpui::Modifiers::default());
+    vcx.simulate_click(button.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     assert!(
@@ -374,7 +374,7 @@ fn optimize_panel_opens_from_toolbar(cx: &mut gpui::TestAppContext) {
     let convert = vcx
         .debug_bounds("ai-optimize-kind-convert")
         .expect("缺少转换选项");
-    vcx.simulate_click(convert.center(), gpui::Modifiers::default());
+    vcx.simulate_click(convert.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     assert!(
         vcx.debug_bounds("ai-optimize-target-postgres").is_some(),
@@ -390,8 +390,8 @@ fn optimize_panel_opens_from_toolbar(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-92：逐段采纳/拒绝；插入编辑器只写文本、不执行。
-#[gpui::test]
-fn optimize_hunks_can_be_skipped_before_insert(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn optimize_hunks_can_be_skipped_before_insert(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -431,13 +431,13 @@ fn optimize_hunks_can_be_skipped_before_insert(cx: &mut gpui::TestAppContext) {
     let second = vcx
         .debug_bounds("ai-optimize-hunk-1")
         .expect("缺少第二段改动");
-    vcx.simulate_click(second.center(), gpui::Modifiers::default());
+    vcx.simulate_click(second.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let insert = vcx
         .debug_bounds("ai-optimize-insert")
         .expect("缺少插入按钮");
-    vcx.simulate_click(insert.center(), gpui::Modifiers::default());
+    vcx.simulate_click(insert.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (closed, sql, status) = vcx.update(|_, app| {
@@ -457,8 +457,8 @@ fn optimize_hunks_can_be_skipped_before_insert(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-92：「新标签」不覆盖当前页，也不触发执行。
-#[gpui::test]
-fn optimize_can_open_a_new_tab(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn optimize_can_open_a_new_tab(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -497,7 +497,7 @@ fn optimize_can_open_a_new_tab(cx: &mut gpui::TestAppContext) {
     let new_tab = vcx
         .debug_bounds("ai-optimize-new-tab")
         .expect("缺少新标签按钮");
-    vcx.simulate_click(new_tab.center(), gpui::Modifiers::default());
+    vcx.simulate_click(new_tab.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (tabs, sql, running, status) = vcx.update(|_, app| {
@@ -522,8 +522,8 @@ fn optimize_can_open_a_new_tab(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-92：生成走同一个 provider，一次调用即回填说明与 diff。
-#[gpui::test]
-fn optimize_generation_fills_result(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn optimize_generation_fills_result(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -551,10 +551,10 @@ fn optimize_generation_fills_result(cx: &mut gpui::TestAppContext) {
     let button = vcx
         .debug_bounds("settings-tool-optimize")
         .expect("缺少优化入口");
-    vcx.simulate_click(button.center(), gpui::Modifiers::default());
+    vcx.simulate_click(button.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let run = vcx.debug_bounds("ai-optimize-run").expect("缺少生成按钮");
-    vcx.simulate_click(run.center(), gpui::Modifiers::default());
+    vcx.simulate_click(run.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (explanation, hunks, error) = vcx.update(|_, app| {
@@ -572,8 +572,8 @@ fn optimize_generation_fills_result(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-93：错误栏的「AI 修复」把出错语句和报错预填进「改写」，且不执行。
-#[gpui::test]
-fn error_offers_ai_fix_and_prefills_rewrite(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn error_offers_ai_fix_and_prefills_rewrite(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -597,7 +597,7 @@ fn error_offers_ai_fix_and_prefills_rewrite(cx: &mut gpui::TestAppContext) {
     vcx.run_until_parked();
 
     let fix = vcx.debug_bounds("ai-fix-error").expect("缺少 AI 修复入口");
-    vcx.simulate_click(fix.center(), gpui::Modifiers::default());
+    vcx.simulate_click(fix.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
     let (kind, original, instruction, running) = vcx.update(|_, app| {
@@ -622,8 +622,8 @@ fn error_offers_ai_fix_and_prefills_rewrite(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-93：上下文芯片可追加、去重、移除。
-#[gpui::test]
-fn ai_context_chips_add_and_remove(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn ai_context_chips_add_and_remove(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -667,7 +667,7 @@ fn ai_context_chips_add_and_remove(cx: &mut gpui::TestAppContext) {
     assert!(vcx.debug_bounds("ai-ctx-chip-1").is_some());
 
     let chip = vcx.debug_bounds("ai-ctx-chip-0").expect("缺少芯片");
-    vcx.simulate_click(chip.center(), gpui::Modifiers::default());
+    vcx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
     let chips = vcx.update(|_, app| {
         view.read(app)
@@ -681,8 +681,8 @@ fn ai_context_chips_add_and_remove(cx: &mut gpui::TestAppContext) {
 }
 
 /// F-93：「应用」只写编辑器，不执行；块状态随标签状态变化。
-#[gpui::test]
-fn ai_sql_block_applies_without_running(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn ai_sql_block_applies_without_running(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -755,8 +755,8 @@ fn ai_sql_block_applies_without_running(cx: &mut gpui::TestAppContext) {
     assert_eq!(statuses.2.as_deref(), Some("标签已关闭"));
 }
 
-#[gpui::test]
-fn ai_model_panel_saves_profile_without_key(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn ai_model_panel_saves_profile_without_key(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -843,8 +843,8 @@ fn ai_model_panel_saves_profile_without_key(cx: &mut gpui::TestAppContext) {
     assert_eq!(editing.as_deref(), Some("ollama"));
 }
 
-#[gpui::test]
-fn ai_model_panel_rejects_bad_config(cx: &mut gpui::TestAppContext) {
+#[gpui_kit::test]
+fn ai_model_panel_rejects_bad_config(cx: &mut gpui_kit::TestAppContext) {
     let (vcx, holder) = test_view(cx);
     vcx.run_until_parked();
     let view = holder.borrow().clone().expect("view 未创建");
@@ -902,4 +902,238 @@ fn ai_model_panel_rejects_bad_config(cx: &mut gpui::TestAppContext) {
         errors.iter().any(|error| error.contains("不支持发现")),
         "{errors:?}"
     );
+}
+
+/// P1-⑤：造 count 条交替角色的消息，撑出长会话。
+fn fill_ai_lines(view: &mut MainView, count: usize) {
+    view.ai_lines.clear();
+    for index in 0..count {
+        let role = if index % 2 == 0 { "user" } else { "assistant" };
+        view.ai_lines.push((
+            role.into(),
+            format!("消息 {index}：这是第 {index} 条测试内容，用来撑高会话触发虚拟化。"),
+        ));
+    }
+}
+
+/// P1-⑤：长会话只渲染可见气泡；贴底时最后一条可见，离屏首条被裁剪。
+#[gpui_kit::test]
+fn ai_long_session_virtualizes_offscreen_bubbles(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.layout.ai_open = true;
+            fill_ai_lines(view, 80);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    vcx.run_until_parked();
+
+    assert!(
+        vcx.debug_bounds("ai-bubble-79").is_some(),
+        "贴底时最后一条消息应可见"
+    );
+    assert!(
+        vcx.debug_bounds("ai-bubble-0").is_none(),
+        "离屏气泡不应渲染"
+    );
+    let visible = (0..80)
+        .filter(|index| vcx.debug_bounds(selector(format!("ai-bubble-{index}"))).is_some())
+        .count();
+    assert!(visible < 40, "虚拟列表应只画可见气泡，实际 {visible}");
+    assert!(
+        vcx.update(|_, app| view.read(app).ai_transcript_stick),
+        "初始应贴底"
+    );
+}
+
+/// P1-⑤：阈值以下仍整段渲染（离屏气泡也有 bounds），行为与旧路径一致。
+#[gpui_kit::test]
+fn ai_short_session_renders_all_bubbles(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.layout.ai_open = true;
+            fill_ai_lines(view, 49);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    assert!(vcx.debug_bounds("ai-bubble-0").is_some());
+    assert!(vcx.debug_bounds("ai-bubble-48").is_some());
+}
+
+/// P1-⑤：滚到顶部后首条可见、末条裁剪，且新消息不再自动跟随。
+#[gpui_kit::test]
+fn ai_long_session_scroll_top_stops_following(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.layout.ai_open = true;
+            fill_ai_lines(view, 80);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    vcx.run_until_parked();
+
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.ai_transcript_scroll
+                .scroll_to_item(0, gpui_kit::ScrollStrategy::Top);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("ai-bubble-0").is_some(),
+        "滚到顶部后首条应可见"
+    );
+    assert!(vcx.debug_bounds("ai-bubble-79").is_none());
+
+    // 顶部时追加新消息：不应把视口拉回底部。
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.ai_lines.push(("user".into(), "新消息".into()));
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("ai-bubble-80").is_none(),
+        "用户上滑后新消息不应自动跟随"
+    );
+    assert!(
+        !vcx.update(|_, app| view.read(app).ai_transcript_stick),
+        "离开底部后应停止贴底"
+    );
+}
+
+/// P1-⑤：贴底时新消息自动跟随；流式追加（末条变长）也跟随。
+#[gpui_kit::test]
+fn ai_long_session_new_message_follows_when_stuck(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.layout.ai_open = true;
+            fill_ai_lines(view, 80);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    vcx.run_until_parked();
+
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.ai_lines.push(("assistant".into(), "追加的回答".into()));
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("ai-bubble-80").is_some(),
+        "贴底时新消息应自动滚到底"
+    );
+
+    // 流式：末条不断变长，视口应继续贴底。
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            let last = view.ai_lines.last_mut().expect("应有消息");
+            last.1.push_str(" 流式追加的内容，越来越长。");
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("ai-bubble-80").is_some(),
+        "流式增长应继续贴底"
+    );
+    assert!(vcx.update(|_, app| view.read(app).ai_transcript_stick));
+}
+
+/// P1-⑤：虚拟列表里相邻气泡不重叠（高度回写后仍保持 6px 间距）。
+#[gpui_kit::test]
+fn ai_long_session_bubbles_do_not_overlap(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.layout.ai_open = true;
+            fill_ai_lines(view, 80);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    vcx.run_until_parked();
+
+    let mut bounds: Vec<(usize, gpui_kit::Bounds<gpui_kit::Pixels>)> = (0..80)
+        .filter_map(|index| {
+            vcx.debug_bounds(selector(format!("ai-bubble-{index}")))
+                .map(|b| (index, b))
+        })
+        .collect();
+    bounds.sort_by_key(|(index, _)| *index);
+    assert!(bounds.len() >= 3, "应至少渲染几个可见气泡");
+    for pair in bounds.windows(2) {
+        let (a, b) = (&pair[0], &pair[1]);
+        assert_eq!(b.0, a.0 + 1, "可见气泡应是连续下标");
+        assert!(
+            a.1.bottom() <= b.1.top(),
+            "气泡 {} 与 {} 重叠：{:?} / {:?}",
+            a.0,
+            b.0,
+            a.1,
+            b.1
+        );
+    }
+}
+
+/// P1-⑤：虚拟化后 SQL 块按钮仍可点击（应用写编辑器，不执行）。
+#[gpui_kit::test]
+fn ai_long_session_sql_block_apply_works(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.layout.ai_open = true;
+            view.current_ns = Some(ns("main"));
+            fill_ai_lines(view, 60);
+            view.ai_lines.push((
+                "assistant".into(),
+                "试试：\n```sql\nSELECT 42 AS answer\n```\n".into(),
+            ));
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    vcx.run_until_parked();
+
+    let apply = vcx
+        .debug_bounds("ai-block-apply-60-0")
+        .expect("贴底时末条 SQL 块应可见");
+    vcx.simulate_click(apply.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
+
+    let (text, running) = vcx.update(|_, app| {
+        let view = view.read(app);
+        (
+            view.sql_input.read(app).value().to_string(),
+            view.tabs.iter().any(|tab| tab.running.is_some()),
+        )
+    });
+    assert!(text.contains("SELECT 42 AS answer"), "{text:?}");
+    assert!(!running, "应用不应自动执行");
 }

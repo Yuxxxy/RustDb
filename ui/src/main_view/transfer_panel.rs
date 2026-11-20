@@ -195,7 +195,7 @@ impl MainView {
     }
 
     /// F-75：跨库传输面板（居中模态）。
-    pub(crate) fn render_transfer_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_transfer_panel(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(panel) = self.transfer.clone() else {
             return div().into_any_element();
@@ -219,7 +219,7 @@ impl MainView {
                     .flex_1()
                     .min_w_0()
                     .text_size(px(crate::design::TS_CAPTION))
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_ellipsis()
                     .child(SharedString::from(format!(
                         "跨库传输 · {} · {}",

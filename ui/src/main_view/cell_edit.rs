@@ -34,7 +34,7 @@ impl MainView {
         };
         let placeholder = format!("{}（{}）", column.name, column.logical_type.label());
         let input = cx
-            .new(|cx| gpui_component::input::InputState::new(window, cx).placeholder(placeholder));
+            .new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder(placeholder));
         input.update(cx, |state, cx| state.set_value(text, window, cx));
         self.edit_cell = Some((row, col, column.name.to_string()));
         self.edit_input = Some(input);
@@ -187,13 +187,13 @@ impl MainView {
     /// 打开行操作菜单（锚点用按钮的点击位置）。
     pub(crate) fn open_row_menu(
         &mut self,
-        event: &gpui::ClickEvent,
+        event: &gpui_kit::ClickEvent,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let at = match event {
-            gpui::ClickEvent::Mouse(mouse) => mouse.down.position,
-            _ => gpui::point(px(0.), px(0.)),
+            gpui_kit::ClickEvent::Mouse(mouse) => mouse.down.position,
+            _ => gpui_kit::point(px(0.), px(0.)),
         };
         self.row_menu = Some(at);
         cx.notify();
@@ -231,7 +231,7 @@ impl MainView {
         ]
     }
 
-    pub(crate) fn render_row_menu(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+    pub(crate) fn render_row_menu(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         self.render_menu(self.row_menu_groups(), cx)
     }
 
