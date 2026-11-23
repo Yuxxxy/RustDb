@@ -1072,9 +1072,10 @@ fn object_context_menu_lists_actions(cx: &mut gpui_kit::TestAppContext) {
     assert!(vcx.debug_bounds("menu-obj-copy").is_none(), "点别处应关闭");
 }
 
-/// F-84：连接树中的对象搜索（名称 + 注释）、置顶、最近访问，状态按连接落盘。
+/// F-84：连接树中的对象搜索（名称 + 注释）与置顶，状态按连接落盘；
+/// 「最近访问」已移除，本用例同时守住它不再出现。
 #[gpui_kit::test]
-fn objects_tree_search_pin_and_recent(cx: &mut gpui_kit::TestAppContext) {
+fn objects_tree_search_pin_and_no_recent_section(cx: &mut gpui_kit::TestAppContext) {
     let state_path =
         std::env::temp_dir().join(format!("rustdb-ui-objects-{}.json", std::process::id()));
     let _ = std::fs::remove_file(&state_path);
@@ -1157,18 +1158,10 @@ fn objects_tree_search_pin_and_recent(cx: &mut gpui_kit::TestAppContext) {
         "置顶状态应写入按连接的状态文件"
     );
 
-    // 最近：访问过的对象出现在「最近」区，置顶项不再重复。
-    let channels = ObjectPath::new(ns("main"), "channels", ObjectKind::Table);
-    vcx.update(|_, app| {
-        view.update(app, |view, cx| {
-            view.record_recent_object(&channels);
-            cx.notify();
-        });
-    });
-    vcx.run_until_parked();
+    // 「最近」区已按用户要求移除：打开过的对象只在原分组出现，不再重复一节。
     assert!(
-        vcx.debug_bounds("obj-recent-channels").is_some(),
-        "channels 应出现在最近区"
+        vcx.debug_bounds("obj-recent-channels").is_none(),
+        "不应再渲染「最近」区"
     );
 
     // 搜索：注释命中（p_touch 的「回写渠道」），其余对象隐藏。

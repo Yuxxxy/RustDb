@@ -1,4 +1,4 @@
-//! 侧栏与导航：连接树（含对象搜索 / 置顶 / 最近）、历史、文件、帮助与参数面板。
+//! 侧栏与导航：连接树（含对象搜索 / 置顶）、历史、文件、帮助与参数面板。
 
 use super::*;
 
@@ -357,17 +357,10 @@ impl MainView {
                         .items_center()
                         .rounded(px(5.))
                         .cursor_pointer()
-                        // RustShell 移植：hover 用 bg_elevated（浅色主题下 bg_overlay 与
-                        // bg_base 同为白，等于没有 hover）；选中用 accent 18% + 同色外线，
-                        // 与 hover 分成两档深浅。
-                        .when(is_active, |row| {
-                            row.bg(crate::theme::to_hsla(t.accent).opacity(0.18))
-                                .border_1()
-                                .border_color(crate::theme::to_hsla(t.accent))
-                        })
-                        .when(!is_active, |row| {
-                            row.hover(|s| s.bg(hex(t.bg_elevated)))
-                        })
+                        // 用户要求：连接行不留选中高亮（此前是 accent 18% + 蓝框，
+                        // 看起来像 hover 永远消不掉）。连接状态只靠左侧绿点与状态栏表达；
+                        // 所有行一律 hover=bg_elevated，鼠标移开即恢复。
+                        .hover(|s| s.bg(hex(t.bg_elevated)))
                         .on_click(cx.listener(move |view, _, _, cx| {
                             // 已连接 / 正在连接的节点只做高亮，不再重复发起连接。
                             if view.connecting.as_deref() == Some(click_id.as_str())
@@ -396,18 +389,14 @@ impl MainView {
                         .child(
                             Icon::new(IconName::Database)
                                 .small()
-                                .text_color(hex(if is_active { t.accent } else { t.fg_muted })),
+                                .text_color(hex(t.fg_muted)),
                         )
                         .child(
                             div()
                                 .flex_1()
                                 .min_w_0()
                                 .text_size(px(crate::design::TS_CAPTION))
-                                .text_color(hex(if is_active {
-                                    t.fg_primary
-                                } else {
-                                    t.fg_secondary
-                                }))
+                                .text_color(hex(t.fg_primary))
                                 .text_ellipsis()
                                 .child(SharedString::from(name)),
                         )
@@ -458,12 +447,6 @@ impl MainView {
                     let key = ns_key(&ns);
                     // 搜索时所有库展开，命中结果直接可见。
                     let expanded = self.expanded_ns.contains(&key) || !filter.is_empty();
-                    let is_current =
-                        self.current_ns.as_ref().map(ns_key).as_deref() == Some(key.as_str());
-                    let in_tab = self
-                        .tabs
-                        .iter()
-                        .any(|tab| tab.ns_key().as_deref() == Some(key.as_str()));
                     let loading = self.loading.contains(&key);
                     // P1-②：400ms 内只留透明占位，超时后才真正显示骨架。
                     let skeleton_visible =
@@ -488,15 +471,8 @@ impl MainView {
                             .items_center()
                             .rounded(px(5.))
                             .cursor_pointer()
-                            // 与连接行同一套两档：hover=bg_elevated，选中=accent 18%+外线。
-                            .when(is_current || in_tab, |row| {
-                                row.bg(crate::theme::to_hsla(t.accent).opacity(0.18))
-                                    .border_1()
-                                    .border_color(crate::theme::to_hsla(t.accent))
-                            })
-                            .when(!(is_current || in_tab), |row| {
-                                row.hover(|s| s.bg(hex(t.bg_elevated)))
-                            })
+                            // 用户要求：库行同样不留选中高亮，hover 对所有行一律生效。
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             // 单击展开 / 收起；双击打开 SQL 标签页。
                             .on_click(cx.listener(
                                 move |view, event: &gpui_kit::ClickEvent, window, cx| {
@@ -563,22 +539,14 @@ impl MainView {
                             .child(
                                 Icon::new(IconName::Database)
                                     .small()
-                                    .text_color(hex(if is_current {
-                                        t.accent
-                                    } else {
-                                        t.fg_muted
-                                    })),
+                                    .text_color(hex(t.fg_muted)),
                             )
                             .child(
                                 div()
                                     .flex_1()
                                     .min_w_0()
                                     .text_size(px(crate::design::TS_CAPTION))
-                                    .text_color(hex(if is_current {
-                                        t.accent
-                                    } else {
-                                        t.fg_primary
-                                    }))
+                                    .text_color(hex(t.fg_primary))
                                     .text_ellipsis()
                                     .child(SharedString::from(ns_label(&ns))),
                             ),
@@ -616,14 +584,13 @@ impl MainView {
                         }
                         continue;
                     }
-                    // 原对象面板的置顶 / 最近并入树中，状态仍按连接持久化。
+                    // 原对象面板的置顶并入树中，状态仍按连接持久化。
                     let profile = self.object_profile_key();
                     let profile_state = self
                         .object_state
                         .profile(&profile)
                         .cloned()
                         .unwrap_or_default();
-                    let ns_prefix = format!("{key}|");
                     let pinned: Vec<ObjectSummary> = objects
                         .iter()
                         .filter(|object| {
@@ -635,21 +602,6 @@ impl MainView {
                     let pinned_keys: HashSet<String> = pinned
                         .iter()
                         .map(|object| object_key(&object.path))
-                        .collect();
-                    let recent: Vec<ObjectSummary> = profile_state
-                        .recent
-                        .iter()
-                        .filter(|recent_key| recent_key.starts_with(&ns_prefix))
-                        .filter_map(|recent_key| {
-                            objects
-                                .iter()
-                                .find(|object| &object_key(&object.path) == recent_key)
-                        })
-                        .filter(|object| {
-                            matches_filter(object)
-                                && !pinned_keys.contains(&object_key(&object.path))
-                        })
-                        .cloned()
                         .collect();
                     let section = |label: &'static str| {
                         div()
@@ -665,13 +617,6 @@ impl MainView {
                         for object in &pinned {
                             tree =
                                 tree.child(self.render_object_row(object, true, "obj-pinned", cx));
-                        }
-                    }
-                    if !recent.is_empty() {
-                        tree = tree.child(section("最近"));
-                        for object in &recent {
-                            tree =
-                                tree.child(self.render_object_row(object, false, "obj-recent", cx));
                         }
                     }
                     let visible: Vec<ObjectSummary> = objects

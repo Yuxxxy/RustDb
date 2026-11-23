@@ -607,7 +607,7 @@ SSH / 终端 / SFTP 业务语义一律不带。对照结论：主区 `flex_1 + m
 
 | 项 | RustShell 来源 | RustDb 落地 | 护栏 / 证据 |
 | --- | --- | --- | --- |
-| hover 与选中两档 | `ui-layout.md`、`753aa0e` | 49 处自绘 `.hover(bg_overlay)` → `bg_elevated`（浅色主题下 `bg_overlay == bg_base`，等于没有 hover）；侧栏连接行 / 对象行、结果 tab、工作区 tab 的选中改 accent 18% + 同色外线，hover 只挂未选中项 | `theme.rs::list_hover_is_lighter_than_the_selection_tint` |
+| hover 与选中两档 | `ui-layout.md`、`753aa0e` | 49 处自绘 `.hover(bg_overlay)` → `bg_elevated`（浅色主题下 `bg_overlay == bg_base`，等于没有 hover）；结果 tab / 工作区 tab 的选中为 accent 18% + 同色外线。**侧栏连接行 / 库行的选中高亮按用户要求已取消**（见 §11.10），hover 对所有行一律生效 | `theme.rs::list_hover_is_lighter_than_the_selection_tint`；`tests_layout::sidebar_rows_have_no_sticky_selection_highlight_and_no_recent_section` |
 | 空态标题层级 | `753aa0e` | `design::empty_state` 主句 13px SEMIBOLD，主句/提示补 `min_w_0 + text_ellipsis + overflow_hidden` | `tests_layout::empty_state_text_never_spills_out_of_the_card` |
 | 必填红星 | `f868b33` | `design::required_mark()` 统一 danger 色 + SEMIBOLD；名称恒标、主机仅非 SQLite 标、端口/口令/数据库有回退不标 | `tests_ai::required_asterisks_follow_the_actual_validation_rules` |
 | 输入框档位 | `29191a6` / `4dd7fae` | 批量更新面板 3 处 `Input::new` 补 `.small()`；连接编辑器原本已统一 small | `tests_ai::conn_editor_uses_driver_dropdown_small_fields_and_default_port` |
@@ -679,3 +679,32 @@ powershell -File .tmp/window-max-check.ps1         # 最大化标记与还原尺
 ```
 
 **已知限制**：`layout.json` 仍无 schema 版本，兼容性靠 `#[serde(default)]`；手工写入被污染的**合法**尺寸（例如 720×480 这种 > 0 但小于最小值的值）不会被恢复侧拦下，需用户手动调一次窗口自愈；设置页没有「记住窗口位置」开关，默认始终开启。
+
+---
+
+### §11.10 侧栏「最近」移除与选中高亮取消（2026-11-23）
+
+用户反馈：红框标出的「最近」分组应移除，且「SQLPub 测试库 / cool_db」的蓝框像
+hover 一直消不掉。确认这两个蓝框其实是 **§11.8 移植进来的选中态**（accent 18% +
+同色外线），非 hover 卡住；按用户选择做两项调整：
+
+| 项 | 处理 | 涉及文件 |
+| --- | --- | --- |
+| 「最近」分组 | 侧栏不再渲染该节，也不再记录。`ProfileObjectState::recent` / `MAX_RECENT` / `record_recent()` 全部删除；老 `object_state.json` 里的 `recent` 键由 serde 静默忽略、回写时不再出现 | `ui/src/main_view/{sidebar,objects,bulk,tests_grid}.rs`、`platform/src/object_state.rs` |
+| 选中高亮 | 连接行与库行的 `when(is_active / is_current, bg 18% + border accent)` 删除；accent 图标色 / 文字色回落常规色；hover 改为对所有行无条件生效 —— 鼠标移开即恢复，不会再把选中误认成 hover | `ui/src/main_view/sidebar.rs` |
+
+**保留**：左侧绿点（`connection_dot_color()`）仍表达连接状态，状态栏也照常显示；
+置顶分组、对象搜索、分组展开不受影响。结果 tab / 工作区 tab 的选中高亮**不动**
+（用户只指侧栏这两行）。
+
+**护栏**：
+
+- `platform::object_state::tests::legacy_recent_key_is_ignored` — 老配置含 `recent` 仍能读，
+  且回写不再带该键（防止已有置顶 / 分组被整份解析失败带崩）。
+- `tests_grid::objects_tree_search_pin_and_no_recent_section` — 打开对象后 `obj-recent-*`
+  不出现，置顶仍正常。
+- `tests_layout::sidebar_rows_have_no_sticky_selection_highlight_and_no_recent_section` —
+  源码级断言：无 `section("最近")`、无 `obj-recent`、无 `opacity(0.18)`、hover 仍在。
+
+**验证**：`cargo test --workspace` 44 个测试套件全绿；实机截图 `.tmp/no-highlight.png`
+与 `.tmp/sidebar-sqlite.png` — 两行无蓝框/蓝底、绿点保留、对象树展开正常、无「最近」区。

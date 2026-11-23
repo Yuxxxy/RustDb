@@ -302,7 +302,7 @@ impl MainView {
 
     /// F-73：从选中单元格跳到外键指向的那一条记录。
     pub(crate) fn foreign_key_jump(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let resolved: Result<(ObjectPath, ForeignKeyInfo, Vec<Value>, ObjectPath), String> =
+        let resolved: Result<(ObjectPath, ForeignKeyInfo, Vec<Value>), String> =
             (|| {
                 let result = self.active_result().ok_or("没有可跳转的结果集")?;
                 let (path, _) = result
@@ -339,14 +339,9 @@ impl MainView {
                         .ok_or_else(|| format!("选中行没有列 {name} 的值"))?;
                     values.push(value);
                 }
-                let target = ObjectPath::new(
-                    path.ns.clone(),
-                    foreign_key.referenced_table.clone(),
-                    ObjectKind::Table,
-                );
-                Ok((path, foreign_key, values, target))
+                Ok((path, foreign_key, values))
             })();
-        let (source, foreign_key, values, target) = match resolved {
+        let (source, foreign_key, values) = match resolved {
             Ok(resolved) => resolved,
             Err(message) => {
                 self.status = message;
@@ -374,7 +369,6 @@ impl MainView {
                     return;
                 }
             };
-        self.record_recent_object(&target);
         self.open_tab(source.ns.clone(), window, cx);
         self.sql_input
             .update(cx, |state, cx| state.set_value(sql.clone(), window, cx));

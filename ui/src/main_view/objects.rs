@@ -143,13 +143,6 @@ impl MainView {
         }
     }
 
-    pub(crate) fn record_recent_object(&mut self, path: &ObjectPath) {
-        let key = object_key(path);
-        let profile = self.object_profile_key();
-        self.object_state.profile_mut(&profile).record_recent(&key);
-        self.persist_object_state();
-    }
-
     pub(crate) fn toggle_object_pin(&mut self, path: &ObjectPath, cx: &mut Context<Self>) {
         let key = object_key(path);
         let profile = self.object_profile_key();
@@ -172,7 +165,6 @@ impl MainView {
             cx.notify();
             return;
         };
-        self.record_recent_object(&path);
         // F-70：驱动支持服务端分页时，「打开表」按页取数，而不是只拉前 N 行。
         if matches!(path.kind, ObjectKind::Table)
             && self
@@ -226,7 +218,6 @@ impl MainView {
             cx.notify();
             return;
         };
-        self.record_recent_object(&path);
         self.open_tab(path.ns.clone(), window, cx);
         let sql = self
             .core

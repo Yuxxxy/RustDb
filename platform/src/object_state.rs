@@ -1,23 +1,20 @@
-//! 对象面板的按连接状态（F-84）：置顶、最近访问、分组展开。
+//! 对象面板的按连接状态（F-84）：置顶、分组展开。
 //!
 //! 只存展示用的键（`库|种类|名称`），不存对象元数据；键失配时静默忽略。
 //! 写入与 `session.json` 一致：临时文件 + 原子替换。
+//!
+//! 「最近访问」一节已按用户要求移除；老 `object_state.json` 里残留的 `recent`
+//! 键由 serde 静默忽略，下次保存时不再写回。
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-
-/// 最近访问列表上限。
-pub const MAX_RECENT: usize = 12;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ProfileObjectState {
     /// 置顶对象键，按固定顺序排列。
     #[serde(default)]
     pub pins: Vec<String>,
-    /// 最近访问对象键，最近的在最前。
-    #[serde(default)]
-    pub recent: Vec<String>,
     /// 分组展开状态：`库|种类` → 是否展开；未记录时沿用默认（表展开）。
     #[serde(default)]
     pub groups: BTreeMap<String, bool>,
@@ -37,12 +34,6 @@ impl ProfileObjectState {
             self.pins.push(key.to_string());
             true
         }
-    }
-
-    pub fn record_recent(&mut self, key: &str) {
-        self.recent.retain(|item| item != key);
-        self.recent.insert(0, key.to_string());
-        self.recent.truncate(MAX_RECENT);
     }
 
     pub fn group_open(&self, key: &str) -> Option<bool> {
@@ -72,7 +63,7 @@ impl ObjectState {
 
     pub fn is_empty(&self) -> bool {
         self.by_profile.values().all(|state| {
-            state.pins.is_empty() && state.recent.is_empty() && state.groups.is_empty()
+            state.pins.is_empty() && state.groups.is_empty()
         })
     }
 }
@@ -123,27 +114,12 @@ mod tests {
     }
 
     #[test]
-    fn pins_toggle_and_recent_is_deduped() {
+    fn pins_toggle() {
         let mut state = ProfileObjectState::default();
         assert!(state.toggle_pin("main|table|orders"));
         assert!(state.is_pinned("main|table|orders"));
         assert!(!state.toggle_pin("main|table|orders"));
         assert!(!state.is_pinned("main|table|orders"));
-
-        state.record_recent("a");
-        state.record_recent("b");
-        state.record_recent("a");
-        assert_eq!(state.recent, vec!["a".to_string(), "b".to_string()]);
-    }
-
-    #[test]
-    fn recent_is_capped() {
-        let mut state = ProfileObjectState::default();
-        for index in 0..(MAX_RECENT + 5) {
-            state.record_recent(&format!("o{index}"));
-        }
-        assert_eq!(state.recent.len(), MAX_RECENT);
-        assert_eq!(state.recent[0], format!("o{}", MAX_RECENT + 4));
     }
 
     #[test]
@@ -152,9 +128,33 @@ mod tests {
         let mut state = ObjectState::default();
         state.profile_mut("prod").toggle_pin("s|table|orders");
         state.profile_mut("prod").set_group("s|Table", false);
-        state.profile_mut("dev").record_recent("d|view|v1");
+        state.profile_mut("dev").toggle_pin("d|view|v1");
         save_to(&path, &state).expect("写入");
         assert_eq!(load_from(&path), Some(state));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// 老版本写出的 `recent` 键必须被静默忽略，不能让整份状态文件解析失败
+    /// （否则用户已有的置顶 / 分组展开会一起丢掉）。
+    #[test]
+    fn legacy_recent_key_is_ignored() {
+        let path = temp_path("legacy");
+        std::fs::write(
+            &path,
+            r#"{"by_profile":{"demo":{"pins":["m|Table|t"],"recent":["m|Table|old"],"groups":{}}}}"#,
+        )
+        .expect("写入老配置");
+        let state = load_from(&path).expect("老配置仍要能读");
+        let profile = state.profile("demo").expect("demo 配置");
+        assert!(profile.is_pinned("m|Table|t"), "置顶不能被 recent 带崩");
+        assert!(profile.groups.is_empty());
+
+        // 再保存时不应把 recent 写回去。
+        save_to(&path, &state).expect("回写");
+        assert!(
+            !std::fs::read_to_string(&path).expect("读取").contains("recent"),
+            "recent 不该被重新写回配置"
+        );
         let _ = std::fs::remove_file(&path);
     }
 }

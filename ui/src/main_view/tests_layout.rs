@@ -2501,3 +2501,27 @@ fn empty_state_text_never_spills_out_of_the_card(cx: &mut gpui_kit::TestAppConte
         );
     }
 }
+
+/// 用户要求：侧栏连接行 / 库行不要常驻选中高亮（蓝框 + accent 18% 底），
+/// 「最近」分组也不再渲染。这三条都是「看着像 hover 消不掉」的直接来源，
+/// 只靠运行期截图看不出来，用源码级断言钉住。
+#[test]
+fn sidebar_rows_have_no_sticky_selection_highlight_and_no_recent_section() {
+    let src = include_str!("sidebar.rs");
+    assert!(!src.contains("section(\"最近\")"), "「最近」分组不该再加回来");
+    assert!(!src.contains("obj-recent"), "最近区选择器不该再加回来");
+    assert!(
+        !src.contains("opacity(0.18)"),
+        "连接行 / 库行不该有 accent 18% 的选中底"
+    );
+    assert!(
+        !src.contains("let in_tab ="),
+        "in_tab 只服务于库行选中高亮，不应复活"
+    );
+    // hover 必须对所有行生效：选中行若被排除，就会出现「高亮永驻、hover 不响应」。
+    let hover_count = src.matches(".hover(|s| s.bg(hex(t.bg_elevated)))").count();
+    assert!(
+        hover_count >= 2,
+        "连接行与库行都应有 hover 反馈，实际只有 {hover_count} 处"
+    );
+}
