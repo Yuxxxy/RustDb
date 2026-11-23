@@ -427,18 +427,29 @@ impl MainView {
 
         let selection = selected_range.filter(GridRange::is_multi_cell);
         let page_tab_id = self.active().map(|tab| tab.id).unwrap_or_default();
+        // 底栏内容多（行数 + 详情 + 行操作 + 删行 + 外键 + 批量更新 + 分页），
+        // 工作区收窄时必须让**行数文字**先省略，而不是把按钮标签挤到互相重叠。
+        // 同时 flex_none：容器高度不够时也不能把底栏压扁、让文字画到状态栏上。
         let footer = h_flex()
+            .debug_selector(|| "result-footer".to_string())
             .h(px(23.))
             .w_full()
+            .flex_none()
             .px_2()
             .items_center()
             .gap_2()
+            .overflow_hidden()
             .border_t_1()
             .border_color(hex(t.border_subtle))
             .child(
                 div()
+                    .debug_selector(|| "result-footer-info".to_string())
+                    .flex_1()
+                    .min_w_0()
                     .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
+                    .text_ellipsis()
+                    .overflow_hidden()
                     .child(SharedString::from(format!(
                         "{} · {} ms{}{}",
                         if result.filter_of_all().is_empty() {
@@ -472,7 +483,7 @@ impl MainView {
                         ))),
                 )
                 .child(
-                    div().debug_selector(|| "copy-selection".to_string()).child(
+                    div().flex_shrink_0().debug_selector(|| "copy-selection".to_string()).child(
                         Button::new("copy-selection-btn")
                             .small()
                             .ghost()
@@ -488,6 +499,7 @@ impl MainView {
             // 放在行数信息右侧而非最右端，避免贴住 AI 栏导致难点中。
             .child(
                 div()
+                    .flex_shrink_0()
                     .debug_selector(|| "cell-detail-button".to_string())
                     .child(
                         Button::new("cell-detail-btn")
@@ -503,7 +515,7 @@ impl MainView {
             // 变更集：行操作 / 删行（仅可编辑结果集）
             .when(result.editable.is_some(), |row| {
                 row.child(
-                    div().debug_selector(|| "edit-row-menu".to_string()).child(
+                    div().flex_shrink_0().debug_selector(|| "edit-row-menu".to_string()).child(
                         Button::new("edit-row-menu-btn")
                             .small()
                             .ghost()
@@ -516,7 +528,7 @@ impl MainView {
                     ),
                 )
                 .child(
-                    div().debug_selector(|| "edit-delete".to_string()).child(
+                    div().flex_shrink_0().debug_selector(|| "edit-delete".to_string()).child(
                         Button::new("edit-delete-btn")
                             .small()
                             .ghost()
@@ -535,7 +547,7 @@ impl MainView {
                         .is_some_and(|caps| caps.foreign_key_pivot),
                 |row| {
                     row.child(
-                        div().debug_selector(|| "fk-jump".to_string()).child(
+                        div().flex_shrink_0().debug_selector(|| "fk-jump".to_string()).child(
                             Button::new("fk-jump-btn")
                                 .small()
                                 .ghost()
@@ -551,7 +563,7 @@ impl MainView {
             // F-73：按条件批量更新（未加载行也能按 WHERE 命中）。
             .when(result.editable.is_some(), |row| {
                 row.child(
-                    div().debug_selector(|| "bulk-open".to_string()).child(
+                    div().flex_shrink_0().debug_selector(|| "bulk-open".to_string()).child(
                         Button::new("bulk-open-btn")
                             .small()
                             .ghost()
@@ -568,13 +580,14 @@ impl MainView {
                 let count = result.change_count();
                 row.child(
                     div()
+                        .flex_shrink_0()
                         .debug_selector(|| "edit-pending".to_string())
                         .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.warning))
                         .child(SharedString::from(format!("待提交 {count} 条"))),
                 )
                 .child(
-                    div().debug_selector(|| "edit-preview".to_string()).child(
+                    div().flex_shrink_0().debug_selector(|| "edit-preview".to_string()).child(
                         Button::new("edit-preview-btn")
                             .small()
                             .ghost()
@@ -583,7 +596,7 @@ impl MainView {
                     ),
                 )
                 .child(
-                    div().debug_selector(|| "edit-apply".to_string()).child(
+                    div().flex_shrink_0().debug_selector(|| "edit-apply".to_string()).child(
                         Button::new("edit-apply-btn")
                             .small()
                             .label(format!("写入 ({count})"))
@@ -591,7 +604,7 @@ impl MainView {
                     ),
                 )
                 .child(
-                    div().debug_selector(|| "edit-revert".to_string()).child(
+                    div().flex_shrink_0().debug_selector(|| "edit-revert".to_string()).child(
                         Button::new("edit-revert-btn")
                             .small()
                             .ghost()
@@ -613,7 +626,7 @@ impl MainView {
                     let path = path.clone();
                     let order = order.clone();
                     row.child(
-                        div().debug_selector(|| "page-prev".to_string()).child(
+                        div().flex_shrink_0().debug_selector(|| "page-prev".to_string()).child(
                             Button::new("page-prev-btn")
                                 .small()
                                 .ghost()
@@ -635,6 +648,7 @@ impl MainView {
                 })
                 .child(
                     div()
+                        .flex_shrink_0()
                         .debug_selector(|| "page-label".to_string())
                         .text_size(px(crate::design::TS_CAPTION))
                         .text_color(hex(t.fg_muted))
@@ -647,7 +661,7 @@ impl MainView {
                     let path = path.clone();
                     let order = order.clone();
                     row.child(
-                        div().debug_selector(|| "page-next".to_string()).child(
+                        div().flex_shrink_0().debug_selector(|| "page-next".to_string()).child(
                             Button::new("page-next-btn")
                                 .small()
                                 .ghost()
@@ -668,7 +682,7 @@ impl MainView {
                     )
                 })
                 .child(
-                    div().debug_selector(|| "page-size".to_string()).child(
+                    div().flex_shrink_0().debug_selector(|| "page-size".to_string()).child(
                         Button::new("page-size-btn")
                             .small()
                             .ghost()
@@ -754,8 +768,12 @@ impl MainView {
                     .child(
                         div()
                             .id("grid-body")
+                            .debug_selector(|| "grid-body".to_string())
                             .flex_1()
                             .min_h_0()
+                            // uniform_list 会把最后一行画到自身 bounds 之外；不裁剪就会
+                            // 穿透到底栏上，与「已加载 N 行 · N ms / 详情」重叠。
+                            .overflow_hidden()
                             .track_scroll(&self.grid_viewport)
                             .child(body),
                     ),

@@ -2427,3 +2427,60 @@ fn status_bar_readonly_badge_follows_profile(cx: &mut gpui_kit::TestAppContext) 
         "取消只读后徽标应消失"
     );
 }
+
+/// 底栏行数文字与按钮不能互相压住，也不能被压扁后画到状态栏上（实机截图里出现过）。
+#[gpui_kit::test]
+fn result_footer_never_overlaps(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |main, cx| {
+            main.layout = rustdb_core::LayoutSettings::default();
+            main.layout.ai_open = true; // 打开 AI 栏，把工作区压到最窄
+            push_editable_result(main); // 可编辑结果集会显示最多底栏按钮
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    let footer = vcx
+        .debug_bounds("result-footer")
+        .expect("缺少结果底栏 result-footer");
+    let status = vcx
+        .debug_bounds("status-bar")
+        .expect("缺少状态栏 status-bar");
+    assert!(
+        (f32::from(footer.size.height) - 23.).abs() < 0.5,
+        "底栏高度应保持 23px，实际 {}",
+        f32::from(footer.size.height)
+    );
+    assert!(
+        f32::from(footer.origin.y + footer.size.height) <= f32::from(status.origin.y) + 0.5,
+        "底栏不应压到状态栏：footer.bottom={} status.top={}",
+        f32::from(footer.origin.y + footer.size.height),
+        f32::from(status.origin.y)
+    );
+
+    let body = vcx
+        .debug_bounds("grid-body")
+        .expect("缺少网格行体 grid-body");
+    assert!(
+        f32::from(body.origin.y + body.size.height) <= f32::from(footer.origin.y) + 0.5,
+        "行体不应伸进底栏：body.bottom={} footer.top={}",
+        f32::from(body.origin.y + body.size.height),
+        f32::from(footer.origin.y)
+    );
+
+    let info = vcx
+        .debug_bounds("result-footer-info")
+        .expect("缺少底栏行数文字");
+    let detail = vcx
+        .debug_bounds("cell-detail-button")
+        .expect("缺少底栏详情按钮");
+    assert!(
+        f32::from(info.origin.x + info.size.width) <= f32::from(detail.origin.x) + 0.5,
+        "行数文字不应压住「详情」按钮：info.right={} detail.left={}",
+        f32::from(info.origin.x + info.size.width),
+        f32::from(detail.origin.x)
+    );
+}

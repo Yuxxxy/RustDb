@@ -269,6 +269,7 @@ cargo test -p rustdb-db-mysql --test read_only_live -- --nocapture
 | D-06 | P1 | 含中文的 MySQL 脚本 `SELECT '中文测试'` panic：`end byte index 9 is not a char boundary` | `sql-lang` 按字节长度切片比关键字：`line[..9]`（DELIMITER）、`trimmed[..2]`（GO）、`trimmed[..4]`（@set） | **已修**：改字节比较 + 2 条回归用例 |
 | D-07 | P2 | 修复 D-02 的过程中，`Row::get::<u64>` 遇到视图的 `table_rows = NULL` 会在 db 工作线程 panic，界面**一直停在骨架屏** | mysql_common 的 `FromValue for u64` 拒绝 NULL，`Row::get` 直接 unwrap | **已修**：改用 `get_opt`；顺带记一笔「对象列表别加相关子查询，`information_schema.statistics` 会把 36 张表拖成十几秒」 |
 | D-08 | P1 | **只读连接只有半套保护**：F-10 要求「客户端拦截 + 服务端只读事务」双保险，实际只做了客户端拦截；驱动拿到 `read_only` 只写进 `ServerInfo`，会话本身没设只读——绕过 core 的入口（AI 工具、脚本、新加的写入路径）仍能落库 | 三个驱动的 `connect()` 都没落实 `ConnectOptions.read_only` | **已修**：MySQL/MariaDB `SET SESSION TRANSACTION READ ONLY`、PostgreSQL `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY`、SQLite `PRAGMA query_only = ON`；设置失败只 warn 不阻断（老版本无此语法时客户端拦截仍有效）。实测 MySQL 只读连接 `@@session.transaction_read_only = 1`（读写连接为 0），绕过 core / CLI 直接经驱动发 `UPDATE` 被服务端以 1792 拒绝；新增 `db-sqlite/tests/read_only.rs`（SQLite `query_only`）和 `db-mysql/tests/read_only_live.rs`（可复跑实库护栏） |
+| D-09 | P2 | 结果网格底部「已加载 30 行 · 38 ms」与「详情 / 行操作 / 删行 / 外键 / 批量更新」画在同一块区域，文字与最后一行数据互相重叠 | 两层：① `uniform_list` 的最后一行画到了自身 bounds 之外，行体容器没有 `overflow_hidden`，穿透到底栏；② 底栏 `h_flex()` 没设 `flex_none`，行数文字也没 `min_w_0`/省略，窄工作区下被挤到按钮上 | **已修**：行体加 `overflow_hidden()`；底栏 `flex_none()` + `overflow_hidden()`，行数文字 `flex_1 min_w_0 text_ellipsis`，所有按钮 `flex_shrink_0()`。实机复拍 `.tmp/footer-fixed2-zoom.png` 底栏与数据行分离；新增 `result_footer_never_overlaps` 布局回归 |
 
 ---
 
@@ -289,13 +290,14 @@ cargo test -p rustdb-db-mysql --test read_only_live -- --nocapture
 | `fix-cells.png`、`zoom-cells3.png` | D-01 | 修复前后同一区域对比（文本止于列边界） |
 | `j01-history.png`、`cal-inserted.png` | J01 / J02 | 历史按连接分桶、点条目灌入编辑器 |
 | `j05-light.png` | J05 | 浅色主题下各面板正常 |
+| `footer-fixed2-zoom.png` | D-09 | **修复后**：底栏「已加载 30 行 · 41 ms / 详情 / 行操作 / 删行 / 外键 / 批量更新」独占一行，最后一行数据不再穿透 |
 
 ---
 
 ## 6. 结论
 
 - MySQL 主链路**可用**：连接 / 认证 / 元数据 / 查询 / 多结果集 / 事务 / 错误回显 / 历史 / 主题 / 状态栏均通过实机验证。
-- 首轮发现的 5 个功能缺陷（D-01 / D-02 / D-04 / D-05 / D-06）+ 收尾轮的 D-03 + 修复过程中踩出的 D-07 / D-08，**8 条全部修复**，其中 D-01 / D-02 / D-03 / D-04 / D-08 均有实机或集成测试复核。
+- 首轮发现的 5 个功能缺陷（D-01 / D-02 / D-04 / D-05 / D-06）+ 收尾轮的 D-03 + 修复过程中踩出的 D-07 / D-08 + 实机截图补充的 D-09，**9 条全部修复**，其中 D-01 / D-02 / D-03 / D-04 / D-08 / D-09 均有实机或集成测试复核。
 - 回归护栏：`rustdb-db-mysql` 新增 4 条单测（列类型映射、文本协议按类型还原、二进制保字节、TEXT/BLOB 按字符集分流），`rustdb-sql-lang` 新增 2 条中文回归用例，`rustdb-bootstrap` 1 条 provider 护栏。
 - 自动化边界：gpui 的键盘注入不可用 + 右键菜单在 150% DPI 下弹出位置会翻转，这两点决定了「菜单项级」用例无法稳定脚本化。后续若要覆盖，建议加 `RUSTDB_UITEST=1` 的测试钩子（按 selector 触发动作），或直接用 `VisualTestContext` 做 UI 级断言。
 
