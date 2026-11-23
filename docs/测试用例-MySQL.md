@@ -239,6 +239,22 @@ GUI 用例的 SQL 注入走一个「不用键盘」的技巧：**预先在 `%APP
 `TC-MY-A01` / `TC-MY-A02` 的结论来自**上一轮同版本实机的截图**（新建连接浮层：驱动为可搜索下拉框、端口 5432、无分组框、输入框 24px）。
 之后侧栏宽度被持久化布局改过，按钮位置随之变化，本轮点「新建连接」时坐标命中失败、未重拍到同一画面；表单逻辑这两轮没有改动。
 
+### 3.5 D-08 只读加固的复跑命令
+
+```bash
+# 全量单测 + SQLite 驱动层只读集成测试（不需要外部数据库）
+cargo test --workspace --lib
+cargo test -p rustdb-db-sqlite --test read_only
+
+# MySQL 实库护栏：直接走驱动，绕过 core / CLI 拦截；未设环境变量时自动跳过
+RUSTDB_LIVE_MYSQL_HOST=mysql2.sqlpub.com RUSTDB_LIVE_MYSQL_PORT=3307 \
+RUSTDB_LIVE_MYSQL_DATABASE=cool_db RUSTDB_LIVE_MYSQL_USER=cool_user \
+RUSTDB_LIVE_MYSQL_PASSWORD='<密码>' \
+cargo test -p rustdb-db-mysql --test read_only_live -- --nocapture
+```
+
+验收数字：`--workspace --lib` 全绿（631 条），`read_only` 1 条通过，`read_only_live` 1 条通过；只读会话变量 1 / 读写会话变量 0，写语句返回 MySQL 1792。
+
 ---
 
 ## 4. 缺陷清单
@@ -252,6 +268,7 @@ GUI 用例的 SQL 注入走一个「不用键盘」的技巧：**预先在 `%APP
 | D-05 | P1 | MySQL / PostgreSQL 首次 TLS 握手 panic「Could not determine the process-level CryptoProvider」，CLI 表现为 `E_TIMEOUT` | 全工程没有一处调用 `rustls::crypto::aws_lc_rs::default_provider().install_default()` | **已修**：`bootstrap::init_crypto()` + 护栏测试 |
 | D-06 | P1 | 含中文的 MySQL 脚本 `SELECT '中文测试'` panic：`end byte index 9 is not a char boundary` | `sql-lang` 按字节长度切片比关键字：`line[..9]`（DELIMITER）、`trimmed[..2]`（GO）、`trimmed[..4]`（@set） | **已修**：改字节比较 + 2 条回归用例 |
 | D-07 | P2 | 修复 D-02 的过程中，`Row::get::<u64>` 遇到视图的 `table_rows = NULL` 会在 db 工作线程 panic，界面**一直停在骨架屏** | mysql_common 的 `FromValue for u64` 拒绝 NULL，`Row::get` 直接 unwrap | **已修**：改用 `get_opt`；顺带记一笔「对象列表别加相关子查询，`information_schema.statistics` 会把 36 张表拖成十几秒」 |
+| D-08 | P1 | **只读连接只有半套保护**：F-10 要求「客户端拦截 + 服务端只读事务」双保险，实际只做了客户端拦截；驱动拿到 `read_only` 只写进 `ServerInfo`，会话本身没设只读——绕过 core 的入口（AI 工具、脚本、新加的写入路径）仍能落库 | 三个驱动的 `connect()` 都没落实 `ConnectOptions.read_only` | **已修**：MySQL/MariaDB `SET SESSION TRANSACTION READ ONLY`、PostgreSQL `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY`、SQLite `PRAGMA query_only = ON`；设置失败只 warn 不阻断（老版本无此语法时客户端拦截仍有效）。实测 MySQL 只读连接 `@@session.transaction_read_only = 1`（读写连接为 0），绕过 core / CLI 直接经驱动发 `UPDATE` 被服务端以 1792 拒绝；新增 `db-sqlite/tests/read_only.rs`（SQLite `query_only`）和 `db-mysql/tests/read_only_live.rs`（可复跑实库护栏） |
 
 ---
 
@@ -278,7 +295,7 @@ GUI 用例的 SQL 注入走一个「不用键盘」的技巧：**预先在 `%APP
 ## 6. 结论
 
 - MySQL 主链路**可用**：连接 / 认证 / 元数据 / 查询 / 多结果集 / 事务 / 错误回显 / 历史 / 主题 / 状态栏均通过实机验证。
-- 首轮发现的 5 个功能缺陷（D-01 / D-02 / D-04 / D-05 / D-06）+ 收尾轮的 D-03 + 修复过程中踩出的 D-07，**7 条全部修复**，其中 D-01 / D-02 / D-03 / D-04 均有实机复拍。
+- 首轮发现的 5 个功能缺陷（D-01 / D-02 / D-04 / D-05 / D-06）+ 收尾轮的 D-03 + 修复过程中踩出的 D-07 / D-08，**8 条全部修复**，其中 D-01 / D-02 / D-03 / D-04 / D-08 均有实机或集成测试复核。
 - 回归护栏：`rustdb-db-mysql` 新增 4 条单测（列类型映射、文本协议按类型还原、二进制保字节、TEXT/BLOB 按字符集分流），`rustdb-sql-lang` 新增 2 条中文回归用例，`rustdb-bootstrap` 1 条 provider 护栏。
 - 自动化边界：gpui 的键盘注入不可用 + 右键菜单在 150% DPI 下弹出位置会翻转，这两点决定了「菜单项级」用例无法稳定脚本化。后续若要覆盖，建议加 `RUSTDB_UITEST=1` 的测试钩子（按 selector 触发动作），或直接用 `VisualTestContext` 做 UI 级断言。
 
@@ -292,4 +309,5 @@ GUI 用例的 SQL 注入走一个「不用键盘」的技巧：**预先在 `%APP
 | 血缘面板加载慢 | 对单表求血缘要十几秒，界面一直停在「正在读取字段…」 | `core::request_lineage` 会对命名空间内**每张表**逐个 `metadata.table()`、每个视图逐个 `object_ddl()`。`cool_db` 38 张表 ≈ 60~100 次往返 | 给 `MetadataProvider` 加列 / 外键的**批量**接口（一次 `information_schema` 查询取全库），6 个方言各实现一次；或先按外键闭包裁剪表集合再逐表取 |
 | MySQL 对象列表无 `has_primary_key` | 该字段恒为 `None` | 探测主键要查 `information_schema.statistics`，相关子查询在 38 张表上会把列表拖到十几秒 | 当前 `ui` 侧无任何消费方（`grep` 只命中测试），加了也是死代码 —— **等有消费方再做** |
 | 菜单项级 30 条用例 | 未执行 | 见 §3.3 | `RUSTDB_UITEST=1` 钩子 / `VisualTestContext` |
+| SQL Server / Oracle 只读加固 | 这两条连接上只读仍只有客户端拦截 | 没有等价的会话级只读设置：SQL Server 只能靠权限或只读库，Oracle 的 `SET TRANSACTION READ ONLY` 只作用于当前事务 | 保持现状，连接编辑器里对这两种方言的只读开关加说明文案 |
 

@@ -100,6 +100,13 @@ impl DriverFactory for SqliteFactory {
         .map_err(|e| DriverError::internal(e.to_string()))??;
 
         let interrupt = conn.get_interrupt_handle();
+        // F-10 的服务端加固：`query_only` 打开后连 VACUUM / 临时表都会拒绝，
+        // 是 SQLite 侧唯一可靠的「服务端」只读开关。
+        if opts.read_only {
+            if let Err(error) = conn.execute_batch("PRAGMA query_only = ON;") {
+                log::warn!("只读连接设置 query_only 失败（客户端拦截仍生效）：{error}");
+            }
+        }
         let mut server = ServerInfo::new(format!("SQLite {version}"));
         server.current_db = Some(if is_memory {
             "main (memory)".into()

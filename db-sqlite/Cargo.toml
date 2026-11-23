@@ -12,3 +12,4 @@ async-trait.workspace = true
 futures-util.workspace = true
 chrono.workspace = true
 parking_lot.workspace = true
+log.workspace = true

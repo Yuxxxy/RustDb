@@ -7425,6 +7425,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures-util",
+ "log",
  "parking_lot",
  "rusqlite",
  "rustdb-db-api",

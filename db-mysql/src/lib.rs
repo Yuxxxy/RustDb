@@ -239,6 +239,19 @@ async fn connect_with(
     // 连接池只留给元数据 / 取消等旁路查询，不再让每条语句随机换连接。
     let conn_id = conn.id();
 
+    // F-10 的「服务端那一半」：客户端语句拦截之外，把会话设成只读。
+    // 只读连接上即使拦截被绕过（新入口、AI 工具、脚本），服务端也会拒写（ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION 1792）。
+    // 设置失败不阻断连接：老版本 MySQL（<5.6）没有这条语法，客户端拦截仍然有效；
+    // 这里显式 warn 而不是静默忽略，避免「以为有双保险」。
+    if opts.read_only {
+        if let Err(error) = conn
+            .query_drop("SET SESSION TRANSACTION READ ONLY")
+            .await
+        {
+            log::warn!("只读连接设置会话只读失败（客户端拦截仍生效）：{error}");
+        }
+    }
+
     let flavor = if version.to_ascii_lowercase().contains("mariadb") {
         Some("MariaDB".to_string())
     } else {

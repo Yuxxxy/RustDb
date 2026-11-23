@@ -163,6 +163,16 @@ impl DriverFactory for PostgresFactory {
         server.max_ident_len = 63;
         server.read_only = opts.read_only;
 
+        // F-10 的服务端加固：会话默认事务只读，绕过客户端拦截也写不进去（ERROR 25006）。
+        if opts.read_only {
+            if let Err(error) = client
+                .batch_execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
+                .await
+            {
+                log::warn!("只读连接设置会话只读失败（客户端拦截仍生效）：{error}");
+            }
+        }
+
         let caps = self.caps.clone();
         let cancel = client.cancel_token();
         let client = Arc::new(client);
