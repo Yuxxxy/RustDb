@@ -653,6 +653,17 @@ SSH / 终端 / SFTP 业务语义一律不带。对照结论：主区 `flex_1 + m
 
 两次关闭都由 `WM_CLOSE` 正常退出（`CLOSED_1=True` / `CLOSED_2=True`），验证退出钩子链路；验证结束已还原原始 `layout.json`。
 
+最大化另测（脚本 `.tmp/window-max-check.ps1`，`ShowWindow(hwnd, SW_MAXIMIZE)`）：
+
+| 阶段 | `IsZoomed` | 落盘 `maximized` | 还原尺寸（逻辑） |
+| --- | --- | --- | --- |
+| 启动（窗口态） | False | False | `1024×640` |
+| 最大化后 | True | **True** | `1024×640`（保留还原尺寸） |
+| 重启后 | **True** | True | `1024×640` |
+| 手动还原后 | False | False | `1024×640`（回到用户上次拖出的尺寸） |
+
+即：最大化标记会被记住，且最大化态携带的 bounds 是**还原尺寸**而非全屏尺寸，取消最大化后窗口回到原来的大小，不会变成系统随手给的尺寸。
+
 **复跑**：
 
 ```bash
@@ -663,7 +674,8 @@ CARGO_INCREMENTAL=0 cargo test -p rustdb-ui --lib window
 CARGO_INCREMENTAL=0 cargo test -p rustdb-shell --lib
 # 实机（会临时改 %APPDATA%/RustDb/layout.json，脚本末尾还原）
 CARGO_INCREMENTAL=0 cargo build -p rustdb
-powershell -File .tmp/window-persist-check.ps1
+powershell -File .tmp/window-persist-check.ps1     # 位置/尺寸
+powershell -File .tmp/window-max-check.ps1         # 最大化标记与还原尺寸
 ```
 
 **已知限制**：`layout.json` 仍无 schema 版本，兼容性靠 `#[serde(default)]`；手工写入被污染的**合法**尺寸（例如 720×480 这种 > 0 但小于最小值的值）不会被恢复侧拦下，需用户手动调一次窗口自愈；设置页没有「记住窗口位置」开关，默认始终开启。
