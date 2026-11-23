@@ -20,7 +20,9 @@ pub fn empty_state(
     message: impl Into<gpui_kit::SharedString>,
     hint: impl Into<gpui_kit::SharedString>,
 ) -> gpui_kit::AnyElement {
-    use gpui_kit::{div, px, IntoElement as _, ParentElement as _, Styled as _};
+    use gpui_kit::{
+        div, px, InteractiveElement as _, IntoElement as _, ParentElement as _, Styled as _,
+    };
     use gpui_kit::component::{v_flex, Icon, Sizable as _, Size};
 
     let t = crate::theme::current(cx);
@@ -43,18 +45,61 @@ pub fn empty_state(
                         .text_color(crate::theme::to_hsla(t.fg_muted)),
                 ),
         )
+        // 对齐 RustShell 的空态层级：主句用 13px SEMIBOLD（11~12px 是分组标签的规格，
+        // 和正文同重会读不出哪句是标题）；长文案先省略，不撑破卡片。
         .child(
             div()
+                .debug_selector(|| "empty-state-message".to_string())
+                .min_w_0()
                 .text_size(px(TS_BODY))
+                .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                 .text_color(crate::theme::to_hsla(t.fg_secondary))
+                .text_ellipsis()
+                .overflow_hidden()
                 .child(message.into()),
         )
         .child(
             div()
+                .debug_selector(|| "empty-state-hint".to_string())
+                .min_w_0()
                 .text_size(px(TS_CAPTION))
                 .text_color(crate::theme::to_hsla(t.fg_muted))
+                .text_ellipsis()
+                .overflow_hidden()
                 .child(hint.into()),
         )
+        .into_any_element()
+}
+
+/// 连接状态点只用红/绿实心（RustShell 0.1.14 的颜色语言统一）：
+/// 连上=success 绿，没连=danger 红。此前未连接取 `fg_muted` 灰点，
+/// 在浅色主题下几乎看不见，也和「不连接就是红点」的口径不一致。
+pub fn connection_dot_color(t: &rustdb_core::theme::ThemeTokens, connected: bool) -> u32 {
+    if connected {
+        t.success
+    } else {
+        t.danger
+    }
+}
+
+/// 必填星号（RustShell `f868b33` 移植）：此前直接拼进标签串，与标签同色（fg_muted），
+/// 12px 下几乎看不见。统一用 danger 色 + SEMIBOLD，且只标真正必填的字段
+/// （有默认值的端口、可空的口令/数据库不标）。
+pub fn required_mark(
+    t: &rustdb_core::theme::ThemeTokens,
+    selector: impl Into<gpui_kit::SharedString>,
+) -> gpui_kit::AnyElement {
+    use gpui_kit::{
+        div, px, InteractiveElement as _, IntoElement as _, ParentElement as _, Styled as _,
+    };
+
+    let selector = selector.into();
+    div()
+        .debug_selector(move || selector.to_string())
+        .text_size(px(TS_CAPTION))
+        .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+        .text_color(crate::theme::to_hsla(t.danger))
+        .child("*")
         .into_any_element()
 }
 
@@ -202,6 +247,7 @@ impl LoadingPhase {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rustdb_core::theme::ThemeTokens;
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -295,5 +341,18 @@ mod tests {
     fn loading_delay_is_400ms_per_spec() {
         assert_eq!(LOADING_DELAY.as_millis(), 400);
         assert!(STALE_CONTENT_OPACITY > 0.4 && STALE_CONTENT_OPACITY < 1.);
+    }
+
+    #[test]
+    fn disconnected_dot_is_solid_red_not_gray() {
+        for tokens in [ThemeTokens::dark(), ThemeTokens::light()] {
+            assert_eq!(connection_dot_color(&tokens, true), tokens.success);
+            assert_eq!(
+                connection_dot_color(&tokens, false),
+                tokens.danger,
+                "未连接必须是红点，不再用 fg_muted 灰点"
+            );
+            assert_ne!(tokens.danger, tokens.fg_muted);
+        }
     }
 }

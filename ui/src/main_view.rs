@@ -765,16 +765,39 @@ fn conn_field(
     input: &gpui_kit::Entity<gpui_kit::component::input::InputState>,
     width: gpui_kit::Pixels,
 ) -> gpui_kit::AnyElement {
+    conn_field_with_required(t, label, input, width, false)
+}
+
+/// 带必填标记的连接字段：星号走 `design::required_mark`（danger 色），
+/// 不再把 `*` 拼进标签串同色渲染（RustShell `f868b33` 移植）。
+fn conn_field_with_required(
+    t: &rustdb_core::theme::ThemeTokens,
+    label: &str,
+    input: &gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    width: gpui_kit::Pixels,
+    required: bool,
+) -> gpui_kit::AnyElement {
     let selector = format!("conn-field-{label}");
     h_flex()
         .items_center()
         .gap_2()
         .child(
-            div()
-                .w(px(38.))
-                .text_size(px(crate::design::TS_CAPTION))
-                .text_color(hex(t.fg_muted))
-                .child(SharedString::from(label.to_string())),
+            h_flex()
+                .w(px(48.))
+                .gap_1()
+                .items_center()
+                .child(
+                    div()
+                        .text_size(px(crate::design::TS_CAPTION))
+                        .text_color(hex(t.fg_muted))
+                        .child(SharedString::from(label.to_string())),
+                )
+                .when(required, |row| {
+                    row.child(crate::design::required_mark(
+                        t,
+                        format!("required-{label}"),
+                    ))
+                }),
         )
         .child(
             div()

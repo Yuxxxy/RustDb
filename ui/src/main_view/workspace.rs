@@ -2,6 +2,22 @@
 
 use super::*;
 
+/// 标签标题长度上限（RustShell `TAB_TITLE_MAX_CHARS` 移植）：从 RustShell 的运行反馈
+/// 「名称过长不要隐藏、按名称长度给宽度、限制名称长度」搬来。上限放在**文案层**，
+/// 布局层不再 `max_w` + 省略号 —— 否则用户看不出这条标签是哪张表/哪条查询。
+pub(crate) const TAB_TITLE_MAX_CHARS: usize = 24;
+
+/// 按字符截断（不切半个汉字/emoji），正好等于上限时不补省略号。
+pub(crate) fn display_tab_title(title: &str) -> String {
+    let mut chars = title.chars();
+    let head: String = chars.by_ref().take(TAB_TITLE_MAX_CHARS).collect();
+    if chars.next().is_some() {
+        format!("{head}…")
+    } else {
+        head
+    }
+}
+
 impl MainView {
     pub(crate) fn render_workspace(
         &mut self,
@@ -482,7 +498,7 @@ impl MainView {
             .items_center()
             .justify_center()
             .cursor(gpui_kit::CursorStyle::ResizeUpDown)
-            .hover(|s| s.bg(hex(t.bg_overlay)))
+            .hover(|s| s.bg(hex(t.bg_elevated)))
             .when(dragging, |s| s.bg(hex(t.bg_overlay)))
             .on_mouse_down(
                 gpui_kit::MouseButton::Left,
@@ -595,7 +611,9 @@ impl MainView {
             .tabs
             .iter()
             .enumerate()
-            .map(|(index, tab)| (index, tab.id, tab.title(), index == self.active_tab))
+            .map(|(index, tab)| {
+                (index, tab.id, display_tab_title(&tab.title()), index == self.active_tab)
+            })
             .collect();
         let mut row = h_flex()
             .h(px(31.))
@@ -630,22 +648,20 @@ impl MainView {
                         .gap_1()
                         .rounded(px(4.))
                         .cursor_pointer()
-                        .when(active, |d| d.bg(hex(t.bg_overlay)))
-                        .hover(|s| s.bg(hex(t.bg_overlay)))
+                        // 与侧栏/结果 tab 同一套两档：选中 accent 18%，未选中 hover bg_elevated。
+                        .when(active, |d| {
+                            d.bg(crate::theme::to_hsla(t.accent).opacity(0.18))
+                        })
+                        .when(!active, |d| d.hover(|s| s.bg(hex(t.bg_elevated))))
                         .on_click(cx.listener(move |view, _, window, cx| {
                             view.activate_tab(index, window, cx)
                         }))
-                        .child(
-                            Icon::new(IconName::SquareTerminal)
-                                .small()
-                                .text_color(hex(if active { t.accent } else { t.fg_muted })),
-                        )
+                        // 2026-09-17 用户要求「tab 标题去掉图标」：这里不再画 SquareTerminal，
+                        // 名字即身份；宽度也不再写 max_w(120)，由文案层的 24 字上限控制。
                         .child(
                             div()
-                                .max_w(px(120.))
                                 .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(if active { t.fg_primary } else { t.fg_secondary }))
-                                .text_ellipsis()
                                 .child(SharedString::from(title)),
                         )
                         .child(
@@ -711,7 +727,7 @@ impl MainView {
                 .border_color(hex(t.border_subtle))
                 .bg(hex(t.bg_elevated))
                 .when(enabled, |el| el.cursor_pointer())
-                .hover(|s| s.bg(hex(t.bg_overlay)))
+                .hover(|s| s.bg(hex(t.bg_elevated)))
                 .on_click(cx.listener(move |view, event: &gpui_kit::ClickEvent, _, cx| {
                     if view.namespaces.is_empty() {
                         return;
@@ -782,7 +798,7 @@ impl MainView {
                     .rounded(px(4.))
                     .cursor_pointer()
                     .when(active, |row| row.bg(hex(t.bg_overlay)))
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(move |view, _, _, cx| {
                         view.db_menu = None;
                         view.expanded_ns.insert(ns_key(&pick));
@@ -858,7 +874,7 @@ impl MainView {
                         .items_center()
                         .rounded(px(4.))
                         .cursor_pointer()
-                        .hover(|s| s.bg(hex(t.bg_overlay)))
+                        .hover(|s| s.bg(hex(t.bg_elevated)))
                         // 键盘高亮与 hover 同底色：焦点在菜单上时高亮项就是
                         // 「按 Enter 会执行的项」，视觉上要和 hover 一致。
                         .when(hot, |s| s.bg(hex(t.bg_overlay)))
@@ -2027,5 +2043,25 @@ impl MainView {
             return;
         }
         self.undo_last_new_row(cx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tab_title_is_capped_by_characters_not_bytes() {
+        let exact = "表".repeat(TAB_TITLE_MAX_CHARS);
+        assert_eq!(display_tab_title(&exact), exact, "正好到上限不应补省略号");
+        let too_long = "表".repeat(TAB_TITLE_MAX_CHARS + 1);
+        assert_eq!(
+            display_tab_title(&too_long),
+            format!("{exact}…"),
+            "超长应按字符截断并补省略号"
+        );
+        // 多字节字符不能被切在中间（RustShell 同一条护栏）。
+        let mixed = format!("{}abc", "中".repeat(TAB_TITLE_MAX_CHARS));
+        assert!(display_tab_title(&mixed).chars().all(|c| c != '\u{FFFD}'));
     }
 }

@@ -596,3 +596,27 @@ prepaint 才更新）；测试滚顶后先断言 bounds、再追加消息断言�
 **未验证项**：下拉框里输入搜索词后列表收窄只在组件自测覆盖（`gpui-component` 的
 `test_combo_box_search_filters_items`），本仓未再测；`RUSTDB_DEV_DB` 之外的 `RUSTDB_DEMO*`
 系列环境变量仍由截图脚本注入，未加还原（只影响手动截图进程）。
+
+---
+
+### §11.8 从 RustShell 移植的界面细节（2026-11-23）
+
+隔壁 `D:\rust\RustShell` 的 2026-11 月 UI 改动里，挑**通用、低风险**的部分搬过来；
+SSH / 终端 / SFTP 业务语义一律不带。对照结论：主区 `flex_1 + min_w_0`、列头三件套、
+可搜索下拉本仓**已达标**，不重复改。
+
+| 项 | RustShell 来源 | RustDb 落地 | 护栏 / 证据 |
+| --- | --- | --- | --- |
+| hover 与选中两档 | `ui-layout.md`、`753aa0e` | 49 处自绘 `.hover(bg_overlay)` → `bg_elevated`（浅色主题下 `bg_overlay == bg_base`，等于没有 hover）；侧栏连接行 / 对象行、结果 tab、工作区 tab 的选中改 accent 18% + 同色外线，hover 只挂未选中项 | `theme.rs::list_hover_is_lighter_than_the_selection_tint` |
+| 空态标题层级 | `753aa0e` | `design::empty_state` 主句 13px SEMIBOLD，主句/提示补 `min_w_0 + text_ellipsis + overflow_hidden` | `tests_layout::empty_state_text_never_spills_out_of_the_card` |
+| 必填红星 | `f868b33` | `design::required_mark()` 统一 danger 色 + SEMIBOLD；名称恒标、主机仅非 SQLite 标、端口/口令/数据库有回退不标 | `tests_ai::required_asterisks_follow_the_actual_validation_rules` |
+| 输入框档位 | `29191a6` / `4dd7fae` | 批量更新面板 3 处 `Input::new` 补 `.small()`；连接编辑器原本已统一 small | `tests_ai::conn_editor_uses_driver_dropdown_small_fields_and_default_port` |
+| tab 标题 | 11-16 运行反馈 | `display_tab_title()` 按字符截到 24 字再补省略号；布局不再 `max_w(120)`，宽度随文案；去掉 `SquareTerminal` 图标，名字即身份 | `workspace::tab_title_is_capped_by_characters_not_bytes` |
+| 状态点红绿实心 | 0.1.14 颜色语言统一 | `design::connection_dot_color()` 收口：连上 success 绿、未连 danger 红，替掉 `fg_muted` 灰点；侧栏两处共用 | `design::disconnected_dot_is_solid_red_not_gray` |
+
+**未移植**（记一笔避免重复评估）：窗口几何持久化 + 丢弃不合理值（RustDb 目前完全不持久化窗口几何，属新功能不是细节）；
+命令面板 i18n 译文（RustDb 还没有命令面板，规范 §10 里是 P2）；`h_6` 替换自定义控件写死高
+（RustDb 没有 RustShell 那种自绘分段控件，`design::chip` 已走 `Button::small()`）。
+
+**验证**：`cargo test -p rustdb-ui --lib` **172 passed / 0 failed**（本轮 +5 条护栏）；
+`cargo test --workspace` 全绿。改动只涉及 `ui/src`，不改任何数据链路。

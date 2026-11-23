@@ -419,7 +419,7 @@ impl MainView {
                                         })
                                         .when(!is_accepted, |d| {
                                             d.text_color(hex(t.fg_muted))
-                                                .hover(|s| s.bg(hex(t.bg_overlay)))
+                                                .hover(|s| s.bg(hex(t.bg_elevated)))
                                         })
                                         .on_click(cx.listener(move |view, _, _, cx| {
                                             view.toggle_optimize_hunk(index, cx);

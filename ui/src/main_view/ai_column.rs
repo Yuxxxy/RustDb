@@ -83,7 +83,7 @@ impl MainView {
                         .gap_2()
                         .items_center()
                         .rounded(px(4.))
-                        .hover(|s| s.bg(hex(t.bg_overlay)))
+                        .hover(|s| s.bg(hex(t.bg_elevated)))
                         .child(
                             div()
                                 .flex_1()

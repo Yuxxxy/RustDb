@@ -137,7 +137,7 @@ impl MainView {
                 .cursor_pointer()
                 .border_b_1()
                 .border_color(hex(t.border_subtle))
-                .hover(|s| s.bg(hex(t.bg_overlay)))
+                .hover(|s| s.bg(hex(t.bg_elevated)))
                 .on_click(
                     cx.listener(move |view, _, window, cx| view.toggle_sort(index, window, cx)),
                 )
@@ -210,7 +210,7 @@ impl MainView {
                         .cursor_pointer()
                         .border_b_1()
                         .border_color(hex(t.border_subtle))
-                        .hover(|s| s.bg(hex(t.bg_overlay)))
+                        .hover(|s| s.bg(hex(t.bg_elevated)))
                         .on_click(cx.listener(
                             move |view, event: &gpui_kit::ClickEvent, window, cx| {
                                 cx.stop_propagation();
@@ -237,7 +237,7 @@ impl MainView {
                         .cursor(gpui_kit::CursorStyle::ResizeLeftRight)
                         .border_b_1()
                         .border_color(hex(t.border_subtle))
-                        .hover(|s| s.bg(hex(t.bg_overlay)))
+                        .hover(|s| s.bg(hex(t.bg_elevated)))
                         .on_mouse_down(
                             gpui_kit::MouseButton::Left,
                             cx.listener(
@@ -298,7 +298,7 @@ impl MainView {
                         .ml(px(-offset))
                         .bg(bg)
                         // 废弃斑马纹：行分隔线 + 整行 hover 更可辨。
-                        .hover(|s| s.bg(hex(t.bg_overlay)));
+                        .hover(|s| s.bg(hex(t.bg_elevated)));
                     for (col, cell_w) in widths.iter().enumerate() {
                         let value = result.rows.get(row_index).and_then(|row| row.get(col));
                         // 交回数据库默认值的单元格显示「(默认)」而不是 NULL。
@@ -350,7 +350,7 @@ impl MainView {
                             // `text_ellipsis()` 只设 text-overflow，不裁剪溢出盒：长文本 / JSON 会
                             // 画到相邻列上去（实测 tc_emp.profile 与 memo 互相重叠）。补 overflow_hidden。
                             .overflow_hidden()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .when(selected, |d| {
                                 // 淡填充 + 高对比描边：单纯提高填充会压低文字对比度。
                                 d.bg(selection_bg).border_color(hex(t.accent))

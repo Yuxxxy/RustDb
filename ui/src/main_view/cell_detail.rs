@@ -118,7 +118,7 @@ impl MainView {
                             .items_center()
                             .rounded(px(4.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .on_click(cx.listener(move |view, _, window, cx| {
@@ -145,7 +145,7 @@ impl MainView {
                             .items_center()
                             .rounded(px(4.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.accent))
                             .on_click(cx.listener(|view, _, _, cx| {
@@ -218,7 +218,7 @@ impl MainView {
                 .when(active, |el| el.bg(hex(t.bg_overlay)))
                 .text_size(px(crate::design::TS_CAPTION))
                 .text_color(hex(if active { t.accent } else { t.fg_secondary }))
-                .hover(|s| s.bg(hex(t.bg_overlay)))
+                .hover(|s| s.bg(hex(t.bg_elevated)))
                 .on_click(cx.listener(move |view, _, _, cx| {
                     if let Some(detail) = view.cell_detail.as_mut() {
                         detail.mode = mode;
@@ -291,7 +291,7 @@ impl MainView {
                             .items_center()
                             .rounded(px(4.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .on_click(cx.listener(move |view, _, _, cx| {
@@ -313,7 +313,7 @@ impl MainView {
                             .justify_center()
                             .rounded(px(3.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.cell_detail = None;
                                 cx.notify();

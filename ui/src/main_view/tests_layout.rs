@@ -2484,3 +2484,20 @@ fn result_footer_never_overlaps(cx: &mut gpui_kit::TestAppContext) {
         f32::from(detail.origin.x)
     );
 }
+
+/// 空态标题与提示必须留在工作区卡片内（RustShell 空态细节移植的护栏）。
+#[gpui_kit::test]
+fn empty_state_text_never_spills_out_of_the_card(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, _holder) = test_view(cx);
+    vcx.run_until_parked();
+    let card = vcx
+        .debug_bounds("workspace-card")
+        .expect("缺少工作区卡片");
+    for selector in ["empty-state-message", "empty-state-hint"] {
+        let bounds = vcx.debug_bounds(selector).unwrap_or_else(|| panic!("缺少 {selector}"));
+        assert!(
+            f32::from(bounds.origin.x + bounds.size.width) <= f32::from(card.origin.x + card.size.width) + 0.5,
+            "{selector} 不应溢出工作区卡片"
+        );
+    }
+}

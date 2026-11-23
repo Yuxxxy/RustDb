@@ -348,7 +348,7 @@ impl MainView {
                     .justify_center()
                     .rounded(px(3.))
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(|view, _, _, cx| view.routine_close(cx)))
                     .child(
                         Icon::new(IconName::Close)
@@ -380,7 +380,7 @@ impl MainView {
                     .id("routine-search-prev")
                     .debug_selector(|| "routine-search-prev".to_string())
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(|view, _, _, cx| {
                         view.routine_search_step(false, cx);
                     }))
@@ -396,7 +396,7 @@ impl MainView {
                     .id("routine-search-next")
                     .debug_selector(|| "routine-search-next".to_string())
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(|view, _, _, cx| {
                         view.routine_search_step(true, cx);
                     }))
@@ -444,7 +444,7 @@ impl MainView {
                     })
                     .when(!active, |this| {
                         this.text_color(hex(t.fg_muted))
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                     })
                     .on_click(cx.listener(move |view, _, _, cx| view.routine_deps_tab(target, cx)))
                     .child(SharedString::from(label))

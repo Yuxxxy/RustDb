@@ -95,7 +95,7 @@ impl MainView {
                             .justify_center()
                             .rounded(px(3.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.table_panel = None;
                                 view.designer = None;
@@ -149,7 +149,7 @@ impl MainView {
                     .rounded(px(4.))
                     .cursor_pointer()
                     .when(is_active, |d| d.bg(hex(t.bg_overlay)))
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(move |view, _, _, cx| {
                         if let Some(designer) = view.designer.as_mut() {
                             designer.tab = tab;
@@ -511,7 +511,7 @@ impl MainView {
                             .justify_center()
                             .rounded(px(3.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.designer_drop_column(index, cx);
                             }))
@@ -640,7 +640,7 @@ impl MainView {
                             .justify_center()
                             .rounded(px(3.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.designer_drop_index(index, cx);
                             }))
@@ -772,7 +772,7 @@ impl MainView {
                                 .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.accent))
                                 .cursor_pointer()
-                                .hover(|s| s.bg(hex(t.bg_overlay)))
+                                .hover(|s| s.bg(hex(t.bg_elevated)))
                                 .on_click(cx.listener(move |view, _, _, cx| {
                                     view.designer_save_foreign_key(index, cx);
                                 }))
@@ -793,7 +793,7 @@ impl MainView {
                             .justify_center()
                             .rounded(px(3.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.designer_remove_foreign_key(index, cx);
                             }))
@@ -933,7 +933,7 @@ impl MainView {
                             .justify_center()
                             .rounded(px(3.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.designer_drop_check(index, cx);
                             }))

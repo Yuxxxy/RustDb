@@ -580,11 +580,12 @@ impl MainView {
         }
         let body = v_flex()
             .gap_2()
-            .child(h_flex().gap_2().items_center().child(conn_field(
+            .child(h_flex().gap_2().items_center().child(conn_field_with_required(
                 &t,
                 "名称",
                 &editor.name,
                 px(180.),
+                true,
             )))
             .child(
                 v_flex()
@@ -601,7 +602,14 @@ impl MainView {
                 h_flex()
                     .gap_2()
                     .items_center()
-                    .child(conn_field(&t, "主机", &editor.host, px(180.)))
+                    // 主机只在非 SQLite 驱动下必填（SQLite 走文件路径），不要恒定标星。
+                    .child(conn_field_with_required(
+                        &t,
+                        "主机",
+                        &editor.host,
+                        px(180.),
+                        editor.driver != DbKind::Sqlite,
+                    ))
                     .child(conn_field(&t, "端口", &editor.port, px(70.))),
             )
             .child(

@@ -146,6 +146,39 @@ pub fn apply_theme_mode(cx: &mut App, mode: ThemeMode) {
 mod tests {
     use super::*;
 
+    /// 从 RustShell 移植：hover 与选中必须是**两个不同深浅**的 accent 淡底。
+    /// 官方 `ListItem` 的 hover 取 `list_hover`、选中取 `list_active` + `list_active_border`，
+    /// 三条口径都收口在主题里；断言「hover 比选中淡且同源、外线为 accent、两者半透明」。
+    #[gpui_kit::test]
+    fn list_hover_is_lighter_than_the_selection_tint(cx: &mut gpui_kit::TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::component::init(cx);
+            for mode in [ThemeMode::Dark, ThemeMode::Light] {
+                apply_theme_mode(cx, mode);
+                let theme = Theme::global(cx);
+                assert!(
+                    theme.colors.list_hover.a < theme.colors.list_active.a,
+                    "{mode:?} 主题下 hover 底色不比选中更淡（{} vs {}）",
+                    theme.colors.list_hover.a,
+                    theme.colors.list_active.a
+                );
+                assert_eq!(
+                    theme.colors.list_hover.h, theme.colors.list_active.h,
+                    "{mode:?} 主题下两者色相必须同源（都是 accent）"
+                );
+                assert_eq!(
+                    theme.colors.list_active_border,
+                    to_hsla(current(cx).accent),
+                    "{mode:?} 主题下选中外线必须取 accent"
+                );
+                assert!(
+                    theme.colors.list_hover.a < 1.0 && theme.colors.list_active.a < 1.0,
+                    "{mode:?} 主题下出现了不透明行底色 —— 旧口径（bg_overlay）回来了"
+                );
+            }
+        });
+    }
+
     fn hex(color: Hsla) -> u32 {
         let rgba = gpui_kit::Rgba::from(color);
         let byte = |v: f32| (v * 255.).round() as u32;

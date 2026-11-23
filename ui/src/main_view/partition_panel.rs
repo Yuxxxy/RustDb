@@ -333,7 +333,7 @@ impl MainView {
                     .justify_center()
                     .rounded(px(3.))
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(|view, _, _, cx| {
                         view.partition = None;
                         cx.notify();
@@ -618,7 +618,7 @@ impl MainView {
                         })
                         .when(!panel.is_default, |this| {
                             this.text_color(hex(t.fg_muted))
-                                .hover(|s| s.bg(hex(t.bg_overlay)))
+                                .hover(|s| s.bg(hex(t.bg_elevated)))
                         })
                         .on_click(cx.listener(|view, _, _, cx| {
                             view.partition_toggle_default(cx);
@@ -695,7 +695,7 @@ impl MainView {
                         })
                         .when(!panel.detach_concurrently, |this| {
                             this.text_color(hex(t.fg_muted))
-                                .hover(|s| s.bg(hex(t.bg_overlay)))
+                                .hover(|s| s.bg(hex(t.bg_elevated)))
                         })
                         .on_click(cx.listener(|view, _, _, cx| {
                             view.partition_toggle_concurrently(cx);

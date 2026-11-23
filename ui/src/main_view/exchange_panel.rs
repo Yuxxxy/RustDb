@@ -399,7 +399,7 @@ impl MainView {
                     .justify_center()
                     .rounded(px(3.))
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(|view, _, _, cx| {
                         view.exchange = None;
                         cx.notify();
@@ -431,7 +431,7 @@ impl MainView {
                     })
                     .when(!active, |chip| {
                         chip.text_color(hex(t.fg_secondary))
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                     })
                     .on_click(cx.listener(move |view, _, _, cx| {
                         view.exchange_set_tab(kind, cx);
@@ -579,7 +579,7 @@ impl MainView {
                     .border_b_1()
                     .border_color(hex(t.border_subtle))
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(move |view, _, _, cx| {
                         view.exchange_toggle_export_row(index, cx);
                     }))
@@ -798,7 +798,7 @@ impl MainView {
                     .border_b_1()
                     .border_color(hex(t.border_subtle))
                     .when(!conflict, |row| {
-                        row.cursor_pointer().hover(|s| s.bg(hex(t.bg_overlay)))
+                        row.cursor_pointer().hover(|s| s.bg(hex(t.bg_elevated)))
                     })
                     .on_click(cx.listener(move |view, _, _, cx| {
                         view.exchange_toggle_import_row(index, cx);

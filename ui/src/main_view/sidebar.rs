@@ -173,7 +173,7 @@ impl MainView {
                             .w(px(6.))
                             .h(px(6.))
                             .rounded_full()
-                            .bg(hex(if connected { t.success } else { t.fg_muted })),
+                            .bg(hex(crate::design::connection_dot_color(&t, connected))),
                     )
                     .child(
                         div()
@@ -287,7 +287,7 @@ impl MainView {
                     .items_center()
                     .rounded(px(5.))
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(move |view, _, _, cx| {
                         if !view.collapsed_folders.remove(&toggle_key) {
                             view.collapsed_folders.insert(toggle_key.clone());
@@ -357,8 +357,17 @@ impl MainView {
                         .items_center()
                         .rounded(px(5.))
                         .cursor_pointer()
-                        .when(is_active, |row| row.bg(hex(t.bg_overlay)))
-                        .hover(|s| s.bg(hex(t.bg_overlay)))
+                        // RustShell 移植：hover 用 bg_elevated（浅色主题下 bg_overlay 与
+                        // bg_base 同为白，等于没有 hover）；选中用 accent 18% + 同色外线，
+                        // 与 hover 分成两档深浅。
+                        .when(is_active, |row| {
+                            row.bg(crate::theme::to_hsla(t.accent).opacity(0.18))
+                                .border_1()
+                                .border_color(crate::theme::to_hsla(t.accent))
+                        })
+                        .when(!is_active, |row| {
+                            row.hover(|s| s.bg(hex(t.bg_elevated)))
+                        })
                         .on_click(cx.listener(move |view, _, _, cx| {
                             // 已连接 / 正在连接的节点只做高亮，不再重复发起连接。
                             if view.connecting.as_deref() == Some(click_id.as_str())
@@ -382,7 +391,7 @@ impl MainView {
                                 .w(px(6.))
                                 .h(px(6.))
                                 .rounded_full()
-                                .bg(hex(if is_active { t.success } else { t.fg_muted })),
+                                .bg(hex(crate::design::connection_dot_color(&t, is_active))),
                         )
                         .child(
                             Icon::new(IconName::Database)
@@ -479,8 +488,15 @@ impl MainView {
                             .items_center()
                             .rounded(px(5.))
                             .cursor_pointer()
-                            .when(is_current || in_tab, |row| row.bg(hex(t.bg_overlay)))
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            // 与连接行同一套两档：hover=bg_elevated，选中=accent 18%+外线。
+                            .when(is_current || in_tab, |row| {
+                                row.bg(crate::theme::to_hsla(t.accent).opacity(0.18))
+                                    .border_1()
+                                    .border_color(crate::theme::to_hsla(t.accent))
+                            })
+                            .when(!(is_current || in_tab), |row| {
+                                row.hover(|s| s.bg(hex(t.bg_elevated)))
+                            })
                             // 单击展开 / 收起；双击打开 SQL 标签页。
                             .on_click(cx.listener(
                                 move |view, event: &gpui_kit::ClickEvent, window, cx| {
@@ -693,7 +709,7 @@ impl MainView {
                                 .items_center()
                                 .rounded(px(5.))
                                 .cursor_pointer()
-                                .hover(|s| s.bg(hex(t.bg_overlay)))
+                                .hover(|s| s.bg(hex(t.bg_elevated)))
                                 .on_click(cx.listener(move |view, _, _, cx| {
                                     let open = view
                                         .group_state
@@ -827,7 +843,7 @@ impl MainView {
                     .items_center()
                     .rounded(px(4.))
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(cx.listener(move |view, _, window, cx| {
                         view.apply_history(sql.clone(), window, cx);
                     }))
@@ -856,7 +872,7 @@ impl MainView {
                             .px_1()
                             .rounded(px(3.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_overlay)))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.core.history().toggle_pin(id);
                                 cx.notify();
@@ -909,7 +925,7 @@ impl MainView {
                     .border_1()
                     .border_color(hex(if active { t.accent } else { t.border_subtle }))
                     .cursor_pointer()
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .on_click(
                         cx.listener(move |view, event: &gpui_kit::ClickEvent, _, cx| {
                             view.history_menu = Some((event.position(), menu));
@@ -977,7 +993,7 @@ impl MainView {
                 .items_center()
                 .rounded(px(4.))
                 .cursor_pointer()
-                .hover(|s| s.bg(hex(t.bg_overlay)))
+                .hover(|s| s.bg(hex(t.bg_elevated)))
                 .on_click(cx.listener(move |view, _, _, cx| {
                     view.apply_history_filter(pick, cx);
                 }))
@@ -1088,7 +1104,7 @@ impl MainView {
             .pl(px(46.))
             .pr_2()
             .rounded(px(5.))
-            .hover(|s| s.bg(hex(t.bg_overlay)))
+            .hover(|s| s.bg(hex(t.bg_elevated)))
             .on_mouse_down(
                 gpui_kit::MouseButton::Right,
                 cx.listener(move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
@@ -1256,7 +1272,7 @@ impl MainView {
                 .pl(px(4. + depth as f32 * 10.))
                 .py_1()
                 .rounded(px(5.))
-                .hover(|s| s.bg(hex(t.bg_overlay)))
+                .hover(|s| s.bg(hex(t.bg_elevated)))
                 .debug_selector({
                     let selector = selector.clone();
                     move || selector.clone()

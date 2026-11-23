@@ -1323,3 +1323,40 @@ fn conn_editor_uses_driver_dropdown_small_fields_and_default_port(
     assert_eq!(saved.driver, DbKind::Oracle);
     assert_eq!(saved.port, Some(15432));
 }
+
+/// RustShell `f868b33` 移植：必填红星只标真正必填的字段。
+/// 名称恒必填；主机只在非 SQLite 驱动下必填；端口有默认值，不标。
+#[gpui_kit::test]
+fn required_asterisks_follow_the_actual_validation_rules(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.panel = PanelKind::Connections;
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    let plus = vcx.debug_bounds("conn-new").expect("缺少新建连接按钮");
+    vcx.simulate_click(plus.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
+
+    assert!(vcx.debug_bounds("required-名称").is_some(), "名称应标必填红星");
+    assert!(vcx.debug_bounds("required-主机").is_some(), "MySQL 主机应标必填红星");
+    assert!(vcx.debug_bounds("required-端口").is_none(), "端口有默认值，不应标星");
+    assert!(vcx.debug_bounds("required-口令").is_none(), "口令可空，不应标星");
+
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.conn_editor.as_mut().expect("编辑器未打开").driver = DbKind::Sqlite;
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("required-主机").is_none(),
+        "SQLite 不需要主机，必填红星应消失"
+    );
+    assert!(vcx.debug_bounds("required-名称").is_some(), "名称红星与驱动无关");
+}

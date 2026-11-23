@@ -26,7 +26,7 @@ impl MainView {
             .cursor_pointer()
             .border_1()
             .border_color(hex(if auto { t.border_subtle } else { t.warning }))
-            .hover(|s| s.bg(hex(t.bg_overlay)))
+            .hover(|s| s.bg(hex(t.bg_elevated)))
             .on_click(cx.listener(|view, _, _, cx| {
                 view.auto_commit = !view.auto_commit;
                 view.status = if view.auto_commit {
@@ -156,11 +156,15 @@ impl MainView {
                     .border_b_2()
                     .border_color(hex(if active { t.accent } else { t.bg_elevated }))
                     .text_size(px(crate::design::TS_CAPTION))
+                    // RustShell 两档口径：选中 accent 18%，未选中才有 hover(bg_elevated)。
                     .when(active, |d| {
-                        d.bg(hex(t.bg_overlay)).text_color(hex(t.accent))
+                        d.bg(crate::theme::to_hsla(t.accent).opacity(0.18))
+                            .text_color(hex(t.accent))
                     })
-                    .when(!active, |d| d.text_color(hex(t.fg_muted)))
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .when(!active, |d| {
+                        d.text_color(hex(t.fg_muted))
+                            .hover(|s| s.bg(hex(t.bg_elevated)))
+                    })
                     .on_click(cx.listener(move |view, _, _, cx| {
                         if let Some(tab) = view.tabs.get_mut(view.active_tab) {
                             tab.active_result = index;
@@ -195,10 +199,13 @@ impl MainView {
                 }))
                 .text_size(px(crate::design::TS_CAPTION))
                 .when(show_messages, |d| {
-                    d.bg(hex(t.bg_overlay)).text_color(hex(t.accent))
+                    d.bg(crate::theme::to_hsla(t.accent).opacity(0.18))
+                        .text_color(hex(t.accent))
                 })
-                .when(!show_messages, |d| d.text_color(hex(t.fg_muted)))
-                .hover(|s| s.bg(hex(t.bg_overlay)))
+                .when(!show_messages, |d| {
+                    d.text_color(hex(t.fg_muted))
+                        .hover(|s| s.bg(hex(t.bg_elevated)))
+                })
                 .on_click(cx.listener(move |view, _, _, cx| {
                     if let Some(tab) = view.tabs.get_mut(view.active_tab) {
                         tab.show_messages = true;
@@ -470,7 +477,7 @@ impl MainView {
                         chip.bg(hex(t.bg_overlay)).text_color(hex(t.accent))
                     })
                     .when(!active, |chip| chip.text_color(hex(t.fg_muted)))
-                    .hover(|s| s.bg(hex(t.bg_overlay)))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
                     .cursor_pointer()
                     .on_click(cx.listener(move |view, _, _, cx| view.show_run(id, cx)))
                     .child(

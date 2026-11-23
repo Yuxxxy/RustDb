@@ -442,7 +442,7 @@ impl MainView {
             body = body.child(
                 div()
                     .debug_selector(|| "bulk-custom-where".to_string())
-                    .child(Input::new(&panel.custom_where)),
+                    .child(Input::new(&panel.custom_where).small()),
             );
         } else {
             let mut join_row = h_flex().gap_1().items_center().child(
@@ -503,13 +503,13 @@ impl MainView {
                         div()
                             .w(px(150.))
                             .debug_selector(move || column_selector.clone())
-                            .child(Input::new(&row.column)),
+                            .child(Input::new(&row.column).small()),
                     )
                     .child(
                         div()
                             .w(px(200.))
                             .debug_selector(move || value_selector.clone())
-                            .child(Input::new(&row.value)),
+                            .child(Input::new(&row.value).small()),
                     );
                 if panel.conditions.len() > 1 {
                     head = head.child(
