@@ -281,3 +281,15 @@ GUI 用例的 SQL 注入走一个「不用键盘」的技巧：**预先在 `%APP
 - 首轮发现的 5 个功能缺陷（D-01 / D-02 / D-04 / D-05 / D-06）+ 收尾轮的 D-03 + 修复过程中踩出的 D-07，**7 条全部修复**，其中 D-01 / D-02 / D-03 / D-04 均有实机复拍。
 - 回归护栏：`rustdb-db-mysql` 新增 4 条单测（列类型映射、文本协议按类型还原、二进制保字节、TEXT/BLOB 按字符集分流），`rustdb-sql-lang` 新增 2 条中文回归用例，`rustdb-bootstrap` 1 条 provider 护栏。
 - 自动化边界：gpui 的键盘注入不可用 + 右键菜单在 150% DPI 下弹出位置会翻转，这两点决定了「菜单项级」用例无法稳定脚本化。后续若要覆盖，建议加 `RUSTDB_UITEST=1` 的测试钩子（按 selector 触发动作），或直接用 `VisualTestContext` 做 UI 级断言。
+
+---
+
+## 7. 已知限制与后续建议（本轮未修，附根因）
+
+| 项 | 现象 | 根因 | 建议 / 代价 |
+| --- | --- | --- | --- |
+| **PostgreSQL 列类型同样丢失** | 与 MySQL 的 D-04 同类：数字列按字典序排序、表头类型恒 `text`、类型感知编辑退化 | **上游 API 限制**，不是本项目漏改：`db-postgres` 走 `simple_query_raw`，而 tokio-postgres 0.7 的 `SimpleColumn` 只保留列名——`RowDescription` 里的 OID 在库内被丢弃（`tokio-postgres/src/simple_query.rs` 中 `SimpleColumn::new(name)`）。驱动层**拿不到**类型 | 三条路径：① 用 `client.prepare()` 探一次列类型再执行 simple query（+1 RTT，多语句不可用，需按 SQL 缓存）；② 改用 `query_raw` 二进制协议（丢多语句与惰性流）；③ 自行解析 Backend 协议（不现实）。**本轮没有 PG 实例可实测，协议级改动不验证不动手** |
+| 血缘面板加载慢 | 对单表求血缘要十几秒，界面一直停在「正在读取字段…」 | `core::request_lineage` 会对命名空间内**每张表**逐个 `metadata.table()`、每个视图逐个 `object_ddl()`。`cool_db` 38 张表 ≈ 60~100 次往返 | 给 `MetadataProvider` 加列 / 外键的**批量**接口（一次 `information_schema` 查询取全库），6 个方言各实现一次；或先按外键闭包裁剪表集合再逐表取 |
+| MySQL 对象列表无 `has_primary_key` | 该字段恒为 `None` | 探测主键要查 `information_schema.statistics`，相关子查询在 38 张表上会把列表拖到十几秒 | 当前 `ui` 侧无任何消费方（`grep` 只命中测试），加了也是死代码 —— **等有消费方再做** |
+| 菜单项级 30 条用例 | 未执行 | 见 §3.3 | `RUSTDB_UITEST=1` 钩子 / `VisualTestContext` |
+
