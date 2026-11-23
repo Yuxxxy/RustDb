@@ -613,10 +613,57 @@ SSH / 终端 / SFTP 业务语义一律不带。对照结论：主区 `flex_1 + m
 | 输入框档位 | `29191a6` / `4dd7fae` | 批量更新面板 3 处 `Input::new` 补 `.small()`；连接编辑器原本已统一 small | `tests_ai::conn_editor_uses_driver_dropdown_small_fields_and_default_port` |
 | tab 标题 | 11-16 运行反馈 | `display_tab_title()` 按字符截到 24 字再补省略号；布局不再 `max_w(120)`，宽度随文案；去掉 `SquareTerminal` 图标，名字即身份 | `workspace::tab_title_is_capped_by_characters_not_bytes` |
 | 状态点红绿实心 | 0.1.14 颜色语言统一 | `design::connection_dot_color()` 收口：连上 success 绿、未连 danger 红，替掉 `fg_muted` 灰点；侧栏两处共用 | `design::disconnected_dot_is_solid_red_not_gray` |
+| 窗口几何持久化 | `0cf5913` | 见 §11.9：`layout.json` 新增 `window_bounds`，开窗前还原、2s 节流落盘、退出兜底 | `core::window_bounds` 7 条 + `window_persist` 5 条 + `app` 2 条 |
 
-**未移植**（记一笔避免重复评估）：窗口几何持久化 + 丢弃不合理值（RustDb 目前完全不持久化窗口几何，属新功能不是细节）；
-命令面板 i18n 译文（RustDb 还没有命令面板，规范 §10 里是 P2）；`h_6` 替换自定义控件写死高
-（RustDb 没有 RustShell 那种自绘分段控件，`design::chip` 已走 `Button::small()`）。
+**未移植**（记一笔避免重复评估）：命令面板 i18n 译文（RustDb 还没有命令面板，规范 §10 里是 P2）；
+`h_6` 替换自定义控件写死高（RustDb 没有 RustShell 那种自绘分段控件，`design::chip` 已走 `Button::small()`）。
 
 **验证**：`cargo test -p rustdb-ui --lib` **172 passed / 0 failed**（本轮 +5 条护栏）；
-`cargo test --workspace` 全绿。改动只涉及 `ui/src`，不改任何数据链路。
+`cargo test --workspace` 全绿。§11.8 的改动只涉及 `ui/src`，不改任何数据链路。
+
+---
+
+### §11.9 窗口几何持久化（2026-11-23 续）
+
+跨会话记住窗口**位置 / 大小 / 最大化状态**。三层分工，与 RustShell 同构：
+
+| 层 | 文件 | 职责 |
+| --- | --- | --- |
+| core（纯函数） | `core/src/window_bounds.rs` | `WindowBoundsRecord`（f32 逻辑像素）+ `fitted_to` / `pick_screen`；不依赖 gpui |
+| 配置 | `core/src/layout.rs` | `LayoutSettings::window_bounds`，`#[serde(default)]` 保证老 `layout.json` 不解析失败 |
+| ui（采集） | `ui/src/main_view/window_persist.rs` | `observe_window_bounds` + render 每帧兜底 → 内存；poll 里 2s 节流写盘；`on_app_quit` 立即 flush |
+| shell（恢复） | `shell/src/app.rs` | 开窗**前** `resolve_window_bounds`，多屏取重叠最大者，收进可见区，避免先居中再跳的闪烁 |
+
+**关键取舍（缺一不可）**：
+
+1. **脏值丢弃，不 clamp**。Windows `GetWindowPlacement` 失败时平台层返回全 0 占位值；若被当成真几何写入，下次启动 `fitted_to` 会把它钳成最小窗 —— 用户看到「每次启动都是小窗」。采集侧 `is_plausible`（宽 ≥ 512、高 ≥ 320、全有限；即 `MIN_WINDOW_*` 的一半，不用硬下限，因为 gpui 会扣边框）与落盘侧各挡一道；恢复侧只拦 `width/height <= 0` 或非有限。负坐标放行（左侧扩展屏）。
+2. **拔屏回正中**。记录与所有当前屏都不相交时，`fitted_to` 直接居中，而不是贴到右边缘 —— 后者看着像 bug。
+3. **尺寸先钳、位置后钳**；屏比最小尺寸还窄时以屏为准，否则窗口会被撑出屏。
+4. **最大化带还原尺寸**：`WindowBounds::Maximized(bounds)` 的 bounds 是用户上次拖出来的尺寸，取消最大化后不会变成系统随手给的窗口。全屏按窗口态记录。
+5. **f32 而非整数**：125% / 150% 缩放下存整数每次启动丢半个像素。
+
+**实机验证**（150% DPI、1920×1080；脚本 `.tmp/window-persist-check.ps1`）：
+
+| 阶段 | 窗口矩形（物理像素） | 说明 |
+| --- | --- | --- |
+| 首次启动 | `529,349,1822,1031` | 默认 1200×680 逻辑，居中 |
+| MoveWindow 后 | `100,80,1600,1000` | 4s 后节流写盘 |
+| 落盘内容 | `x=74, y=56.67, w=1052, h=659.33, maximized=false` | 逻辑像素；老配置无该字段时按「没记过」 |
+| 重启后 | `100,80,1600,1000` | 与移动后**完全一致**，恢复成功 |
+
+两次关闭都由 `WM_CLOSE` 正常退出（`CLOSED_1=True` / `CLOSED_2=True`），验证退出钩子链路；验证结束已还原原始 `layout.json`。
+
+**复跑**：
+
+```bash
+# 纯函数 / 序列化 / 采集落盘 / 启动恢复护栏
+CARGO_INCREMENTAL=0 cargo test -p rustdb-core --lib window_bounds
+CARGO_INCREMENTAL=0 cargo test -p rustdb-core --lib layout
+CARGO_INCREMENTAL=0 cargo test -p rustdb-ui --lib window
+CARGO_INCREMENTAL=0 cargo test -p rustdb-shell --lib
+# 实机（会临时改 %APPDATA%/RustDb/layout.json，脚本末尾还原）
+CARGO_INCREMENTAL=0 cargo build -p rustdb
+powershell -File .tmp/window-persist-check.ps1
+```
+
+**已知限制**：`layout.json` 仍无 schema 版本，兼容性靠 `#[serde(default)]`；手工写入被污染的**合法**尺寸（例如 720×480 这种 > 0 但小于最小值的值）不会被恢复侧拦下，需用户手动调一次窗口自愈；设置页没有「记住窗口位置」开关，默认始终开启。

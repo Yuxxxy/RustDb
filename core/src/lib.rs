@@ -32,6 +32,7 @@ pub mod runs;
 pub mod secrets;
 pub mod session_actor;
 pub mod theme;
+pub mod window_bounds;
 pub mod transfer;
 pub mod tunnel;
 

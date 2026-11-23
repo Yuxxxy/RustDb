@@ -96,6 +96,9 @@ pub struct LayoutSettings {
     /// SQL 编辑器高度（不含分隔条）；旧配置缺字段时回落到 176。
     #[serde(default = "default_editor_height")]
     pub editor_height: f32,
+    /// 上次退出时的窗口几何；老配置缺字段时按「没记过」处理。
+    #[serde(default)]
+    pub window_bounds: Option<crate::window_bounds::WindowBoundsRecord>,
 }
 
 fn default_version() -> u32 {
@@ -125,6 +128,7 @@ impl Default for LayoutSettings {
             theme: crate::theme::ThemeMode::Dark,
             grid_density: GridDensity::default(),
             editor_height: EDITOR_HEIGHT_DEFAULT,
+            window_bounds: None,
         }
     }
 }
@@ -262,6 +266,28 @@ mod tests {
         save_layout(&path, &layout).unwrap();
         assert_eq!(load_layout(&path), layout);
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn window_bounds_roundtrip_and_legacy_compatibility() {
+        use crate::window_bounds::WindowBoundsRecord;
+
+        let path = temp_path("window-bounds");
+        let mut layout = LayoutSettings::default();
+        assert_eq!(layout.window_bounds, None, "老配置缺省必须当没记过");
+        layout.window_bounds = Some(WindowBoundsRecord::new(120., 80., 1300., 860., true));
+        save_layout(&path, &layout).unwrap();
+        assert_eq!(load_layout(&path), layout, "窗口几何必须能穿过 serde 往返");
+
+        // 手写老配置：缺 window_bounds 一节不能让整份 layout.json 解析失败，
+        // 否则用户所有布局设置（侧栏宽度 / 主题）会一起回到默认值。
+        let legacy = temp_path("legacy");
+        std::fs::write(&legacy, r#"{"version":1,"ai_width":360.0,"ai_open":true}"#).unwrap();
+        let back = load_layout(&legacy);
+        assert_eq!(back.window_bounds, None);
+        assert!(back.ai_open, "缺字段不能把别的设置也清掉");
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&legacy);
     }
 
     #[test]

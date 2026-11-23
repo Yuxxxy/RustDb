@@ -25,6 +25,13 @@ impl MainView {
         core: Arc<rustdb_core::Core>,
         layout_path: std::path::PathBuf,
     ) -> Self {
+        // 窗口几何：只更新内存，写盘交给 poll 节流与退出钩子。
+        // 不 detach 的话订阅会在构造函数返回时被 drop，等于没挂。
+        cx.observe_window_bounds(window, |view: &mut Self, window, cx| {
+            view.window_bounds_observed(window, cx)
+        })
+        .detach();
+
         let completion_catalog: std::rc::Rc<
             std::cell::RefCell<crate::completion::CompletionCatalog>,
         > = Default::default();
@@ -244,6 +251,7 @@ impl MainView {
             data_compare_config_path,
             layout,
             layout_path,
+            window_mem: window_persist::WindowMemory::default(),
             export_menu: None,
             export_focus: cx.focus_handle(),
             export_hover: None,
@@ -430,6 +438,9 @@ impl MainView {
     }
 
     pub(crate) fn poll(&mut self, _cx: &mut Context<Self>) -> bool {
+        // 窗口在 Windows 上纯拖动位置不触发 bounds 观察者，render 的每帧兜底
+        // 与这里的节流落盘必须都在，详见 window_persist。
+        self.window_poll();
         let mut drained = 0;
         let mut changed = false;
         while drained < 64 {

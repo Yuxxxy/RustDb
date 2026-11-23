@@ -7,6 +7,8 @@ use super::*;
 
 impl Render for MainView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Windows 上纯拖动位置不会触发 bounds 观察者，每帧兜底读一次。
+        self.window_bounds_observed(window, cx);
         if let Some(key) = self.demo_sidebar.take() {
             if let Some(panel) = PanelKind::ALL.into_iter().find(|kind| kind.key() == key) {
                 self.panel = panel;

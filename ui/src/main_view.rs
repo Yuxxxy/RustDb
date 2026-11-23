@@ -109,6 +109,9 @@ mod status_bar;
 mod transfer_panel;
 /// 工作区布局、菜单与 Esc 分发。
 mod workspace;
+/// 窗口几何采集与节流落盘。
+mod window_persist;
+pub use window_persist::ui_install_flush_window_bounds_on_quit;
 
 use editing::*;
 
@@ -2317,6 +2320,8 @@ pub struct MainView {
     /// 三列布局：宽度（侧栏按面板记忆）、折叠与 AI 开关，落 `layout.json`。
     layout: rustdb_core::LayoutSettings,
     layout_path: PathBuf,
+    /// 窗口几何的跨帧状态（观察 → 内存 → 节流落盘）。
+    window_mem: window_persist::WindowMemory,
     /// 结果区「导出格式」菜单：打开位置（窗口坐标）；`None` 为关闭。
     export_menu: Option<Point<gpui_kit::Pixels>>,
     /// P1-③：导出触发按钮的自有焦点句柄 —— Tab 可停留、Enter / Space 可开菜单。
