@@ -13,4 +13,5 @@ rustdb-db-mysql.workspace = true
 rustdb-db-postgres.workspace = true
 rustdb-db-mssql.workspace = true
 rustdb-db-oracle.workspace = true
+rustls.workspace = true
 log.workspace = true

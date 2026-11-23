@@ -941,7 +941,10 @@ fn ai_long_session_virtualizes_offscreen_bubbles(cx: &mut gpui_kit::TestAppConte
         "离屏气泡不应渲染"
     );
     let visible = (0..80)
-        .filter(|index| vcx.debug_bounds(selector(format!("ai-bubble-{index}"))).is_some())
+        .filter(|index| {
+            vcx.debug_bounds(selector(format!("ai-bubble-{index}")))
+                .is_some()
+        })
         .count();
     assert!(visible < 40, "虚拟列表应只画可见气泡，实际 {visible}");
     assert!(
@@ -1035,7 +1038,8 @@ fn ai_long_session_new_message_follows_when_stuck(cx: &mut gpui_kit::TestAppCont
 
     vcx.update(|_, app| {
         view.update(app, |view, cx| {
-            view.ai_lines.push(("assistant".into(), "追加的回答".into()));
+            view.ai_lines
+                .push(("assistant".into(), "追加的回答".into()));
             cx.notify();
         });
     });
@@ -1136,4 +1140,186 @@ fn ai_long_session_sql_block_apply_works(cx: &mut gpui_kit::TestAppContext) {
     });
     assert!(text.contains("SELECT 42 AS answer"), "{text:?}");
     assert!(!running, "应用不应自动执行");
+}
+
+/// 侧栏标题栏与搜索框：搜索框常驻、「新建连接」贴最右、收起按钮已移除。
+#[gpui_kit::test]
+fn sidebar_search_is_always_visible_and_new_connection_sits_right(
+    cx: &mut gpui_kit::TestAppContext,
+) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.panel = PanelKind::Connections;
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    // 未连接（默认状态）也要能看到搜索框。
+    let search = vcx
+        .debug_bounds("conn-search")
+        .expect("未连接时搜索框也应显示");
+    // 独立的「收起侧栏」按钮已移除。
+    assert!(
+        vcx.debug_bounds("sidebar-collapse").is_none(),
+        "标题栏不应再有收起侧栏按钮"
+    );
+
+    // 「新建连接」在标题栏最右侧：右缘贴侧栏内容右缘，且落在搜索框右侧。
+    let new = vcx.debug_bounds("conn-new").expect("缺少新建连接按钮");
+    let search_right = search.origin.x + search.size.width;
+    assert!(
+        new.origin.x > search.origin.x + search.size.width / 2.0,
+        "新建按钮应贴右侧：new={new:?} search={search:?}"
+    );
+    let new_right = new.origin.x + new.size.width;
+    assert!(
+        f32::from(search_right - new_right).abs() <= 16.0,
+        "新建按钮右缘应贴侧栏右缘：new_right={new_right} search_right={search_right}"
+    );
+
+    // 未连接时搜索词作用于连接名，清空后恢复。
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.object_filter = "不存在的连接".into();
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("conn-demo-sqlite").is_none(),
+        "不匹配的连接应隐藏"
+    );
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.object_filter = String::new();
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    assert!(
+        vcx.debug_bounds("conn-demo-sqlite").is_some(),
+        "清空搜索后连接应回来"
+    );
+}
+
+/// 新建连接表单：驱动改可搜索下拉框、输入框统一 small 高度、无分组框、端口跟驱动走。
+#[gpui_kit::test]
+fn conn_editor_uses_driver_dropdown_small_fields_and_default_port(
+    cx: &mut gpui_kit::TestAppContext,
+) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|window, app| {
+        view.update(app, |view, cx| {
+            view.open_conn_editor(None, window, cx);
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    // 驱动换成下拉框：触发器在，老的单选 chip 不在。
+    assert!(vcx.debug_bounds("conn-driver").is_some(), "缺少驱动下拉框");
+    assert!(
+        vcx.debug_bounds("conn-driver-postgres").is_none(),
+        "驱动单选 chip 应已移除"
+    );
+
+    // 输入框统一 small 高度（medium 约 30+，这里卡 30 作护栏）。
+    let port = vcx.debug_bounds("conn-field-端口").expect("缺少端口输入框");
+    assert!(
+        port.size.height <= px(26.),
+        "端口输入框应为 small 高度，实测 {}",
+        port.size.height
+    );
+    let name = vcx.debug_bounds("conn-field-名称").expect("缺少名称输入框");
+    assert!(
+        name.size.height <= px(26.),
+        "名称输入框应为 small 高度，实测 {}",
+        name.size.height
+    );
+
+    // 分组输入框已移除。
+    assert!(
+        vcx.debug_bounds("conn-field-分组").is_none(),
+        "分组输入框应已移除"
+    );
+
+    let port_value = |vcx: &mut gpui_kit::VisualTestContext, view: &gpui_kit::Entity<MainView>| {
+        vcx.update(|_, app| {
+            view.read(app)
+                .conn_editor
+                .as_ref()
+                .expect("编辑器未打开")
+                .port
+                .read(app)
+                .value()
+                .to_string()
+        })
+    };
+
+    // 新建默认为 PostgreSQL：端口预填 5432。
+    assert_eq!(port_value(&mut *vcx, &view), "5432", "新连接应预填默认端口");
+
+    // 切驱动 → 端口跟着换默认值。
+    vcx.update(|window, app| {
+        view.update(app, |view, cx| {
+            view.set_conn_driver(DbKind::Mysql, window, cx)
+        });
+    });
+    vcx.run_until_parked();
+    assert_eq!(port_value(&mut *vcx, &view), "3306", "切 MySQL 应换成 3306");
+
+    // 用户手填过的端口不能被切驱动悄悄改掉。
+    vcx.update(|window, app| {
+        view.update(app, |view, cx| {
+            let port = view
+                .conn_editor
+                .as_ref()
+                .expect("编辑器未打开")
+                .port
+                .clone();
+            port.update(cx, |state, cx| state.set_value("15432", window, cx));
+            view.set_conn_driver(DbKind::Oracle, window, cx);
+        });
+    });
+    vcx.run_until_parked();
+    assert_eq!(
+        port_value(&mut *vcx, &view),
+        "15432",
+        "手填端口不应被默认值覆盖"
+    );
+
+    // 保存后：无分组、驱动/端口按界面所填写落库。
+    vcx.update(|window, app| {
+        view.update(app, |view, cx| {
+            let editor = view.conn_editor.as_mut().expect("编辑器未打开");
+            editor
+                .name
+                .update(cx, |state, cx| state.set_value("下拉框测试", window, cx));
+            editor
+                .host
+                .update(cx, |state, cx| state.set_value("db.internal", window, cx));
+        });
+    });
+    vcx.run_until_parked();
+    let save = vcx.debug_bounds("conn-editor-save").expect("缺少保存按钮");
+    vcx.simulate_click(save.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
+
+    let saved = vcx.update(|_, app| {
+        view.read(app)
+            .profiles
+            .iter()
+            .find(|profile| profile.name == "下拉框测试")
+            .cloned()
+    });
+    let saved = saved.expect("保存后应出现在连接列表");
+    assert_eq!(saved.folder, None, "新建连接不应再有分组");
+    assert_eq!(saved.driver, DbKind::Oracle);
+    assert_eq!(saved.port, Some(15432));
 }

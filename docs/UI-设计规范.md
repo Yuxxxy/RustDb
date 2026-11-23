@@ -564,3 +564,35 @@ prepaint 才更新）；测试滚顶后先断言 bounds、再追加消息断言�
 
 **未验证项**：tooltip 悬停实际弹出未在无头环境断言（原生 tooltip 路径与组件一致，真机待看）；
 窄窗下常驻字段总宽与状态消息的挤压比例未真机量过。
+
+### §11.7 连接侧栏与新建连接表单（本轮追加）
+
+| 口径 | 值 |
+| --- | --- |
+| 收起侧栏 | 标题栏不再有独立按钮（`sidebar-collapse` 删除）；收起伏笔只剩「再点导轨当前项」一条路径，`toggle_sidebar` 与 `layout.sidebar_collapsed` 语义不变 |
+| 新建连接 | 移到标题栏最右侧（`flex_1` 撑开），图标由裸「+」文本换成 `IconName::DatabasePlus`（数据库 + 加号），24px ghost 按钮 + tooltip「新建连接」 |
+| 搜索框 | 常驻：不再受 `connected` 门控，未连接也显示（之前只有建立会话后才出现）；placeholder 改「搜索连接或对象」 |
+| 搜索对象 | 同一个词同时过滤连接（名称 / 驱动显示名 / 主机）与对象；**当前连接的节点不因搜索词隐藏**，否则搜对象注释时宿主连接一起消失、命中项无处可挂 |
+| 驱动选择 | 单选 chip 行换成 `gpui_component::Combobox`（`ComboboxState<SearchableVec<&'static str>>` + `.searchable(true)`），触发器 180px 与「主机 / 名称」对齐，`menu_width 220`、`menu_max_h 180`、搜索框 placeholder「搜索驱动」 |
+| 回写驱动 | 用 `cx.subscribe_in`（**不是** `subscribe`）：切驱动要顺手改端口，而 `InputState::set_value` 需要 `&mut Window`，`subscribe` 的闭包拿不到 window |
+| 默认端口 | 新建时按驱动预填（PG 5432 / MySQL·MariaDB 3306 / MSSQL 1433 / Oracle 1521 / SQLite 空）；切驱动时只覆盖「为空」或「仍是上一个驱动默认值」的端口，手填值（如 15432）不动 |
+| 输入框高度 | 连接编辑器所有输入框统一 `Input::small()`：实测 30px → 24px（`crates` 的 `input_h` 映射 h_8=30 / h_6=24，`Size` 默认 Medium） |
+| 分组 | 表单不再有分组输入框；`ConnEditor.folder` 改为 `Option<String>` 原样保留旧值（编辑老配置不丢分组），新建恒为 `None` |
+
+**验收用例**（+2，`tests_ai.rs`）：
+- `sidebar_search_is_always_visible_and_new_connection_sits_right`：未连接时 `conn-search` 存在、`sidebar-collapse` 不存在、
+  `conn-new` 右缘与侧栏右缘差 ≤16px 且落在搜索框右半、搜索词能隐藏 / 恢复连接行；
+- `conn_editor_uses_driver_dropdown_small_fields_and_default_port`：`conn-driver` 在而 `conn-driver-postgres` 不在、
+  输入框高度 ≤26px（**反向验证**：去掉 `.small()` 实测 30px ⇒ 变红）、无 `conn-field-分组`、
+  新建预填 5432 → 切 MySQL 3306 → 手填 15432 后切 Oracle 保持 15432 → 保存后 `folder.is_none()`。
+
+**回归记录八（测试用例互污染，靠环境变量）**：`connection_tree_groups_and_collapses` 里
+`std::env::set_var("RUSTDB_DEV_DB", "1")` 从不还原，同进程后续用例的 `Core::new` 都会多出
+`dev-postgres` / `dev-mysql` 两条示例配置。表现为「单独跑绿、全量跑红」：树被撑高后
+`obj-main-orders` 掉出侧栏可视区 —— **`debug_bounds` 取的是绘制期记录，滚动区裁掉的节点没有 bounds**。
+修复：用完立即还原（`var_os` 存旧值 → 恢复 / `remove_var`）。
+**护栏**：凡「单个用例绿、全量红」先查进程级全局状态（env / static / 文件），不要先怀疑布局。
+
+**未验证项**：下拉框里输入搜索词后列表收窄只在组件自测覆盖（`gpui-component` 的
+`test_combo_box_search_filters_items`），本仓未再测；`RUSTDB_DEV_DB` 之外的 `RUSTDB_DEMO*`
+系列环境变量仍由截图脚本注入，未加还原（只影响手动截图进程）。

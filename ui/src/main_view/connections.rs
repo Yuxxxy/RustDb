@@ -74,10 +74,7 @@ impl MainView {
             .as_ref()
             .map(|profile| profile.name.clone())
             .unwrap_or_default();
-        let folder = existing
-            .as_ref()
-            .and_then(|profile| profile.folder.clone())
-            .unwrap_or_default();
+        let folder = existing.as_ref().and_then(|profile| profile.folder.clone());
         let driver = existing
             .as_ref()
             .map(|profile| profile.driver)
@@ -86,11 +83,17 @@ impl MainView {
             .as_ref()
             .and_then(|profile| profile.host.clone())
             .unwrap_or_default();
+        // 端口默认跟着驱动走：新建连接直接把默认端口填好，编辑时保留原值。
         let port = existing
             .as_ref()
             .and_then(|profile| profile.port)
             .map(|port| port.to_string())
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                driver
+                    .default_port()
+                    .map(|port| port.to_string())
+                    .unwrap_or_default()
+            });
         let database = existing
             .as_ref()
             .and_then(|profile| profile.database.clone())
@@ -103,11 +106,46 @@ impl MainView {
             .as_ref()
             .and_then(|profile| profile.ssl_mode.clone())
             .unwrap_or_default();
+        // 驱动下拉框：条目是驱动的显示名，选中项通过 `ComboboxEvent` 写回 `driver`。
+        let drivers: Vec<&'static str> =
+            DbKind::ALL.iter().map(|kind| kind.display_name()).collect();
+        let selected = DbKind::ALL
+            .iter()
+            .position(|kind| *kind == driver)
+            .unwrap_or(0);
+        let driver_select = cx.new(|cx| {
+            ComboboxState::new(
+                SearchableVec::new(drivers),
+                vec![gpui_kit::component::IndexPath::new(selected)],
+                window,
+                cx,
+            )
+            .searchable(true)
+        });
+        // `subscribe_in` 而不是 `subscribe`：切驱动要顺手改端口，改输入框需要 `Window`。
+        cx.subscribe_in(
+            &driver_select,
+            window,
+            |view, emitter, _: &ComboboxEvent<SearchableVec<&'static str>>, window, cx| {
+                let Some(name) = emitter.read(cx).selected_value() else {
+                    return;
+                };
+                let Some(kind) = DbKind::ALL
+                    .into_iter()
+                    .find(|kind| kind.display_name() == name)
+                else {
+                    return;
+                };
+                view.set_conn_driver(kind, window, cx);
+            },
+        )
+        .detach();
         self.conn_editor = Some(ConnEditor {
             id: existing.as_ref().map(|profile| profile.id.clone()),
             name: conn_input(window, cx, "连接名", Some(&name)),
-            folder: conn_input(window, cx, "分组（可空）", Some(&folder)),
+            folder,
             driver,
+            driver_select,
             host: conn_input(window, cx, "主机", Some(&host)),
             port: conn_input(window, cx, "端口", Some(&port)),
             database: conn_input(window, cx, "数据库 / 文件", Some(&database)),
@@ -133,7 +171,30 @@ impl MainView {
         cx.notify();
     }
 
-    /// 从编辑器读出一份连接配置；校验不通过时返回原因。
+    /// 驱动下拉框选中后：写回驱动，并把端口换成新驱动的默认端口。
+    ///
+    /// 只有「端口为空」或「端口仍是上一个驱动的默认值」时才覆盖 —— 用户手填过的
+    /// 端口（比如非标端口 15432）不能被切驱动悄悄改掉。
+    pub(crate) fn set_conn_driver(
+        &mut self,
+        kind: DbKind,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(editor) = self.conn_editor.as_mut() else {
+            return;
+        };
+        let previous = editor.driver;
+        editor.driver = kind;
+        let current = editor.port.read(cx).value().trim().to_string();
+        let next = conn_port_after_driver_change(previous, kind, &current);
+        let port = editor.port.clone();
+        if let Some(next) = next {
+            port.update(cx, |state, cx| state.set_value(next, window, cx));
+        }
+        cx.notify();
+    }
+
     pub(crate) fn conn_editor_profile(
         &self,
         cx: &App,
@@ -299,8 +360,8 @@ impl MainView {
         Ok(rustdb_core::ConnectionProfile {
             id,
             name,
-            folder: Some(editor.folder.read(cx).value().trim().to_string())
-                .filter(|folder| !folder.is_empty()),
+            // 分组输入框已从界面移除：编辑时保留原分组，新建时无分组。
+            folder: editor.folder.clone(),
             driver: editor.driver,
             host: (!host.is_empty()).then_some(host),
             port,
@@ -378,7 +439,6 @@ impl MainView {
             "新建连接"
         };
         let error = editor.error.clone();
-        let driver = editor.driver;
         let read_only = editor.read_only;
         let production = editor.production;
         let tunnel_on = editor.tunnel;
@@ -387,23 +447,18 @@ impl MainView {
         let proxy_order = editor.proxy_order;
         let proxy_remote_dns = editor.proxy_remote_dns;
         let lan_on = editor.forward_lan;
-        // 驱动选择条。
-        let mut driver_row = h_flex().gap_1().items_center().flex_wrap();
-        for kind in DbKind::ALL {
-            let active = kind == driver;
-            let selector = format!("conn-driver-{}", kind.key());
-            driver_row = driver_row.child(crate::design::chip(
-                selector,
-                kind.display_name(),
-                active,
-                cx.listener(move |view, _, _, cx| {
-                    if let Some(editor) = view.conn_editor.as_mut() {
-                        editor.driver = kind;
-                    }
-                    cx.notify();
-                }),
-            ));
-        }
+        // 驱动下拉框（可搜索）：宽度与「主机 / 名称」对齐，弹出层比触发器略宽便于看全称。
+        let driver_row = div()
+            .w(px(180.))
+            .debug_selector(|| "conn-driver".to_string())
+            .child(
+                Combobox::new(&editor.driver_select)
+                    .small()
+                    .menu_width(px(220.))
+                    .menu_max_h(px(180.))
+                    .search_placeholder("搜索驱动")
+                    .placeholder("选择驱动"),
+            );
         // 跳板编辑行。
         let mut hop_rows = v_flex().gap_2();
         for (index, hop) in editor.hops.iter().enumerate() {
@@ -525,13 +580,12 @@ impl MainView {
         }
         let body = v_flex()
             .gap_2()
-            .child(
-                h_flex()
-                    .gap_2()
-                    .items_center()
-                    .child(conn_field(&t, "名称", &editor.name, px(180.)))
-                    .child(conn_field(&t, "分组", &editor.folder, px(120.))),
-            )
+            .child(h_flex().gap_2().items_center().child(conn_field(
+                &t,
+                "名称",
+                &editor.name,
+                px(180.),
+            )))
             .child(
                 v_flex()
                     .gap_1()
@@ -888,4 +942,23 @@ impl MainView {
             )
             .into_any_element()
     }
+}
+
+/// 切驱动后端口该变成什么。
+///
+/// 返回 `None` 表示不动（端口是用户手填的，不能被悄悄改掉）；返回 `Some(value)`
+/// 表示把端口覆盖成 `value`。判定口径：端口为空、或端口正好等于上一个驱动的默认
+/// 端口，才算「自动值」。SQLite 没有默认端口，于是清空。
+fn conn_port_after_driver_change(previous: DbKind, next: DbKind, current: &str) -> Option<String> {
+    let current = current.trim();
+    let previous_default = previous.default_port().map(|port| port.to_string());
+    let automatic = current.is_empty() || previous_default.as_deref() == Some(current);
+    if !automatic {
+        return None;
+    }
+    let next_default = next
+        .default_port()
+        .map(|port| port.to_string())
+        .unwrap_or_default();
+    (next_default != current).then_some(next_default)
 }

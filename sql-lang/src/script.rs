@@ -110,11 +110,17 @@ pub fn split_script(sql: &str, flavor: Flavor) -> Vec<ScriptStatement> {
 }
 
 /// `DELIMITER $$` / `delimiter //` → `Some("$$")`。
+///
+/// 关键字比较走**字节**而不是 `line[..keyword.len()]`：行首可能是多字节字符
+/// （例如中文注释 `-- 说明` 之外的裸中文行），按字节长度切片会切在字符中间
+/// 直接 panic（实测：`SELECT '中文测试'` 首行 `end byte index 9 is not a char boundary`）。
+/// 反过来，一旦字节前缀与纯 ASCII 关键字相等，`keyword.len()` 必然落在字符边界。
 fn strip_directive<'a>(line: &'a str, keyword: &str) -> Option<&'a str> {
-    if line.len() <= keyword.len() {
+    let bytes = line.as_bytes();
+    if bytes.len() <= keyword.len() {
         return None;
     }
-    if !line[..keyword.len()].eq_ignore_ascii_case(keyword) {
+    if !bytes[..keyword.len()].eq_ignore_ascii_case(keyword.as_bytes()) {
         return None;
     }
     let rest = &line[keyword.len()..];
@@ -126,9 +132,11 @@ fn strip_directive<'a>(line: &'a str, keyword: &str) -> Option<&'a str> {
 
 /// `GO` / `GO 5` / `GO -- 说明`。
 fn is_go_line(trimmed: &str) -> bool {
-    if trimmed.len() < 2 || !trimmed[..2].eq_ignore_ascii_case("GO") {
+    let bytes = trimmed.as_bytes();
+    if bytes.len() < 2 || !bytes[..2].eq_ignore_ascii_case(b"GO") {
         return false;
     }
+    // 两个字节都命中了 ASCII 的 `GO`，`trimmed[2..]` 一定在字符边界上。
     let rest = trimmed[2..].trim();
     rest.is_empty()
         || rest.starts_with("--")
@@ -258,5 +266,30 @@ mod tests {
     fn semicolons_in_identifiers_are_ignored() {
         let sql = "SELECT `a;b` FROM t; SELECT ';';";
         assert_eq!(texts(sql, Flavor::MySql).len(), 2);
+    }
+
+    /// 回归：行首是多字节字符时不能按字节长度切片。
+    ///
+    /// 实测崩溃：`SELECT '中文测试' ...` 在 MySQL 方言下进入 `strip_directive`
+    /// （关键字 `DELIMITER` 9 字节）⇒ `line[..9]` 切在「中」的第二个字节上 ⇒
+    /// `end byte index 9 is not a char boundary`。`is_go_line` 的 `[..2]` 同病。
+    #[test]
+    fn multibyte_leading_chars_do_not_panic() {
+        for flavor in [
+            Flavor::MySql,
+            Flavor::MsSql,
+            Flavor::Postgres,
+            Flavor::Generic,
+        ] {
+            let sql = "SELECT '中文测试' AS zh;\n中文注释一样的行;\nSELECT 2;";
+            assert_eq!(texts(sql, flavor).len(), 3, "{flavor:?}");
+        }
+        // 单个 CJK 字符正好落在 `GO` 的两字节窗口上。
+        assert_eq!(texts("中文\nGO\nSELECT 1", Flavor::MsSql).len(), 2);
+        // 关键字本身仍要认得（大小写不敏感）。
+        assert_eq!(
+            texts("delimiter //\nSELECT 1//\ndelimiter ;", Flavor::MySql).len(),
+            1
+        );
     }
 }

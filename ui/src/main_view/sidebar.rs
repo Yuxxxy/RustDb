@@ -105,11 +105,13 @@ impl MainView {
     ) -> impl IntoElement {
         let t = current(cx);
         let is_connections = self.panel == PanelKind::Connections;
+        // 标题在左、操作贴最右；收起伏笔只保留「再点导轨当前项」这一条路径，
+        // 标题栏不再放独立的收起按钮（与连接的「新建」抢同一块右侧空间）。
         let header = h_flex()
             .h(px(34.))
             .px_3()
             .items_center()
-            .justify_between()
+            .gap_2()
             .border_b_1()
             .border_color(hex(t.border_subtle))
             .child(
@@ -119,36 +121,23 @@ impl MainView {
                     .text_color(hex(t.fg_primary))
                     .child(self.panel.label()),
             )
+            .child(div().flex_1())
             // F-02：连接面板可以直接新建连接。
+            // 图标用「数据库 + 加号」而不是一个裸「+」：一眼能看出是「新建连接」。
             .when(is_connections, |head| {
                 head.child(
-                    h_flex().gap_2().items_center().child(
-                        div()
-                            .id("conn-new")
-                            .debug_selector(|| "conn-new".to_string())
-                            .text_size(px(crate::design::TS_BODY))
-                            .text_color(hex(t.fg_muted))
-                            .cursor_pointer()
-                            .hover(|s| s.text_color(hex(t.accent)))
-                            .on_click(cx.listener(|view, _, window, cx| {
-                                view.open_conn_editor(None, window, cx);
-                            }))
-                            .child("+"),
-                    ),
-                )
-            })
-            .child(
-                div()
-                    .debug_selector(|| "sidebar-collapse".to_string())
-                    .child(
-                        Button::new("sidebar-collapse-btn")
+                    div().debug_selector(|| "conn-new".to_string()).child(
+                        Button::new("conn-new-btn")
                             .small()
                             .ghost()
-                            .icon(IconName::PanelLeftClose)
-                            .tooltip("收起侧栏")
-                            .on_click(cx.listener(|view, _, _, cx| view.toggle_sidebar(cx))),
+                            .icon(IconName::DatabasePlus)
+                            .tooltip("新建连接")
+                            .on_click(cx.listener(|view, _, window, cx| {
+                                view.open_conn_editor(None, window, cx);
+                            })),
                     ),
-            );
+                )
+            });
 
         let body: gpui_kit::AnyElement = match self.panel {
             PanelKind::Dashboard => self.render_dashboard(cx).into_any_element(),
@@ -217,9 +206,11 @@ impl MainView {
         let connected = self.session.is_some();
         let active_profile = self.active_profile.clone();
         // 对象面板并入连接树后，搜索框随树一起出现。
+        // 搜索框常驻（未连接也要能看到），连接名与已加载对象共用同一个过滤词。
         if self.object_input.is_none() {
             let input = cx.new(|cx| {
-                gpui_kit::component::input::InputState::new(window, cx).placeholder("搜索对象")
+                gpui_kit::component::input::InputState::new(window, cx)
+                    .placeholder("搜索连接或对象")
             });
             cx.subscribe(&input, |view, _, event: &InputEvent, cx| {
                 if let InputEvent::Change = event {
@@ -244,19 +235,43 @@ impl MainView {
                     .is_some_and(|comment| comment.to_lowercase().contains(&filter))
         };
         let mut tree = v_flex().p_2().gap(px(1.));
-        if connected {
-            if let Some(input) = &self.object_input {
-                tree = tree.child(
-                    div()
-                        .px_1()
-                        .pb_1()
-                        .child(gpui_kit::component::input::Input::new(input).small()),
-                );
-            }
+        if let Some(input) = &self.object_input {
+            tree = tree.child(
+                div()
+                    .debug_selector(|| "conn-search".to_string())
+                    .px_1()
+                    .pb_1()
+                    .child(gpui_kit::component::input::Input::new(input).small()),
+            );
         }
 
         for folder in group_by_folder(&self.profiles) {
             let key = folder.key().to_string();
+            let label = folder.label().to_string();
+            // 未连接时树里只有连接本身，搜索词也作用在连接名 / 驱动 / 主机上；
+            // 已连接时对象另按同一个词过滤，所以**当前连接的节点必须留下** ——
+            // 否则搜「对象注释」会把宿主连接一起藏掉，命中项无处可挂。
+            let profiles: Vec<_> = folder
+                .profiles
+                .into_iter()
+                .filter(|profile| {
+                    filter.is_empty()
+                        || (connected && active_profile.as_deref() == Some(profile.id.as_str()))
+                        || profile.name.to_lowercase().contains(&filter)
+                        || profile
+                            .driver
+                            .display_name()
+                            .to_lowercase()
+                            .contains(&filter)
+                        || profile
+                            .host
+                            .as_deref()
+                            .is_some_and(|host| host.to_lowercase().contains(&filter))
+                })
+                .collect();
+            if !filter.is_empty() && profiles.is_empty() {
+                continue;
+            }
             let collapsed = self.collapsed_folders.contains(&key);
             let toggle_key = key.clone();
             tree = tree.child(
@@ -304,7 +319,7 @@ impl MainView {
                             .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_secondary))
                             .text_ellipsis()
-                            .child(SharedString::from(folder.label().to_string())),
+                            .child(SharedString::from(label)),
                     ),
             );
 
@@ -312,7 +327,7 @@ impl MainView {
                 continue;
             }
 
-            for profile in folder.profiles {
+            for profile in profiles {
                 let is_active = connected && active_profile.as_deref() == Some(profile.id.as_str());
                 let name = profile.name.clone();
                 let badge = profile.driver_badge();
@@ -895,10 +910,12 @@ impl MainView {
                     .border_color(hex(if active { t.accent } else { t.border_subtle }))
                     .cursor_pointer()
                     .hover(|s| s.bg(hex(t.bg_overlay)))
-                    .on_click(cx.listener(move |view, event: &gpui_kit::ClickEvent, _, cx| {
-                        view.history_menu = Some((event.position(), menu));
-                        cx.notify();
-                    }))
+                    .on_click(
+                        cx.listener(move |view, event: &gpui_kit::ClickEvent, _, cx| {
+                            view.history_menu = Some((event.position(), menu));
+                            cx.notify();
+                        }),
+                    )
                     .child(
                         div()
                             .text_size(px(crate::design::TS_CAPTION))
@@ -1093,6 +1110,11 @@ impl MainView {
                     .debug_selector(move || selector.clone())
                     .flex_1()
                     .min_w_0()
+                    // 名称与注释**同行**：`div()` 默认是纵向 flex，不加这行注释会被排到第二行，
+                    // 24px 行高放不下两行，于是注释要么看不见、要么和下一行叠在一起。
+                    .flex()
+                    .items_center()
+                    .gap_2()
                     .when(queryable, |el| el.cursor_pointer())
                     .on_click(cx.listener(move |view, _, window, cx| {
                         if queryable {
@@ -1100,18 +1122,27 @@ impl MainView {
                         }
                     }))
                     .child(
+                        // 名称不参与压缩：窄侧栏下先让注释让位，名称必须读得全。
                         div()
+                            .flex_none()
+                            .max_w(px(160.))
                             .text_size(px(crate::design::TS_CAPTION))
                             .text_color(hex(t.fg_primary))
                             .text_ellipsis()
+                            .overflow_hidden()
                             .child(SharedString::from(name.clone())),
                     )
                     .when_some(comment, |el, comment| {
+                        // 注释吃剩余空间并省略：之前它没有弹性约束，在行内被挤成 0 宽，
+                        // 于是「表的注释永远看不见」。
                         el.child(
                             div()
+                                .flex_1()
+                                .min_w_0()
                                 .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.fg_muted))
                                 .text_ellipsis()
+                                .overflow_hidden()
                                 .child(SharedString::from(comment)),
                         )
                     }),

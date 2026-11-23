@@ -2,6 +2,7 @@
 //! information_schema 元数据 + KILL QUERY 取消。
 
 use async_trait::async_trait;
+use mysql_async::consts::{ColumnFlags, ColumnType};
 use mysql_async::prelude::Queryable;
 use mysql_async::{Conn, OptsBuilder, Pool, PoolOpts, Row as MyRow, SslOpts, Value as MyValue};
 use parking_lot::Mutex;
@@ -361,9 +362,11 @@ impl Session for MySqlSession {
 
         let outcome = async {
             let mut result = conn.query_iter(&req.sql).await.map_err(map_mysql_error)?;
-            let columns: Vec<String> = result
+            // 列元数据按 `ColumnType` 还原：表头类型名、类型感知编辑、数值排序都靠它。
+            // 之前这里把每一列都硬编码成 `text`，导致 MySQL 上所有列都被当成字符串。
+            let column_meta: Vec<ColumnMeta> = result
                 .columns()
-                .map(|cols| cols.iter().map(|c| c.name_str().to_string()).collect())
+                .map(|cols| cols.iter().map(column_meta_of).collect())
                 .unwrap_or_default();
 
             let mut rows: Vec<Row> = Vec::new();
@@ -378,30 +381,22 @@ impl Session for MySqlSession {
                 }
                 let mut values = Vec::with_capacity(row.len());
                 for i in 0..row.len() {
-                    values.push(convert_value(row.as_ref(i)));
+                    let logical = column_meta.get(i).map(|meta| &meta.logical_type);
+                    values.push(convert_value(row.as_ref(i), logical));
                 }
                 rows.push(values);
             }
             drop(result);
             let affected = conn.affected_rows();
-            Ok::<_, DriverError>((columns, rows, affected, truncated))
+            Ok::<_, DriverError>((column_meta, rows, affected, truncated))
         }
         .await;
 
         *self.active_query.lock() = None;
-        let (columns, rows, affected, truncated) = outcome?;
+        let (column_meta, rows, affected, truncated) = outcome?;
 
-        let has_columns = !columns.is_empty();
-        let column_meta: Arc<[ColumnMeta]> = columns
-            .into_iter()
-            .map(|name| ColumnMeta {
-                name: Arc::from(name),
-                logical_type: LogicalType::Unknown("text".into()),
-                native_type: "text".into(),
-                nullable: true,
-            })
-            .collect::<Vec<_>>()
-            .into();
+        let has_columns = !column_meta.is_empty();
+        let column_meta: Arc<[ColumnMeta]> = column_meta.into();
 
         let mut warnings = Vec::new();
         if truncated {
@@ -482,15 +477,148 @@ impl Session for MySqlSession {
     }
 }
 
-fn convert_value(value: Option<&MyValue>) -> Value {
+/// MySQL 列类型 → （逻辑类型，原生类型名）。
+///
+/// 这是 MySQL 侧唯一一处「列类型事实来源」：表头的类型标签、类型感知编辑、
+/// 数值排序都从 `logical_type` 出发。之前整列硬编码成 `text`，后果是
+/// `id` 列升序排成 `1, 10, 11, …, 2, 20`（字典序）。
+///
+/// `binary` 指列的字符集是 `binary`（63）：MySQL 的 `TEXT` 列同样报
+/// `MYSQL_TYPE_BLOB`，只能靠字符集区分「文本大字段」和「二进制大字段」。
+fn map_column_type(ty: ColumnType, unsigned: bool, binary: bool) -> (LogicalType, &'static str) {
+    use ColumnType::*;
+    match ty {
+        MYSQL_TYPE_TINY => (LogicalType::Int { bits: 8, unsigned }, "TINYINT"),
+        MYSQL_TYPE_SHORT => (LogicalType::Int { bits: 16, unsigned }, "SMALLINT"),
+        MYSQL_TYPE_INT24 => (LogicalType::Int { bits: 24, unsigned }, "MEDIUMINT"),
+        MYSQL_TYPE_LONG => (LogicalType::Int { bits: 32, unsigned }, "INT"),
+        MYSQL_TYPE_LONGLONG => (LogicalType::Int { bits: 64, unsigned }, "BIGINT"),
+        MYSQL_TYPE_YEAR => (
+            LogicalType::Int {
+                bits: 16,
+                unsigned: false,
+            },
+            "YEAR",
+        ),
+        MYSQL_TYPE_FLOAT => (LogicalType::Float { bits: 32 }, "FLOAT"),
+        MYSQL_TYPE_DOUBLE => (LogicalType::Float { bits: 64 }, "DOUBLE"),
+        // 定点数留住精度：显示/排序都按十进制字符串处理，绝不转 f64。
+        MYSQL_TYPE_DECIMAL | MYSQL_TYPE_NEWDECIMAL => (
+            LogicalType::Decimal {
+                precision: None,
+                scale: None,
+            },
+            "DECIMAL",
+        ),
+        MYSQL_TYPE_DATE | MYSQL_TYPE_NEWDATE => (LogicalType::Date, "DATE"),
+        MYSQL_TYPE_TIME | MYSQL_TYPE_TIME2 => (LogicalType::Time, "TIME"),
+        MYSQL_TYPE_DATETIME | MYSQL_TYPE_DATETIME2 => (LogicalType::Timestamp, "DATETIME"),
+        MYSQL_TYPE_TIMESTAMP | MYSQL_TYPE_TIMESTAMP2 => (LogicalType::Timestamp, "TIMESTAMP"),
+        MYSQL_TYPE_JSON => (LogicalType::Json, "JSON"),
+        MYSQL_TYPE_BIT => (LogicalType::Bytes, "BIT"),
+        MYSQL_TYPE_GEOMETRY => (LogicalType::Bytes, "GEOMETRY"),
+        MYSQL_TYPE_VECTOR => (LogicalType::Bytes, "VECTOR"),
+        // TEXT 与 BLOB 共用 MYSQL_TYPE_BLOB，靠字符集分流。
+        MYSQL_TYPE_TINY_BLOB | MYSQL_TYPE_MEDIUM_BLOB | MYSQL_TYPE_LONG_BLOB | MYSQL_TYPE_BLOB => {
+            if binary {
+                (LogicalType::Bytes, "BLOB")
+            } else {
+                (LogicalType::Text { max_len: None }, "TEXT")
+            }
+        }
+        MYSQL_TYPE_STRING | MYSQL_TYPE_VAR_STRING | MYSQL_TYPE_VARCHAR => {
+            if binary {
+                (LogicalType::Bytes, "VARBINARY")
+            } else {
+                (LogicalType::Text { max_len: None }, "VARCHAR")
+            }
+        }
+        MYSQL_TYPE_ENUM => (LogicalType::Text { max_len: None }, "ENUM"),
+        MYSQL_TYPE_SET => (LogicalType::Text { max_len: None }, "SET"),
+        MYSQL_TYPE_NULL => (LogicalType::Unknown("NULL".into()), "NULL"),
+        MYSQL_TYPE_TYPED_ARRAY | MYSQL_TYPE_UNKNOWN => {
+            (LogicalType::Unknown("text".into()), "TEXT")
+        }
+    }
+}
+
+/// 字符集 63 是 MySQL 的 `binary`：用它区分「文本」与「字节」。
+const MYSQL_BINARY_CHARSET: u16 = 63;
+
+fn column_meta_of(column: &mysql_async::Column) -> ColumnMeta {
+    let flags = column.flags();
+    let unsigned = flags.contains(ColumnFlags::UNSIGNED_FLAG);
+    let binary = column.character_set() == MYSQL_BINARY_CHARSET;
+    let (logical_type, native) = map_column_type(column.column_type(), unsigned, binary);
+    ColumnMeta {
+        name: Arc::from(column.name_str().as_ref()),
+        logical_type,
+        native_type: native.into(),
+        // 计算结果集里 MySQL 不一定回填 NOT_NULL，缺省按可空处理（宁可多让改一次）。
+        nullable: !flags.contains(ColumnFlags::NOT_NULL_FLAG),
+    }
+}
+
+/// 把协议层的一个值转成 `Value`。
+///
+/// `query_iter` 走的是**文本协议**：整数、定点数、日期在线上都是字节串。
+/// 光看字节没法区分 `1`（INT）和 `"1"`（VARCHAR），所以必须借列的逻辑类型还原，
+/// 否则排序退化成字典序、编辑器也做不了类型校验。
+fn convert_value(value: Option<&MyValue>, logical: Option<&LogicalType>) -> Value {
+    /// 文本协议下的字节串按列类型还原；还原失败一律退回文本，不丢数据。
+    fn coerce(text: &str, logical: Option<&LogicalType>) -> Value {
+        let Some(logical) = logical else {
+            return Value::Text(Arc::from(text));
+        };
+        match logical {
+            LogicalType::Bool => match text {
+                "0" => Value::Bool(false),
+                "1" => Value::Bool(true),
+                _ => Value::Text(Arc::from(text)),
+            },
+            LogicalType::Int { unsigned, .. } => {
+                if *unsigned {
+                    text.parse::<u64>()
+                        .map(Value::UInt)
+                        .unwrap_or_else(|_| Value::Text(Arc::from(text)))
+                } else {
+                    text.parse::<i64>()
+                        .map(Value::Int)
+                        .unwrap_or_else(|_| Value::Text(Arc::from(text)))
+                }
+            }
+            LogicalType::Float { .. } => text
+                .parse::<f64>()
+                .map(Value::Float)
+                .unwrap_or_else(|_| Value::Text(Arc::from(text))),
+            LogicalType::Decimal { .. } => Value::Decimal(Arc::from(text)),
+            LogicalType::Date => parse_date(text)
+                .map(Value::Date)
+                .unwrap_or_else(|| invalid_temporal("DATE", text)),
+            LogicalType::Time => parse_time(text)
+                .map(Value::Time)
+                .unwrap_or_else(|| invalid_temporal("TIME", text)),
+            LogicalType::Timestamp | LogicalType::TimestampTz => parse_timestamp(text)
+                .map(Value::Timestamp)
+                .unwrap_or_else(|| invalid_temporal("DATETIME", text)),
+            LogicalType::Json => Value::Json(Arc::from(text)),
+            LogicalType::Bytes => Value::Bytes(Arc::from(text.as_bytes())),
+            _ => Value::Text(Arc::from(text)),
+        }
+    }
+
     match value {
         None | Some(MyValue::NULL) => Value::Null,
         Some(MyValue::Int(v)) => Value::Int(*v),
         Some(MyValue::UInt(v)) => Value::UInt(*v),
         Some(MyValue::Float(v)) => Value::Float(*v as f64),
         Some(MyValue::Double(v)) => Value::Float(*v),
+        // BLOB / VARBINARY / BIT 原样保留字节：合法 UTF-8 也不当文本，否则 0x01 会变成控制字符。
+        Some(MyValue::Bytes(bytes)) if matches!(logical, Some(LogicalType::Bytes)) => {
+            Value::Bytes(Arc::from(bytes.as_slice()))
+        }
         Some(MyValue::Bytes(bytes)) => match std::str::from_utf8(bytes) {
-            Ok(text) => Value::Text(Arc::from(text.to_string())),
+            Ok(text) => coerce(text, logical),
             Err(_) => Value::Bytes(Arc::from(bytes.as_slice())),
         },
         Some(MyValue::Date(y, m, d, h, mi, s, us)) => {
@@ -510,11 +638,32 @@ fn convert_value(value: Option<&MyValue>) -> Value {
         }
         Some(MyValue::Time(neg, days, h, mi, s, us)) => {
             let sign = if *neg { "-" } else { "" };
-            Value::Text(Arc::from(format!(
-                "{sign}{days}d {h:02}:{mi:02}:{s:02}.{us:06}"
-            )))
+            let text = format!("{sign}{days}d {h:02}:{mi:02}:{s:02}.{us:06}");
+            coerce(&text, logical)
         }
     }
+}
+
+/// 无法解析的日期 / 时间：保留原文并标成未知类型，绝不静默改值。
+fn invalid_temporal(native_type: &str, text: &str) -> Value {
+    Value::Unknown {
+        native_type: native_type.to_string(),
+        text: Arc::from(text),
+    }
+}
+
+fn parse_date(text: &str) -> Option<chrono::NaiveDate> {
+    chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d").ok()
+}
+
+fn parse_time(text: &str) -> Option<chrono::NaiveTime> {
+    chrono::NaiveTime::parse_from_str(text, "%H:%M:%S%.f").ok()
+}
+
+fn parse_timestamp(text: &str) -> Option<chrono::NaiveDateTime> {
+    chrono::NaiveDateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S%.f")
+        .ok()
+        .or_else(|| parse_date(text).and_then(|date| date.and_hms_opt(0, 0, 0)))
 }
 
 struct MySqlMetadata {
@@ -551,9 +700,15 @@ impl MetadataProvider for MySqlMetadata {
             return Ok(Vec::new());
         };
         let mut conn = self.pool.get_conn().await.map_err(map_mysql_error)?;
+        // 注释 / 行数估计一起取：对象树要靠它们显示副标题与行数。
+        // 之前只查了表名和类型，`comment` 恒为 None ⇒ 侧栏的注释永远不显示。
+        //
+        // 注意别在这里加「是否存在主键」的相关子查询：`information_schema.statistics`
+        // 很大，36 张表就能把对象列表拖到十几秒（实测会一直转骨架屏）。
         let rows: Vec<MyRow> = conn
             .exec(
-                "SELECT table_name, table_type FROM information_schema.tables \
+                "SELECT table_name, table_type, table_comment, table_rows \
+                 FROM information_schema.tables \
                  WHERE table_schema = ? ORDER BY table_name",
                 (schema.clone(),),
             )
@@ -564,6 +719,15 @@ impl MetadataProvider for MySqlMetadata {
         for row in rows {
             let name: String = row.get(0).unwrap_or_default();
             let table_type: String = row.get(1).unwrap_or_default();
+            // 一律走 `get_opt`：mysql_common 的 `Row::get::<u64>` 遇到 NULL 会 panic
+            // （视图的 table_rows 就是 NULL），而这里跑在 db 工作线程上，panic 之后
+            // 界面只会一直停在骨架屏，排查成本极高。
+            let comment: Option<String> = row
+                .get_opt::<String, _>(2)
+                .and_then(|text| text.ok())
+                .and_then(|text| (!text.trim().is_empty()).then_some(text));
+            // InnoDB 的 table_rows 是估算值，视图为 NULL。
+            let row_estimate: Option<u64> = row.get_opt::<u64, _>(3).and_then(|value| value.ok());
             let kind = if table_type.contains("VIEW") {
                 ObjectKind::View
             } else {
@@ -574,8 +738,9 @@ impl MetadataProvider for MySqlMetadata {
             }
             out.push(ObjectSummary {
                 path: ObjectPath::new(ns.clone(), name, kind),
-                row_estimate: None,
-                comment: None,
+                row_estimate,
+                comment,
+                // 主键探测成本太高（见上），交给 `columns()` 按需回答。
                 has_primary_key: None,
             });
         }
@@ -1105,10 +1270,133 @@ mod tests {
 
     #[test]
     fn zero_dates_are_preserved_instead_of_becoming_epoch() {
-        let value = convert_value(Some(&MyValue::Date(0, 0, 0, 0, 0, 0, 0)));
+        let value = convert_value(Some(&MyValue::Date(0, 0, 0, 0, 0, 0, 0)), None);
         match value {
             Value::Unknown { text, .. } => assert!(text.starts_with("0000-00-00")),
             other => panic!("零日期应保留原文，实际 {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod column_type_tests {
+    use super::*;
+    use chrono::{Datelike, Timelike};
+
+    fn logical(ty: ColumnType, unsigned: bool) -> LogicalType {
+        map_column_type(ty, unsigned, false).0
+    }
+
+    /// 回归：结果列曾一律被标成 `text`，导致 `id` 升序排成 1,10,11,…,2,20。
+    #[test]
+    fn numeric_columns_map_to_numeric_logical_types() {
+        assert!(matches!(
+            logical(ColumnType::MYSQL_TYPE_LONG, false),
+            LogicalType::Int { bits: 32, .. }
+        ));
+        assert!(matches!(
+            logical(ColumnType::MYSQL_TYPE_LONGLONG, true),
+            LogicalType::Int { bits: 64, .. }
+        ));
+        assert!(matches!(
+            logical(ColumnType::MYSQL_TYPE_NEWDECIMAL, false),
+            LogicalType::Decimal { .. }
+        ));
+        assert!(matches!(
+            logical(ColumnType::MYSQL_TYPE_DOUBLE, false),
+            LogicalType::Float { bits: 64 }
+        ));
+        assert!(matches!(
+            logical(ColumnType::MYSQL_TYPE_DATETIME, false),
+            LogicalType::Timestamp
+        ));
+        assert!(matches!(
+            logical(ColumnType::MYSQL_TYPE_JSON, false),
+            LogicalType::Json
+        ));
+        assert!(matches!(
+            logical(ColumnType::MYSQL_TYPE_VAR_STRING, false),
+            LogicalType::Text { .. }
+        ));
+    }
+
+    fn text(v: &str) -> MyValue {
+        MyValue::Bytes(v.as_bytes().to_vec())
+    }
+
+    /// 文本协议下整列都是字节串，靠列类型还原。
+    #[test]
+    fn text_protocol_values_are_coerced_by_column_type() {
+        let int_ty = LogicalType::Int {
+            bits: 32,
+            unsigned: false,
+        };
+        assert_eq!(
+            convert_value(Some(&text("42")), Some(&int_ty)),
+            Value::Int(42)
+        );
+        // 同一串 "42" 在 VARCHAR 列必须还是文本，不能被当成数字。
+        let text_ty = LogicalType::Text { max_len: None };
+        assert_eq!(
+            convert_value(Some(&text("42")), Some(&text_ty)),
+            Value::Text(Arc::from("42"))
+        );
+        assert_eq!(
+            convert_value(
+                Some(&text("12.30")),
+                Some(&LogicalType::Decimal {
+                    precision: None,
+                    scale: None
+                })
+            ),
+            Value::Decimal(Arc::from("12.30")),
+            "定点数必须原样保留，不能转 f64"
+        );
+        assert_eq!(
+            convert_value(Some(&text("{\"k\": 1}")), Some(&LogicalType::Json)),
+            Value::Json(Arc::from("{\"k\": 1}"))
+        );
+        match convert_value(Some(&text("2024-01-02")), Some(&LogicalType::Date)) {
+            Value::Date(date) => {
+                assert_eq!((date.year(), date.month(), date.day()), (2024, 1, 2))
+            }
+            other => panic!("DATE 列应还原成日期，实际 {other:?}"),
+        }
+        match convert_value(
+            Some(&text("2024-01-02 03:04:05.5")),
+            Some(&LogicalType::Timestamp),
+        ) {
+            Value::Timestamp(ts) => {
+                assert_eq!((ts.hour(), ts.minute(), ts.second()), (3, 4, 5))
+            }
+            other => panic!("DATETIME 列应还原成时间戳，实际 {other:?}"),
+        }
+        // 超范围 TIME（MySQL 允许到 838 小时）还原失败时保原文，不静默清零。
+        match convert_value(Some(&text("838:59:59")), Some(&LogicalType::Time)) {
+            Value::Unknown { text, .. } => assert_eq!(text.as_ref(), "838:59:59"),
+            other => panic!("超范围 TIME 应保留原文，实际 {other:?}"),
+        }
+    }
+
+    /// MySQL 的 TEXT 与 BLOB 都报 MYSQL_TYPE_BLOB，只能靠字符集分流：
+    /// 分错就会把长文本渲染成十六进制，或把二进制当文本显示控制字符。
+    #[test]
+    fn text_and_blob_are_distinguished_by_charset() {
+        let (text_ty, text_native) = map_column_type(ColumnType::MYSQL_TYPE_BLOB, false, false);
+        assert!(
+            matches!(text_ty, LogicalType::Text { .. }),
+            "TEXT 列应是文本"
+        );
+        assert_eq!(text_native, "TEXT");
+        let (blob_ty, blob_native) = map_column_type(ColumnType::MYSQL_TYPE_BLOB, false, true);
+        assert_eq!(blob_ty, LogicalType::Bytes, "binary 字符集的 BLOB 应是字节");
+        assert_eq!(blob_native, "BLOB");
+    }
+
+    /// 二进制列即使内容是合法 UTF-8，也不能被当文本（否则 0x01 会变控制字符）。
+    #[test]
+    fn binary_columns_keep_raw_bytes() {
+        let value = convert_value(Some(&text("A")), Some(&LogicalType::Bytes));
+        assert_eq!(value, Value::Bytes(Arc::from(b"A".as_slice())));
     }
 }

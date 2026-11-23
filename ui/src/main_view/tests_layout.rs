@@ -318,12 +318,20 @@ fn server_label_drops_build_noise() {
 
 #[gpui_kit::test]
 fn connection_tree_groups_and_collapses(cx: &mut gpui_kit::TestAppContext) {
+    // `RUSTDB_DEV_DB` 是进程级环境变量：不还原会污染同一进程里后续所有用例
+    // （它们的 `Core::new` 会多出 dev-postgres / dev-mysql，把侧栏树撑高）。
+    let previous = std::env::var_os("RUSTDB_DEV_DB");
     std::env::set_var("RUSTDB_DEV_DB", "1");
     cx.update(|cx| {
         gpui_kit::component::init(cx);
         crate::theme::apply_theme_mode(cx, rustdb_core::theme::ThemeMode::Dark);
     });
     let core = rustdb_core::Core::new(rustdb_db_api::DriverRegistry::new());
+    // 示例配置在 `Core::new` 里就已经展开，后续用例不该再看到这两条。
+    match previous {
+        Some(value) => std::env::set_var("RUSTDB_DEV_DB", value),
+        None => std::env::remove_var("RUSTDB_DEV_DB"),
+    }
     let (_, vcx) = cx.add_window_view(move |window, cx| {
         let view = cx.new(|cx| MainView::new(window, cx, core));
         gpui_kit::component::Root::new(view, window, cx)
@@ -1792,7 +1800,11 @@ fn editor_splitter_drag_persists_height(cx: &mut gpui_kit::TestAppContext) {
         x: start.x,
         y: start.y + px(80.),
     };
-    vcx.simulate_mouse_down(start, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    vcx.simulate_mouse_down(
+        start,
+        gpui_kit::MouseButton::Left,
+        gpui_kit::Modifiers::default(),
+    );
     vcx.run_until_parked();
     vcx.simulate_mouse_move(
         end,
@@ -1812,7 +1824,11 @@ fn editor_splitter_drag_persists_height(cx: &mut gpui_kit::TestAppContext) {
         gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
-    vcx.simulate_mouse_up(further, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    vcx.simulate_mouse_up(
+        further,
+        gpui_kit::MouseButton::Left,
+        gpui_kit::Modifiers::default(),
+    );
     vcx.run_until_parked();
 
     let after = f32::from(

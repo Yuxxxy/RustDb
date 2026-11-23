@@ -117,6 +117,13 @@ impl MainView {
             let cell_w = fixed
                 .map(|width| width - COL_HANDLE_W - COL_FILTER_W)
                 .unwrap_or(0.);
+            // 窄列优先保列名：类型标签是辅助信息，列名读不出来就完全没法认列。
+            // 列宽用与拖拽同一套估算（`col_display_width`）；尚未完成首帧布局时
+            // 视口宽为 0，此时先按「有空间」处理，避免标签闪一下又消失。
+            let show_type = {
+                let viewport = self.grid_viewport_width();
+                viewport <= 0. || self.col_display_width(result, index) >= TYPE_LABEL_MIN_W
+            };
             let title = h_flex()
                 .id(SharedString::from(format!("header-{index}")))
                 .debug_selector({
@@ -142,6 +149,7 @@ impl MainView {
                         .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                         .text_color(hex(if is_new_value { t.accent } else { t.fg_primary }))
                         .text_ellipsis()
+                        .overflow_hidden()
                         .child(
                             h_flex()
                                 .w_full()
@@ -149,19 +157,31 @@ impl MainView {
                                 .items_center()
                                 .gap_1()
                                 .child(
-                                    div().flex_1().min_w_0().text_ellipsis().child(
-                                        SharedString::from(format!("{}{marker}", column.name)),
-                                    ),
-                                )
-                                .child(
                                     div()
-                                        .flex_none()
-                                        .text_size(px(crate::design::TS_CAPTION))
-                                        .text_color(hex(t.fg_muted))
-                                        .child(SharedString::from(
-                                            column.native_type.chars().take(6).collect::<String>(),
-                                        )),
-                                ),
+                                        .flex_1()
+                                        .min_w_0()
+                                        .text_ellipsis()
+                                        .overflow_hidden()
+                                        .child(SharedString::from(format!(
+                                            "{}{marker}",
+                                            column.name
+                                        ))),
+                                )
+                                .when(show_type, |el| {
+                                    el.child(
+                                        div()
+                                            .flex_none()
+                                            .text_size(px(crate::design::TS_CAPTION))
+                                            .text_color(hex(t.fg_muted))
+                                            .child(SharedString::from(
+                                                column
+                                                    .native_type
+                                                    .chars()
+                                                    .take(6)
+                                                    .collect::<String>(),
+                                            )),
+                                    )
+                                }),
                         ),
                 );
             let title = match fixed {
@@ -191,12 +211,12 @@ impl MainView {
                         .border_b_1()
                         .border_color(hex(t.border_subtle))
                         .hover(|s| s.bg(hex(t.bg_overlay)))
-                        .on_click(
-                            cx.listener(move |view, event: &gpui_kit::ClickEvent, window, cx| {
+                        .on_click(cx.listener(
+                            move |view, event: &gpui_kit::ClickEvent, window, cx| {
                                 cx.stop_propagation();
                                 view.open_filter(index, event.position(), window, cx);
-                            }),
-                        )
+                            },
+                        ))
                         .child(
                             Icon::new(IconName::Funnel)
                                 .small()
@@ -220,14 +240,16 @@ impl MainView {
                         .hover(|s| s.bg(hex(t.bg_overlay)))
                         .on_mouse_down(
                             gpui_kit::MouseButton::Left,
-                            cx.listener(move |view, event: &gpui_kit::MouseDownEvent, window, cx| {
-                                // 双击分隔线自适应列宽，单击进入拖拽。
-                                if event.click_count >= 2 {
-                                    view.fit_column(index, window, cx);
-                                } else {
-                                    view.begin_col_resize(index, event.position.x, cx);
-                                }
-                            }),
+                            cx.listener(
+                                move |view, event: &gpui_kit::MouseDownEvent, window, cx| {
+                                    // 双击分隔线自适应列宽，单击进入拖拽。
+                                    if event.click_count >= 2 {
+                                        view.fit_column(index, window, cx);
+                                    } else {
+                                        view.begin_col_resize(index, event.position.x, cx);
+                                    }
+                                },
+                            ),
                         )
                         // 拖出网格再松手时，靠这个收尾。
                         .on_mouse_up_out(
@@ -325,6 +347,9 @@ impl MainView {
                             .text_color(hex(if null { t.fg_muted } else { t.fg_primary }))
                             .when(null, |d| d.italic())
                             .text_ellipsis()
+                            // `text_ellipsis()` 只设 text-overflow，不裁剪溢出盒：长文本 / JSON 会
+                            // 画到相邻列上去（实测 tc_emp.profile 与 memo 互相重叠）。补 overflow_hidden。
+                            .overflow_hidden()
                             .hover(|s| s.bg(hex(t.bg_overlay)))
                             .when(selected, |d| {
                                 // 淡填充 + 高对比描边：单纯提高填充会压低文字对比度。
@@ -333,9 +358,11 @@ impl MainView {
                             // 按下开始拖拽选区；Shift 点击在 click 里扩选，避免覆盖锚点。
                             .on_mouse_down(
                                 gpui_kit::MouseButton::Left,
-                                cx.listener(move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
-                                    view.begin_grid_drag(row_index, col, event, cx);
-                                }),
+                                cx.listener(
+                                    move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
+                                        view.begin_grid_drag(row_index, col, event, cx);
+                                    },
+                                ),
                             )
                             .on_mouse_move(cx.listener(move |view, _, _, cx| {
                                 view.extend_grid_drag(row_index, col, cx);
@@ -701,9 +728,11 @@ impl MainView {
                     .on_scroll(cx.listener(|view, event: &gpui_kit::ScrollEvent, _, cx| {
                         view.scroll_grid_h(event, cx);
                     }))
-                    .on_mouse_move(cx.listener(|view, event: &gpui_kit::MouseMoveEvent, _, cx| {
-                        view.drag_col_resize(event, cx);
-                    }))
+                    .on_mouse_move(
+                        cx.listener(|view, event: &gpui_kit::MouseMoveEvent, _, cx| {
+                            view.drag_col_resize(event, cx);
+                        }),
+                    )
                     .on_mouse_up(
                         gpui_kit::MouseButton::Left,
                         cx.listener(|view, _, _, cx| view.end_col_resize(cx)),

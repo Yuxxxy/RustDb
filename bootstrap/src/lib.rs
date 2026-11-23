@@ -49,5 +49,37 @@ pub fn build_core() -> Arc<Core> {
 
 /// 以指定仓库组装 `Core`（CLI 用 `--connections` 指向别的配置文件）。
 pub fn build_core_with(profiles: ProfileStore, history: HistoryStore) -> Arc<Core> {
+    init_crypto();
     Core::with_config(driver_registry(), history, profiles)
+}
+
+/// 安装进程级 rustls `CryptoProvider`（幂等）。
+///
+/// rustls 0.23 起 TLS 客户端必须显式选 provider：本工程按 `aws-lc-rs` 编译
+/// （见 workspace `Cargo.toml`，与 SQL Server / Oracle 共用同一 provider），
+/// 但 **没有任何地方调用过 `install_default()`**。后果是 MySQL / PostgreSQL 第一次
+/// 建 TLS 时在 `rustls::crypto` 里 panic：
+/// 「Could not automatically determine the process-level CryptoProvider」，
+/// 而连接跑在 `rustdb-db` 工作线程上 —— 主线程只看到「等待超时」，排查成本极高。
+/// 放在组合根而不是各驱动里：桌面端与 CLI 都只经 `build_core*` 起步，装一次就够。
+pub fn init_crypto() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 护栏：`build_core` 之后进程里必须已经装好 rustls provider。
+    ///
+    /// 没有它，任何走 TLS 的连接（MySQL / PostgreSQL / SQL Server）第一次握手就会
+    /// 在工作线程里 panic，而调用方只看到「等待超时」——实测就是这么丢了一轮排查时间。
+    #[test]
+    fn build_core_installs_rustls_provider() {
+        init_crypto();
+        assert!(
+            rustls::crypto::CryptoProvider::get_default().is_some(),
+            "进程级 CryptoProvider 未安装：TLS 连接会在 rustls::crypto 里 panic"
+        );
+    }
 }

@@ -481,8 +481,11 @@ pub fn extract_set_directives(sql: &str) -> (String, Vec<SetDirective>) {
     let mut directives = Vec::new();
     for (idx, line) in sql.split_inclusive('\n').enumerate() {
         let trimmed = line.trim();
-        let is_set = trimmed.len() >= 4
-            && trimmed[..4].eq_ignore_ascii_case("@set")
+        // 关键字比较走字节：`trimmed[..4]` 在行首是多字节字符时会切在字符中间直接 panic
+        // （与 `script.rs::strip_directive` 同一类缺陷）。ASCII 命中即保证 4 在边界上。
+        let bytes = trimmed.as_bytes();
+        let is_set = bytes.len() >= 4
+            && bytes[..4].eq_ignore_ascii_case(b"@set")
             && trimmed[4..]
                 .chars()
                 .next()
@@ -633,6 +636,16 @@ mod tests {
         assert_eq!(directives[0].line, 1);
         assert_eq!(directives[1].line, 3);
         assert_eq!(directives[1].value, ParamValue::Text("'hi there'".into()));
+    }
+
+    /// 回归：行首多字节字符不能让 `trimmed[..4]` 切在字符中间。
+    #[test]
+    fn set_directive_scan_survives_multibyte_lines() {
+        let sql = "中文行\n@set id = 7\nSELECT '中文', ${id}\n";
+        let (cleaned, directives) = extract_set_directives(sql);
+        assert_eq!(directives.len(), 1);
+        assert_eq!(directives[0].name, "id");
+        assert_eq!(cleaned.lines().count(), sql.lines().count());
     }
 
     #[test]

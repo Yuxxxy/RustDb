@@ -3,21 +3,23 @@
 //! 布局参数与 RustShell 对齐：标题栏 28px、活动栏 38.4px、卡片间距 6px、圆角 8px。
 
 use crate::theme::{current, to_hsla as hex};
+use gpui_kit::assets::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::combobox::{Combobox, ComboboxEvent, ComboboxState};
+use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent};
+use gpui_kit::component::scroll::ScrollableElement as _;
+use gpui_kit::component::searchable_list::SearchableVec;
+use gpui_kit::component::Disableable as _;
+use gpui_kit::component::ElementExt as _;
+use gpui_kit::component::RopeExt as _;
+use gpui_kit::component::Selectable as _;
+use gpui_kit::component::{h_flex, v_flex, Icon, Sizable as _, Size, TitleBar};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     anchored, div, px, uniform_list, App, AppContext as _, ClipboardItem, Context, FocusHandle,
     Focusable, InteractiveElement as _, IntoElement, ParentElement as _, PathPromptOptions, Point,
     Render, SharedString, StatefulInteractiveElement as _, Styled as _, Window,
 };
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent};
-use gpui_kit::component::scroll::ScrollableElement as _;
-use gpui_kit::component::Disableable as _;
-use gpui_kit::component::ElementExt as _;
-use gpui_kit::component::RopeExt as _;
-use gpui_kit::component::Selectable as _;
-use gpui_kit::component::{h_flex, v_flex, Icon, Sizable as _, Size, TitleBar};
-use gpui_kit::assets::IconName;
 use rustdb_core::docs::DocInput;
 use rustdb_core::history::{HistoryFilter, HistorySource};
 use rustdb_core::import::{self, ImportOptions, ImportPlan, ParsedData};
@@ -130,6 +132,8 @@ const MAX_COL_W: f32 = 640.;
 const COL_HANDLE_W: f32 = 6.;
 /// 表头筛选按钮的宽度。
 const COL_FILTER_W: f32 = 16.;
+/// 列宽低于此值时表头只显示列名、隐藏类型标签（列名优先于类型）。
+const TYPE_LABEL_MIN_W: f32 = 96.;
 /// 表数据分页的页大小选项（循环切换，回到第 1 页）。
 const PAGE_SIZE_CHOICES: [u32; 4] = [100, 200, 500, 1000];
 /// 结果网格行高由 `LayoutSettings::grid_density` 决定（虚拟列表要求等行高）。
@@ -191,7 +195,11 @@ impl PanelKind {
 /// `resizable_panel().size(..)` 只在首次布局生效，同一个 id 下换面板会共用旧宽度；
 /// 而面板组的 slot 是按位置存的，列数一变就会张冠李戴。两个维度都进 key，
 /// 换面板或折叠列时新 state 首帧直接按当前配置布局。
-fn layout_split_id(panel: PanelKind, sidebar_visible: bool, ai_visible: bool) -> gpui_kit::ElementId {
+fn layout_split_id(
+    panel: PanelKind,
+    sidebar_visible: bool,
+    ai_visible: bool,
+) -> gpui_kit::ElementId {
     gpui_kit::ElementId::Name(SharedString::from(format!(
         "main-split:{}:{}{}",
         panel.key(),
@@ -471,13 +479,19 @@ pub(crate) struct ExchangePanel {
     message: Option<(String, bool)>,
 }
 
+/// F-02：驱动下拉框的状态（可搜索单选 combobox，条目是驱动的显示名）。
+type DriverSelect = ComboboxState<SearchableVec<&'static str>>;
+
 /// F-02：连接编辑器（新建 / 编辑连接配置）。
 struct ConnEditor {
     /// 正在编辑的配置 id；`None` 表示新建。
     id: Option<String>,
     name: gpui_kit::Entity<gpui_kit::component::input::InputState>,
-    folder: gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    /// 原分组：界面不再提供输入框，编辑时原样保留，新建时为 `None`。
+    folder: Option<String>,
     driver: DbKind,
+    /// 驱动下拉框（可搜索）：界面上是唯一的驱动入口，选中项写回 `driver`。
+    driver_select: gpui_kit::Entity<DriverSelect>,
     host: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     port: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     database: gpui_kit::Entity<gpui_kit::component::input::InputState>,
@@ -742,12 +756,16 @@ fn exchange_check(checked: bool, t: &rustdb_core::theme::ThemeTokens) -> gpui_ki
 }
 
 /// 连接编辑器里的一行：标签 + 输入框。
+///
+/// 输入框统一 `small()` 高度（28px 行高的紧凑表单）：新建连接一屏能放下全部字段，
+/// 不再需要滚动。`conn-field-{label}` 供布局用例量高度。
 fn conn_field(
     t: &rustdb_core::theme::ThemeTokens,
     label: &str,
     input: &gpui_kit::Entity<gpui_kit::component::input::InputState>,
     width: gpui_kit::Pixels,
 ) -> gpui_kit::AnyElement {
+    let selector = format!("conn-field-{label}");
     h_flex()
         .items_center()
         .gap_2()
@@ -761,7 +779,8 @@ fn conn_field(
         .child(
             div()
                 .w(width)
-                .child(gpui_kit::component::input::Input::new(input)),
+                .debug_selector(move || selector.clone())
+                .child(gpui_kit::component::input::Input::new(input).small()),
         )
         .into_any_element()
 }
@@ -2338,7 +2357,10 @@ pub struct MainView {
     /// 历史面板是否展开。
     ai_history_open: bool,
     /// 重命名会话：(会话 id, 输入框)。
-    ai_rename: Option<(String, gpui_kit::Entity<gpui_kit::component::input::InputState>)>,
+    ai_rename: Option<(
+        String,
+        gpui_kit::Entity<gpui_kit::component::input::InputState>,
+    )>,
     /// 待确认的工具调用：(run_id, call_id, tool, summary)。
     ai_pending: Option<(String, String, String, String)>,
     ai_running: bool,
@@ -2472,7 +2494,10 @@ fn doc_table_separator(cells: &[String]) -> bool {
             .all(|cell| !cell.is_empty() && cell.chars().all(|ch| matches!(ch, '-' | ':')))
 }
 
-fn render_doc_table(rows: &[Vec<String>], t: &rustdb_core::theme::ThemeTokens) -> gpui_kit::AnyElement {
+fn render_doc_table(
+    rows: &[Vec<String>],
+    t: &rustdb_core::theme::ThemeTokens,
+) -> gpui_kit::AnyElement {
     let columns = rows.iter().map(Vec::len).max().unwrap_or(0);
     let mut table = v_flex()
         .w_full()
@@ -2511,7 +2536,10 @@ fn render_doc_table(rows: &[Vec<String>], t: &rustdb_core::theme::ThemeTokens) -
     table.into_any_element()
 }
 
-fn render_doc_markdown(markdown: &str, t: &rustdb_core::theme::ThemeTokens) -> gpui_kit::AnyElement {
+fn render_doc_markdown(
+    markdown: &str,
+    t: &rustdb_core::theme::ThemeTokens,
+) -> gpui_kit::AnyElement {
     let mut body = v_flex().gap(px(1.));
     let lines: Vec<&str> = markdown.lines().collect();
     let mut index = 0;
@@ -2551,7 +2579,12 @@ fn render_doc_markdown(markdown: &str, t: &rustdb_core::theme::ThemeTokens) -> g
                 t.fg_primary,
             )
         } else if let Some(rest) = trimmed.strip_prefix("# ") {
-            (rest.to_string(), 14., gpui_kit::FontWeight::BOLD, t.fg_primary)
+            (
+                rest.to_string(),
+                14.,
+                gpui_kit::FontWeight::BOLD,
+                t.fg_primary,
+            )
         } else if let Some(rest) = trimmed.strip_prefix("> ") {
             (
                 format!("│ {rest}"),
