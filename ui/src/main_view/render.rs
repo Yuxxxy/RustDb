@@ -587,16 +587,28 @@ impl Render for MainView {
             })
             .when_some(self.table_panel.as_ref().map(|_| ()), |layout, _| {
                 let panel = self.render_table_panel(window, cx);
-                // 非模态面板：不铺遮罩（遮罩会抢走面板内按钮的点击），用右上角 ✕ 关闭。
-                layout.child(
-                    div()
-                        .absolute()
-                        .inset_0()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .child(panel),
-                )
+                // 非模态面板：透明遮罩只吃掉鼠标、不关闭面板（面板在遮罩之上，
+                // 按钮点击照常命中）。没有这一层时 hover 会穿透到背后的结果表格，
+                // 表现为「鼠标划过面板，表格行却跟着高亮」。
+                layout
+                    .child(
+                        div()
+                            .id("table-scrim")
+                            .debug_selector(|| "table-scrim".to_string())
+                            .absolute()
+                            .inset_0()
+                            .occlude()
+                            .on_click(cx.listener(|_, _, _, _| {})),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(panel),
+                    )
             })
             // F-82：例程源码面板（非模态，右上角 ✕ 关闭）。
             .when_some(self.routine.as_ref().map(|_| ()), |layout, _| {

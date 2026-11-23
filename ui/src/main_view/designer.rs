@@ -3,6 +3,36 @@
 use super::*;
 
 impl MainView {
+    /// 设计器分区标题：统一的 13px 半粗标题 + 12px 灰色说明。
+    fn designer_section(
+        title: &'static str,
+        hint: &'static str,
+        cx: &mut Context<Self>,
+    ) -> gpui_kit::AnyElement {
+        let t = current(cx);
+        h_flex()
+            .mb(px(2.))
+            .gap_2()
+            .items_center()
+            .child(
+                div()
+                    .text_size(px(crate::design::TS_BODY))
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                    .text_color(hex(t.fg_primary))
+                    .child(SharedString::from(title)),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .text_color(hex(t.fg_muted))
+                    .text_ellipsis()
+                    .child(SharedString::from(hint)),
+            )
+            .into_any_element()
+    }
+
     /// 表设计器面板：六个页签（列 / 索引 / 外键 / 检查约束 / 触发器 / 选项）+ DDL 预览与执行。
     pub(crate) fn render_table_panel(
         &mut self,
@@ -54,59 +84,84 @@ impl MainView {
             })
             .unwrap_or(false);
 
+        let column_count = detail.columns.len();
+        let tab_count = rustdb_core::DesignerTab::ALL.len();
+
         v_flex()
             .id("table-panel")
             .debug_selector(|| "table-panel".to_string())
-            .w(px(560.))
-            .h(px(420.))
-            .rounded(px(8.))
+            .w(px(680.))
+            .h(px(480.))
+            .rounded(px(12.))
             .border_1()
-            .border_color(hex(t.border_subtle))
+            .border_color(hex(t.border_strong))
             .bg(hex(t.bg_elevated))
+            .occlude()
             .overflow_hidden()
             // 吃掉面板内的点击，避免穿透到遮罩把面板关掉。
             .on_click(cx.listener(|_, _, _, _| {}))
             .child(
                 h_flex()
-                    .h(px(34.))
-                    .px_3()
-                    .gap_2()
+                    .h(px(48.))
+                    .flex_shrink_0()
+                    .px_4()
+                    .gap_3()
                     .items_center()
                     .border_b_1()
                     .border_color(hex(t.border_subtle))
-                    .child(Icon::new(IconName::Table).small().text_color(hex(t.accent)))
                     .child(
                         div()
+                            .w(px(28.))
+                            .h(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(7.))
+                            .bg(crate::theme::to_hsla(t.accent).opacity(0.14))
+                            .child(Icon::new(IconName::Table).small().text_color(hex(t.accent))),
+                    )
+                    .child(
+                        v_flex()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                            .text_ellipsis()
-                            .child(SharedString::from(label)),
+                            .gap(px(2.))
+                            .child(
+                                div()
+                                    .text_size(px(crate::design::TS_BASE))
+                                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                                    .text_color(hex(t.fg_primary))
+                                    .text_ellipsis()
+                                    .child(SharedString::from(label)),
+                            )
+                            .child(
+                                div()
+                                    .text_size(px(crate::design::TS_CAPTION))
+                                    .text_color(hex(t.fg_muted))
+                                    .text_ellipsis()
+                                    .child(SharedString::from(format!(
+                                        "表结构 · {column_count} 列 · {tab_count} 个页签"
+                                    ))),
+                            ),
                     )
                     .child(
                         div()
                             .id("table-panel-close")
                             .debug_selector(|| "table-panel-close".to_string())
-                            .w(px(18.))
-                            .h(px(18.))
+                            .w(px(28.))
+                            .h(px(28.))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .rounded(px(3.))
+                            .rounded(px(6.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_elevated)))
+                            .hover(|s| s.bg(hex(t.bg_overlay)))
                             .on_click(cx.listener(|view, _, _, cx| {
                                 view.table_panel = None;
                                 view.designer = None;
                                 view.design_pending = None;
                                 cx.notify();
                             }))
-                            .child(
-                                Icon::new(IconName::Close)
-                                    .small()
-                                    .text_color(hex(t.fg_muted)),
-                            ),
+                            .child(Icon::new(IconName::Close).small().text_color(hex(t.fg_muted))),
                     ),
             )
             .when(tab.is_some(), |panel| panel.child(tabs_bar))
@@ -114,6 +169,8 @@ impl MainView {
                 div()
                     .flex_1()
                     .min_h_0()
+                    .px_3()
+                    .py_2()
                     .overflow_y_scrollbar()
                     .scroll_bounce(false)
                     .child(body),
@@ -122,52 +179,40 @@ impl MainView {
             .into_any_element()
     }
 
-    /// 设计器页签栏。
+    /// 设计器页签栏：复用全局 chip 组件做分段控件（选中 primary、其余 ghost）。
     pub(crate) fn render_designer_tabs(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
-        let t = current(cx);
         let active = self
             .designer
             .as_ref()
             .map(|designer| designer.tab)
             .unwrap_or(rustdb_core::DesignerTab::Columns);
         let mut row = h_flex()
-            .h(px(26.))
-            .px_2()
+            .h(px(38.))
+            .flex_shrink_0()
+            .px_3()
             .gap_1()
             .items_center()
             .border_b_1()
-            .border_color(hex(t.border_subtle));
+            .border_color(hex(current(cx).border_subtle));
         for tab in rustdb_core::DesignerTab::ALL {
-            let is_active = tab == active;
             let selector = format!("designer-tab-{}", tab.label());
-            row = row.child(
-                h_flex()
-                    .id(SharedString::from(selector.clone()))
-                    .debug_selector(move || selector.clone())
-                    .h(px(20.))
-                    .px_2()
-                    .rounded(px(4.))
-                    .cursor_pointer()
-                    .when(is_active, |d| d.bg(hex(t.bg_overlay)))
-                    .hover(|s| s.bg(hex(t.bg_elevated)))
-                    .on_click(cx.listener(move |view, _, _, cx| {
-                        if let Some(designer) = view.designer.as_mut() {
-                            designer.tab = tab;
-                        }
-                        cx.notify();
-                    }))
-                    .child(
-                        div()
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(if is_active { t.accent } else { t.fg_secondary }))
-                            .child(tab.label()),
-                    ),
-            );
+            let label = tab.label();
+            row = row.child(crate::design::chip(
+                selector,
+                label,
+                tab == active,
+                cx.listener(move |view, _, _, cx| {
+                    if let Some(designer) = view.designer.as_mut() {
+                        designer.tab = tab;
+                    }
+                    cx.notify();
+                }),
+            ));
         }
         row.into_any_element()
     }
 
-    /// 设计器底栏：校验结论 / 失败明细 + 预览、执行。
+    /// 设计器底栏：校验结论 / 失败明细 + 预览、执行（右对齐主次按钮）。
     pub(crate) fn render_designer_footer(
         &mut self,
         issues: Vec<rustdb_core::ValidationIssue>,
@@ -183,70 +228,70 @@ impl MainView {
             .count();
         let warning_count = issues.len() - error_count;
 
-        let mut left = v_flex().flex_1().min_w_0().gap(px(1.));
-        if let Some(failure) = failure {
-            left = left
-                .child(
-                    div()
-                        .text_size(px(crate::design::TS_CAPTION))
-                        .text_color(hex(t.danger))
-                        .text_ellipsis()
-                        .child(SharedString::from(format!("失败：{}", failure.message))),
-                )
-                .child(
-                    div()
-                        .text_size(px(crate::design::TS_CAPTION))
-                        .text_color(hex(t.fg_muted))
-                        .text_ellipsis()
-                        .child(SharedString::from(failure.hint)),
-                );
+        let (icon, color, mut lines): (IconName, u32, Vec<String>) = if let Some(failure) = failure {
+            (
+                IconName::TriangleAlert,
+                t.danger,
+                vec![
+                    format!("失败：{}", failure.message),
+                    failure.hint.to_string(),
+                ],
+            )
         } else if error_count > 0 {
-            left = left.child(
-                div()
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .text_color(hex(t.danger))
-                    .text_ellipsis()
-                    .child(SharedString::from(format!(
-                        "{error_count} 处问题待修正，保存前需先处理"
-                    ))),
-            );
+            (
+                IconName::TriangleAlert,
+                t.danger,
+                vec![format!("{error_count} 处问题待修正，保存前需先处理")],
+            )
         } else if warning_count > 0 {
-            left = left.child(
-                div()
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .text_color(hex(t.warning))
-                    .text_ellipsis()
-                    .child(SharedString::from(format!("{warning_count} 条提示"))),
-            );
+            (
+                IconName::Info,
+                t.warning,
+                vec![format!("{warning_count} 条提示")],
+            )
         } else {
-            left = left.child(
-                div()
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .text_color(hex(t.fg_muted))
-                    .text_ellipsis()
-                    .child("先预览，再执行"),
-            );
-        }
-        // SQLite 改结构只能重建表：明确提示，别让人以为只是加列。
+            (
+                IconName::Check,
+                t.fg_muted,
+                vec!["先预览，再执行".to_string()],
+            )
+        };
         if rebuild {
-            left = left.child(
-                div()
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .text_color(hex(t.warning))
-                    .text_ellipsis()
-                    .child("SQLite 改结构将重建表（先备份）"),
-            );
+            lines.push("SQLite 改结构将重建表（先备份）".to_string());
         }
+        let status = h_flex()
+            .flex_1()
+            .min_w_0()
+            .gap_2()
+            .items_start()
+            .child(Icon::new(icon).small().text_color(hex(color)).mt(px(1.)))
+            .child(
+                v_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .gap(px(2.))
+                    .children(lines.into_iter().enumerate().map(|(index, line)| {
+                        div()
+                            .text_size(px(if index == 0 {
+                                crate::design::TS_BODY
+                            } else {
+                                crate::design::TS_CAPTION
+                            }))
+                            .text_color(hex(if index == 0 { color } else { t.fg_muted }))
+                            .text_ellipsis()
+                            .child(SharedString::from(line))
+                    })),
+            );
 
         h_flex()
-            .h(px(34.))
+            .h(px(46.))
             .flex_shrink_0()
-            .px_2()
+            .px_4()
             .gap_2()
             .items_center()
             .border_t_1()
             .border_color(hex(t.border_subtle))
-            .child(left)
+            .child(status)
             .when(has_designer, |footer| {
                 footer
                     .child(
@@ -283,21 +328,34 @@ impl MainView {
         cx: &mut Context<Self>,
     ) -> gpui_kit::AnyElement {
         let t = current(cx);
-        let mut columns = v_flex().gap(px(1.));
+        let mut columns = v_flex().gap(px(2.));
         for column in &detail.columns {
-            let flags = [
-                (!column.meta.nullable).then_some("NOT NULL"),
-                column.is_primary_key.then_some("PK"),
-                column.default.as_deref(),
-            ]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join(" · ");
+            let mut flags: Vec<gpui_kit::AnyElement> = Vec::new();
+            if column.is_primary_key {
+                flags.push(
+                    gpui_kit::component::tag::Tag::primary().small()
+                        .child("PK")
+                        .into_any_element(),
+                );
+            }
+            if !column.meta.nullable {
+                flags.push(
+                    gpui_kit::component::tag::Tag::warning().small()
+                        .child("NOT NULL")
+                        .into_any_element(),
+                );
+            }
+            if let Some(default) = column.default.as_deref() {
+                flags.push(
+                    gpui_kit::component::tag::Tag::secondary().small()
+                        .child(SharedString::from(default.to_string()))
+                        .into_any_element(),
+                );
+            }
             columns = columns.child(
                 h_flex()
-                    .h(px(24.))
-                    .px_2()
+                    .h(px(28.))
+                    .px_3()
                     .gap_2()
                     .items_center()
                     .border_b_1()
@@ -318,18 +376,10 @@ impl MainView {
                             .text_ellipsis()
                             .child(SharedString::from(column.meta.native_type.clone())),
                     )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(t.fg_muted))
-                            .text_ellipsis()
-                            .child(SharedString::from(flags)),
-                    ),
+                    .child(h_flex().flex_1().min_w_0().gap_1().children(flags)),
             );
         }
-        let mut indexes = v_flex().gap(px(1.));
+        let mut indexes = v_flex().gap(px(2.));
         for index in &detail.indexes {
             let tag = if index.primary {
                 "PK"
@@ -340,8 +390,8 @@ impl MainView {
             };
             indexes = indexes.child(
                 h_flex()
-                    .h(px(22.))
-                    .px_2()
+                    .h(px(26.))
+                    .px_3()
                     .gap_2()
                     .items_center()
                     .child(
@@ -366,10 +416,11 @@ impl MainView {
             );
         }
         v_flex()
+            .child(Self::designer_section("列", "只读结构（点对象树「设计表」进入编辑）", cx))
             .child(
                 h_flex()
-                    .h(px(22.))
-                    .px_2()
+                    .h(px(26.))
+                    .px_3()
                     .bg(hex(t.bg_overlay))
                     .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
@@ -382,7 +433,7 @@ impl MainView {
                 panel
                     .child(
                         div()
-                            .px_2()
+                            .px_3()
                             .pt_2()
                             .pb_1()
                             .text_size(px(crate::design::TS_CAPTION))
@@ -407,19 +458,33 @@ impl MainView {
             .collect();
         let columns = designer.draft.columns.clone();
 
-        let mut list = v_flex().gap(px(1.));
+        let mut list = v_flex().gap(px(2.));
         for (index, draft) in columns.iter().enumerate() {
             let name = draft.name.clone();
             let type_name = draft.type_text.clone();
-            let flags = [
-                (!draft.nullable).then_some("NOT NULL"),
-                draft.default.as_deref(),
-                (!before_names.iter().any(|n| n.eq_ignore_ascii_case(&name))).then_some("新增"),
-            ]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join(" · ");
+            let is_new = !before_names.iter().any(|n| n.eq_ignore_ascii_case(&name));
+            let mut flags: Vec<gpui_kit::AnyElement> = Vec::new();
+            if !draft.nullable {
+                flags.push(
+                    gpui_kit::component::tag::Tag::warning().small()
+                        .child("NOT NULL")
+                        .into_any_element(),
+                );
+            }
+            if let Some(default) = draft.default.as_deref() {
+                flags.push(
+                    gpui_kit::component::tag::Tag::secondary().small()
+                        .child(SharedString::from(default.to_string()))
+                        .into_any_element(),
+                );
+            }
+            if is_new {
+                flags.push(
+                    gpui_kit::component::tag::Tag::success().small()
+                        .child("新增")
+                        .into_any_element(),
+                );
+            }
             let drag_label = name.clone();
             let weak = cx.weak_entity();
             list = list.child(
@@ -429,8 +494,8 @@ impl MainView {
                         let selector = format!("designer-column-{index}");
                         move || selector.clone()
                     })
-                    .h(px(24.))
-                    .px_2()
+                    .h(px(28.))
+                    .px_3()
                     .gap_2()
                     .items_center()
                     .border_b_1()
@@ -488,15 +553,7 @@ impl MainView {
                             .text_ellipsis()
                             .child(SharedString::from(type_name)),
                     )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(t.fg_muted))
-                            .text_ellipsis()
-                            .child(SharedString::from(flags)),
-                    )
+                    .child(h_flex().flex_1().min_w_0().gap_1().children(flags))
                     .child(
                         div()
                             .id(SharedString::from(format!("designer-drop-{index}")))
@@ -504,14 +561,14 @@ impl MainView {
                                 let selector = format!("designer-drop-{index}");
                                 move || selector.clone()
                             })
-                            .w(px(18.))
-                            .h(px(18.))
+                            .w(px(24.))
+                            .h(px(24.))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .rounded(px(3.))
+                            .rounded(px(6.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_elevated)))
+                            .hover(|s| s.bg(crate::theme::to_hsla(t.accent).opacity(0.10)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.designer_drop_column(index, cx);
                             }))
@@ -520,7 +577,7 @@ impl MainView {
             );
         }
 
-        let mut add_row = h_flex().h(px(28.)).px_2().gap_2().items_center();
+        let mut add_row = h_flex().h(px(32.)).px_3().gap_2().items_center();
         if let Some(designer) = self.designer.as_ref() {
             if let (Some(name_input), Some(type_input)) = (
                 designer.inputs.column_name.clone(),
@@ -553,10 +610,11 @@ impl MainView {
             .child(div().flex_1());
 
         v_flex()
+            .child(Self::designer_section("列", "拖动左侧手柄调整顺序", cx))
             .child(
                 h_flex()
-                    .h(px(22.))
-                    .px_2()
+                    .h(px(26.))
+                    .px_3()
                     .bg(hex(t.bg_overlay))
                     .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
@@ -585,7 +643,7 @@ impl MainView {
             .collect();
         let indexes = designer.draft.indexes.clone();
 
-        let mut list = v_flex().gap(px(1.));
+        let mut list = v_flex().gap(px(2.));
         for (index, draft) in indexes.iter().enumerate() {
             let exists = baseline.iter().any(|name| name == &draft.name);
             let tag = if draft.unique { "UNIQUE" } else { "INDEX" };
@@ -596,18 +654,21 @@ impl MainView {
                         let selector = format!("designer-index-{index}");
                         move || selector.clone()
                     })
-                    .h(px(24.))
-                    .px_2()
+                    .h(px(28.))
+                    .px_3()
                     .gap_2()
                     .items_center()
                     .border_b_1()
                     .border_color(hex(t.border_subtle))
                     .child(
-                        div()
-                            .w(px(56.))
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(if exists { t.accent } else { t.success }))
+                        div().w(px(56.)).child(
+                            if exists {
+                                gpui_kit::component::tag::Tag::primary().small()
+                            } else {
+                                gpui_kit::component::tag::Tag::success().small()
+                            }
                             .child(SharedString::from(tag)),
+                        ),
                     )
                     .child(
                         div()
@@ -633,14 +694,14 @@ impl MainView {
                                 let selector = format!("designer-index-drop-{index}");
                                 move || selector.clone()
                             })
-                            .w(px(18.))
-                            .h(px(18.))
+                            .w(px(24.))
+                            .h(px(24.))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .rounded(px(3.))
+                            .rounded(px(6.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_elevated)))
+                            .hover(|s| s.bg(crate::theme::to_hsla(t.accent).opacity(0.10)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.designer_drop_index(index, cx);
                             }))
@@ -649,7 +710,7 @@ impl MainView {
             );
         }
 
-        let mut add_row = h_flex().h(px(28.)).px_2().gap_2().items_center();
+        let mut add_row = h_flex().h(px(32.)).px_3().gap_2().items_center();
         if let Some(designer) = self.designer.as_ref() {
             if let (Some(name_input), Some(columns_input)) = (
                 designer.inputs.index_name.clone(),
@@ -684,10 +745,11 @@ impl MainView {
             .child(div().flex_1());
 
         v_flex()
+            .child(Self::designer_section("索引", "UNIQUE / INDEX 草稿，执行前可预览", cx))
             .child(
                 h_flex()
-                    .h(px(22.))
-                    .px_2()
+                    .h(px(26.))
+                    .px_3()
                     .bg(hex(t.bg_overlay))
                     .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
@@ -717,7 +779,7 @@ impl MainView {
             .collect();
         let foreign_keys = designer.draft.foreign_keys.clone();
 
-        let mut list = v_flex().gap(px(1.));
+        let mut list = v_flex().gap(px(2.));
         for (index, fk) in foreign_keys.iter().enumerate() {
             let exists = baseline.iter().any(|name| name == &fk.name);
             let target = format!(
@@ -733,8 +795,8 @@ impl MainView {
                         let selector = format!("designer-fk-{index}");
                         move || selector.clone()
                     })
-                    .h(px(24.))
-                    .px_2()
+                    .h(px(28.))
+                    .px_3()
                     .gap_2()
                     .items_center()
                     .border_b_1()
@@ -764,15 +826,15 @@ impl MainView {
                                     let selector = format!("designer-fk-save-{index}");
                                     move || selector.clone()
                                 })
-                                .px_2()
-                                .h(px(18.))
+                                .px_3()
+                                .h(px(22.))
                                 .flex()
                                 .items_center()
-                                .rounded(px(3.))
+                                .rounded(px(6.))
                                 .text_size(px(crate::design::TS_CAPTION))
                                 .text_color(hex(t.accent))
                                 .cursor_pointer()
-                                .hover(|s| s.bg(hex(t.bg_elevated)))
+                                .hover(|s| s.bg(crate::theme::to_hsla(t.accent).opacity(0.10)))
                                 .on_click(cx.listener(move |view, _, _, cx| {
                                     view.designer_save_foreign_key(index, cx);
                                 }))
@@ -786,14 +848,14 @@ impl MainView {
                                 let selector = format!("designer-fk-drop-{index}");
                                 move || selector.clone()
                             })
-                            .w(px(18.))
-                            .h(px(18.))
+                            .w(px(24.))
+                            .h(px(24.))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .rounded(px(3.))
+                            .rounded(px(6.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_elevated)))
+                            .hover(|s| s.bg(crate::theme::to_hsla(t.accent).opacity(0.10)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.designer_remove_foreign_key(index, cx);
                             }))
@@ -802,7 +864,7 @@ impl MainView {
             );
         }
 
-        let mut add_row = h_flex().h(px(28.)).px_2().gap_2().items_center();
+        let mut add_row = h_flex().h(px(32.)).px_3().gap_2().items_center();
         if let Some(designer) = self.designer.as_ref() {
             if let (Some(name_input), Some(columns_input), Some(table_input), Some(ref_input)) = (
                 designer.inputs.fk_name.clone(),
@@ -849,10 +911,11 @@ impl MainView {
             .child(div().flex_1());
 
         v_flex()
+            .child(Self::designer_section("外键", "新增的外键需逐条「保存」后才进入迁移计划", cx))
             .child(
                 h_flex()
-                    .h(px(22.))
-                    .px_2()
+                    .h(px(26.))
+                    .px_3()
                     .bg(hex(t.bg_overlay))
                     .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
@@ -879,7 +942,7 @@ impl MainView {
             .collect();
         let checks = designer.draft.checks.clone();
 
-        let mut list = v_flex().gap(px(1.));
+        let mut list = v_flex().gap(px(2.));
         for (index, check) in checks.iter().enumerate() {
             let exists = baseline.iter().any(|name| name == &check.name);
             list = list.child(
@@ -889,8 +952,8 @@ impl MainView {
                         let selector = format!("designer-check-{index}");
                         move || selector.clone()
                     })
-                    .h(px(24.))
-                    .px_2()
+                    .h(px(28.))
+                    .px_3()
                     .gap_2()
                     .items_center()
                     .border_b_1()
@@ -913,11 +976,14 @@ impl MainView {
                             .child(SharedString::from(check.expression.clone())),
                     )
                     .child(
-                        div()
-                            .w(px(40.))
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(if exists { t.accent } else { t.success }))
+                        div().w(px(52.)).child(
+                            if exists {
+                                gpui_kit::component::tag::Tag::primary().small()
+                            } else {
+                                gpui_kit::component::tag::Tag::success().small()
+                            }
                             .child(if exists { "现状" } else { "新增" }),
+                        ),
                     )
                     .child(
                         div()
@@ -926,14 +992,14 @@ impl MainView {
                                 let selector = format!("designer-check-drop-{index}");
                                 move || selector.clone()
                             })
-                            .w(px(18.))
-                            .h(px(18.))
+                            .w(px(24.))
+                            .h(px(24.))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .rounded(px(3.))
+                            .rounded(px(6.))
                             .cursor_pointer()
-                            .hover(|s| s.bg(hex(t.bg_elevated)))
+                            .hover(|s| s.bg(crate::theme::to_hsla(t.accent).opacity(0.10)))
                             .on_click(cx.listener(move |view, _, _, cx| {
                                 view.designer_drop_check(index, cx);
                             }))
@@ -942,7 +1008,7 @@ impl MainView {
             );
         }
 
-        let mut add_row = h_flex().h(px(28.)).px_2().gap_2().items_center();
+        let mut add_row = h_flex().h(px(32.)).px_3().gap_2().items_center();
         if let Some(designer) = self.designer.as_ref() {
             if let (Some(name_input), Some(expr_input)) = (
                 designer.inputs.check_name.clone(),
@@ -977,16 +1043,17 @@ impl MainView {
             .child(div().flex_1());
 
         v_flex()
+            .child(Self::designer_section("检查约束", "表达式草稿，执行前可预览", cx))
             .child(
                 h_flex()
-                    .h(px(22.))
-                    .px_2()
+                    .h(px(26.))
+                    .px_3()
                     .bg(hex(t.bg_overlay))
                     .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
                     .child(div().w(px(130.)).child("名称"))
                     .child(div().flex_1().child("表达式"))
-                    .child(div().w(px(40.)))
+                    .child(div().w(px(52.)))
                     .child(div().w(px(18.))),
             )
             .child(list)
@@ -1001,20 +1068,20 @@ impl MainView {
             return div().into_any_element();
         };
         match &designer.triggers {
-            None => v_flex()
-                .p_3()
-                .text_size(px(crate::design::TS_CAPTION))
-                .text_color(hex(t.fg_muted))
-                .child("该连接的驱动未提供触发器元数据")
-                .into_any_element(),
-            Some(triggers) if triggers.is_empty() => v_flex()
-                .p_3()
-                .text_size(px(crate::design::TS_CAPTION))
-                .text_color(hex(t.fg_muted))
-                .child("该表没有触发器")
-                .into_any_element(),
+            None => crate::design::empty_state(
+                cx,
+                IconName::Zap,
+                "该连接的驱动未提供触发器元数据",
+                "触发器编辑请到「例程源码」面板",
+            ),
+            Some(triggers) if triggers.is_empty() => crate::design::empty_state(
+                cx,
+                IconName::Zap,
+                "该表没有触发器",
+                "新建触发器请使用数据库的 DDL 语句",
+            ),
             Some(triggers) => {
-                let mut list = v_flex().gap(px(1.));
+                let mut list = v_flex().gap(px(2.));
                 for trigger in triggers {
                     let mut tags: Vec<&str> = Vec::new();
                     if let Some(timing) = &trigger.timing {
@@ -1025,8 +1092,8 @@ impl MainView {
                     }
                     list = list.child(
                         h_flex()
-                            .h(px(24.))
-                            .px_2()
+                            .h(px(28.))
+                            .px_3()
                             .gap_2()
                             .items_center()
                             .border_b_1()
@@ -1076,7 +1143,7 @@ impl MainView {
         let collation = designer.inputs.collation.clone();
         let comment = designer.inputs.comment.clone();
 
-        let mut list = v_flex().gap(px(1.));
+        let mut list = v_flex().gap(px(2.));
         for (label, input) in [
             ("存储引擎", &engine),
             ("排序规则", &collation),
@@ -1085,7 +1152,7 @@ impl MainView {
             list = list.child(
                 h_flex()
                     .h(px(26.))
-                    .px_2()
+                    .px_3()
                     .gap_2()
                     .items_center()
                     .border_b_1()
@@ -1108,11 +1175,12 @@ impl MainView {
             );
         }
         v_flex()
+            .child(Self::designer_section("表选项", "各方言支持度不同，未支持的项不会下发", cx))
             .child(list)
             .child(
                 h_flex()
-                    .h(px(28.))
-                    .px_2()
+                    .h(px(32.))
+                    .px_3()
                     .gap_2()
                     .items_center()
                     .child(

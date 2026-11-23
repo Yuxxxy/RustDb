@@ -708,3 +708,38 @@ hover 一直消不掉。确认这两个蓝框其实是 **§11.8 移植进来的�
 
 **验证**：`cargo test --workspace` 44 个测试套件全绿；实机截图 `.tmp/no-highlight.png`
 与 `.tmp/sidebar-sqlite.png` — 两行无蓝框/蓝底、绿点保留、对象树展开正常、无「最近」区。
+
+---
+
+### §11.11 表设计器组件化改造与 hover 穿透修复（2026-11-23）
+
+用户反馈：设计表面板不够大气；鼠标划过面板时背后结果表格的行也跟着高亮。
+
+**根因**：`render.rs` 里设计表浮层只有一个 `absolute().inset_0()` 容器，没有背景、监听或
+`occlude()`，gpui 不会为它插入 hitbox，鼠标事件直接命中下层结果网格。面板自身的
+`on_click(noop)` 只吃掉点击，挡不住 hover。
+
+| 项 | 改造 | 涉及文件 |
+| --- | --- | --- |
+| hover 穿透 | 浮层新增 `table-scrim`（透明 + `occlude()` + 空点击监听），面板本体也加 `occlude()`；面板绘制在遮罩之上，按钮点击照常命中，遮罩只拦背后元素 | `ui/src/main_view/render.rs`、`designer.rs` |
+| 面板骨架 | 560×420 → 680×480，圆角 8 → 12，`border_subtle` → `border_strong`；48px 标题栏（28px accent 图标块 + 15px SEMIBOLD 标题 + 12px 副标题「表结构 · N 列 · 6 个页签」）、38px 页签栏、46px 底栏 | `designer.rs::render_table_panel` |
+| 页签 | 手写 div 页签 → 复用 `design::chip()`（`Button::small().ghost()/primary()`），选中 primary、其余 ghost；保留 `designer-tab-*` 调试选择器 | `designer.rs::render_designer_tabs` |
+| 分区标题 | 新增 `designer_section()` 统一 13px SEMIBOLD 标题 + 12px 灰色说明，六个页签与只读结构视图全部挂载 | `designer.rs` |
+| 约束徽标 | 手写灰字 → `gpui_component::tag::Tag`：`PK`/`现状`/`UNIQUE` primary，新增成功 success，`NOT NULL` warning，默认值 secondary | `designer.rs` 列 / 索引 / 检查 / 只读结构 |
+| 行与删除 | 数据行 24 → 28px、表头 22 → 26px、内边距 `px_2` → `px_3`、行距 1 → 2px；删除按钮 18 → 24px、圆角 3 → 6，hover 由「等于面板背景的 bg_elevated」改为 accent 10% | `designer.rs` 六个页签 |
+| 空态 | 触发器无数据从一行灰字改为 `design::empty_state()`（图标 + 主句 + 提示） | `designer.rs::render_designer_triggers` |
+| 底栏 | 34 → 46px，状态文案带 Check/Info/TriangleAlert 图标与颜色层级，「预览 DDL」ghost +「执行」primary 右对齐 | `designer.rs::render_designer_footer` |
+
+**护栏**：
+
+- `tests_layout::table_panel_shows_columns` 反转为断言 `table-scrim` **存在**（此前断言不存在）。
+- `tests_layout::table_panel_occludes_background_hover` 源码级断言浮层含 `table-scrim` 与
+  `.occlude()`，且面板本体也 occlude。
+
+**验证**：`cargo test -p rustdb-ui --lib` 179 passed（含 5 条 designer + 面板/护栏测试）；
+`cargo test --workspace` 44 个测试套件全绿；离屏复拍 `.tmp/shots-redesign/12-designer.png`
+确认标题块、chip 页签、分区标题、Tag 徽标、24px 删除按钮与新底栏均正常，无重叠或截断。
+
+**已知限制**：屏幕抓取复跑 hover 对照时会话处于锁屏态，`CopyFromScreen` 只能拿到锁屏画面，
+因此 hover 不穿透由 `occlude()` 命中语义 + 源码护栏证明，未留动态截图；解锁后可用
+`.tmp/hover-designer-check.ps1` 重拍（窗口需保持前台且屏幕未锁）。

@@ -865,8 +865,8 @@ fn table_panel_shows_columns(cx: &mut gpui_kit::TestAppContext) {
 
     assert!(vcx.debug_bounds("table-panel").is_some(), "应渲染结构面板");
     assert!(
-        vcx.debug_bounds("table-scrim").is_none(),
-        "设计表面板不应有遮罩"
+        vcx.debug_bounds("table-scrim").is_some(),
+        "设计表必须有透明遮罩吃掉鼠标，否则 hover 会穿透到背后的结果表格"
     );
     let close = vcx.debug_bounds("table-panel-close").expect("缺少关闭按钮");
     vcx.simulate_click(close.center(), gpui_kit::Modifiers::default());
@@ -2523,5 +2523,30 @@ fn sidebar_rows_have_no_sticky_selection_highlight_and_no_recent_section() {
     assert!(
         hover_count >= 2,
         "连接行与库行都应有 hover 反馈，实际只有 {hover_count} 处"
+    );
+}
+
+/// 用户反馈：鼠标划过设计表面板时，背后结果表格的行也跟着高亮。
+/// 原因是浮层没有命中体，hover 直接命中了下层网格。遮罩与面板都必须 occlude。
+#[test]
+fn table_panel_occludes_background_hover() {
+    let render = include_str!("render.rs");
+    let production = render.split("#[cfg(test)]").next().unwrap_or(render);
+    let start = production
+        .find("self.table_panel.as_ref().map(|_| ())")
+        .expect("缺少设计表浮层");
+    let end = production[start..]
+        .find("// F-82：例程源码面板")
+        .expect("缺少浮层边界");
+    let block = &production[start..start + end];
+    assert!(block.contains("table-scrim"), "浮层必须有透明遮罩");
+    assert!(
+        block.contains(".occlude()"),
+        "遮罩必须吃掉鼠标，否则 hover 穿透到背后表格"
+    );
+    let designer = include_str!("designer.rs");
+    assert!(
+        designer.contains(".occlude()"),
+        "设计表面板本体也必须 occlude"
     );
 }
