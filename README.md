@@ -211,7 +211,7 @@ cargo run -p rustdb
   每次调用写审计；未配置模型端点时退回离线演示 provider（面板标注 `offline-demo`）。
 - **崩溃恢复**：标签页 SQL 落到 `session.json`，下次启动回填并提示。
 - **i18n 骨架**：`ui::i18n` 词条表 + `t(key)`，缺失回落 key 并告警。
-- **打包脚本**：`scripts/package.ps1` 产出 `dist/RustDb-<版本>-windows-x64.zip`。
+- **打包脚本**：`scripts/package.ps1` 产出 `target/dist/RustDb-<版本>-windows-x64.zip`。
 
 详见 [`docs/M3-验证报告.md`](docs/M3-验证报告.md) / [`docs/M4-验证报告.md`](docs/M4-验证报告.md) / [`docs/M5-验证报告.md`](docs/M5-验证报告.md)。
 
@@ -263,39 +263,50 @@ Key 只从环境变量读，不写任何配置文件。写操作会在右栏弹�
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package.ps1
 ```
 
-产出 `dist/RustDb-<版本>-windows-x64.zip`（exe + README + 文档）。
+产出 `target/dist/RustDb-<版本>-windows-x64.zip`（exe + README + 文档）。
 
 ## 目录
 
+根目录只保留 `apps/`、`crates/`、`docs/`、`scripts/` 四个文件夹：可执行入口与库分离，
+驱动统一收进 `crates/db/`，新增驱动不会再抬高根目录噪音。
+
 ```
-app/        启动入口：建 core、起窗口
-bootstrap/  组合根：驱动注册 + 配置 / 历史存储（app 与 cli 共用）
-cli/        命令行工具（rustdb-cli）：连接、Schema、查询、上下文、DDL 导出
-shell/      GPUI Application / 窗口 / Root
-ui/         主视图、主题、结果网格、设计器、AI 栏、i18n
-             `main_view.rs` 只保留状态类型、常量、模块声明与少量自由函数（约 2.8k 行）；
-             `main_view/` 下 38 个模块，全部实现挂在 `impl MainView` 上、方法统一 `pub(crate)`：
+apps/
+  desktop/   启动入口：建 core、起窗口（bin: rustdb）
+  cli/       命令行工具（bin: rustdb-cli）：连接、Schema、查询、上下文、DDL 导出
+crates/
+  bootstrap/ 组合根：驱动注册 + 配置 / 历史存储（desktop 与 cli 共用）
+  shell/     GPUI Application / 窗口 / Root
+  ui/        主视图、主题、结果网格、设计器、AI 栏、i18n
+             `src/main_view.rs` 只保留状态类型、常量、模块声明与少量自由函数；
+             `src/main_view/` 下 40 个模块，全部实现挂在 `impl MainView` 上、方法统一 `pub(crate)`：
              命令簇 `events` / `execute` / `lifecycle` / `workspace` / `objects` / `cell_edit` /
              `cell_detail` / `bulk` / `generator` / `result_tabs` / `status_bar` / `editing` /
              `grid` / `render` / `result_view`；面板 `connections` / `designer` / `routine_panel` /
              `partition_panel` / `exchange_panel` / `docs_panel` / `lineage_panel` /
              `compare_panel` / `data_compare_panel` / `import_panel` / `dump_panel` /
-             `transfer_panel` / `optimize_panel` / `ai_panel` / `ai_column` / `ai_chat` / `sidebar`；
-             测试 `tests_helpers`（共用夹具）+ `tests_layout` / `tests_grid` / `tests_panels` /
-             `tests_exchange` / `tests_ai`（按功能域分组）
-core/       编排：连接、会话 Actor、事件总线、结果存储、变更集、迁移计划、AI Agent、DML 预览、运行记录
-             分页兜底独立在 `core/page.rs`；口令解析在 `core/secrets.rs`
-db-api/     驱动契约（trait + IR + Capabilities）
-db-postgres/  PostgreSQL（真实）
-db-mysql/     MySQL / MariaDB（真实）
-db-sqlite/    SQLite（真实）
-db-mssql/     SQL Server（tiberius）
-db-oracle/    Oracle（ODPI-C）
-sql-lang/    词法、语句切分、分类、只读判定、参数、脚本（GO/DELIMITER）、位置换算
-platform/    路径、日志、崩溃恢复（session.json）
-docs/        需求文档、M1–M6 验证报告、截图
-scripts/     打包脚本 + P2 真库环境（setup-live-p2.sh / seed-pg.sql / seed-mysql.sql）
+             `transfer_panel` / `optimize_panel` / `ai_panel` / `ai_column` / `ai_chat` / `sidebar` /
+             `shortcuts` / `db_icon`；测试 `tests_helpers`（共用夹具）+ `tests_layout` /
+             `tests_grid` / `tests_panels` / `tests_exchange` / `tests_ai` / `tests_shortcuts`
+  core/      编排：连接、会话 Actor、事件总线、结果存储、变更集、迁移计划、AI Agent、DML 预览、运行记录
+             分页兜底独立在 `crates/core/src/page.rs`；口令解析在 `crates/core/src/secrets.rs`
+  platform/  路径、日志、崩溃恢复（session.json）
+  sql-lang/  词法、语句切分、分类、只读判定、参数、脚本（GO/DELIMITER）、位置换算
+  db/
+    api/       驱动契约（trait + IR + Capabilities）
+    postgres/  PostgreSQL（真实）
+    mysql/     MySQL / MariaDB（真实）
+    sqlite/    SQLite（真实）
+    mssql/     SQL Server（tiberius）
+    oracle/    Oracle（ODPI-C）
+    oracle-rust/ Oracle（纯 Rust 试验驱动）
+    tunnel/    SSH 隧道 / 代理
+docs/        需求文档、UI 规范、M1–M6 验证报告、截图
+scripts/     打包脚本 + 真库环境（setup-live*.sh / seed-*.sql）
 ```
+
+> `docs/M1`–`M6-验证报告.md` 是当时快照，正文里的 `core/…`、`ui/…` 等路径按当时布局书写，
+> 与当前 `crates/…` 目录一一对应，不再回改历史报告。
 
 ## 测试
 
@@ -322,23 +333,23 @@ RUSTDB_LIVE_TESTS=1 cargo test -p rustdb-core       --test live_p2
 RUSTDB_LIVE_TESTS=1 cargo test -p rustdb-core --test sqlite_flow
 ```
 
-- `core/tests/sqlite_flow.rs`：SQLite 端到端 + 批量多结果集 + 串行化 + DDL + 变更集冲突回滚 + Agent +
+- `crates/core/tests/sqlite_flow.rs`：SQLite 端到端 + 批量多结果集 + 串行化 + DDL + 变更集冲突回滚 + Agent +
   运行记录/历史 + DML 预览零写入 + 结果集导出 + 文件执行历史来源 + 逐语句进度/遇错停止（17 个用例）
-- `core/tests/perf.rs`：M-04 首屏 / M-07 取消门禁
-- `core/src/{edit,migration,agent,optimize,preview,runs,history,export,ai_context,ai_config}.rs`：变更集 / 迁移计划 / Agent / 优化与方言转换 / 预览 / 运行记录 / 历史 / 导出 / AI 上下文组装 / 模型配置 的纯逻辑单测
+- `crates/core/tests/perf.rs`：M-04 首屏 / M-07 取消门禁
+- `crates/core/src/{edit,migration,agent,optimize,preview,runs,history,export,ai_context,ai_config}.rs`：变更集 / 迁移计划 / Agent / 优化与方言转换 / 预览 / 运行记录 / 历史 / 导出 / AI 上下文组装 / 模型配置 的纯逻辑单测
   （历史含 JSONL 重启恢复、损坏行跳过、删除/上限落盘；`ai_context` 含截断、转义、SQL 围栏解析 13 例；
   `ai_config` 含预设校验、配置读写与损坏回退、模型列表三种响应、错误分类、导出脱敏 15 例）
-- `ui/src/main_view/tests_{layout,grid,panels,exchange,ai}.rs`（共用夹具在 `tests_helpers.rs`）：布局几何、连接树、右键菜单、网格编辑、多选/拖选、设计器、AI 面板、导出格式菜单、DML 预览、运行记录条、历史筛选、AI 优化面板（逐段采纳/新标签）、AI 上下文芯片与 SQL 块「应用/试跑」状态、错误栏 AI 修复、模型配置保存（密钥不落盘）与校验拦截、依赖条页签与脏草稿跳转拦截、分区面板（列表 / 表单 / 预览 / Esc 层级 / 能力位）、配置交换面板（导出勾选 / 明文确认 / 导入去重 / Esc）、连接编辑器代理段（类型 / 远程 DNS / 局域网开关 / 保存）、SQL 文件打开/保存与失败后「继续」与文件树、外键跳转与批量更新面板、数据库文档面板、字段血缘面板（置信度过滤 / 切换字段重算 / Esc）、三列布局（拖拽宽度 / 折叠恢复 / AI 开关）（108 个用例；`rustdb-ui --lib` 合计 135）
-- `db-api/src/page.rs` + `db-sqlite/tests/page.rs`：分页 SQL 构建（4 个单测）与 SQLite 真库分页
+- `crates/ui/src/main_view/tests_{layout,grid,panels,exchange,ai}.rs`（共用夹具在 `tests_helpers.rs`）：布局几何、连接树、右键菜单、网格编辑、多选/拖选、设计器、AI 面板、导出格式菜单、DML 预览、运行记录条、历史筛选、AI 优化面板（逐段采纳/新标签）、AI 上下文芯片与 SQL 块「应用/试跑」状态、错误栏 AI 修复、模型配置保存（密钥不落盘）与校验拦截、依赖条页签与脏草稿跳转拦截、分区面板（列表 / 表单 / 预览 / Esc 层级 / 能力位）、配置交换面板（导出勾选 / 明文确认 / 导入去重 / Esc）、连接编辑器代理段（类型 / 远程 DNS / 局域网开关 / 保存）、SQL 文件打开/保存与失败后「继续」与文件树、外键跳转与批量更新面板、数据库文档面板、字段血缘面板（置信度过滤 / 切换字段重算 / Esc）、三列布局（拖拽宽度 / 折叠恢复 / AI 开关）（108 个用例；`rustdb-ui --lib` 合计 135）
+- `crates/db/api/src/page.rs` + `db-sqlite/tests/page.rs`：分页 SQL 构建（4 个单测）与 SQLite 真库分页
   （不重不漏、LIKE/NULLS LAST、NULL 过滤、`has_more`，6 个集成用例）
-- `ui/src/csv.rs`：CSV 转义与公式防护（走 `core::export`）
+- `crates/ui/src/csv.rs`：CSV 转义与公式防护（走 `core::export`）
 - `sql-lang`：词法 / 切分 / 分类 / 只读判定 / 参数 / 脚本 / 位置换算（34 个用例）
 - `cli/tests/cli.rs`：直接跑 `rustdb-cli` 二进制，断言稳定错误码与退出码、默认只读、
   写 / 危险 SQL 开关组合、只读与生产连接带开关仍拒、JSON 信封与 CSV 输出（19 个用例）
-- `db-api/src/session.rs::chunked_row_stream` + `core/tests/stream_batches.rs`：`page_size` /
+- `crates/db/api/src/session.rs::chunked_row_stream` + `crates/core/tests/stream_batches.rs`：`page_size` /
   `first_screen` 切批（3 个单测）与 500 行递归 CTE 的增量 `RowsAppended` 端到端（1 个用例）
 - P2 live：`db-postgres/tests/live.rs`（6 例）、`db-mysql/tests/live.rs`（5 例）、
-  `core/tests/live_p2.rs`（2 例）—— TLS 模式矩阵、独占 Conn 事务、`fetch_page` 分页兜底、
+  `crates/core/tests/live_p2.rs`（2 例）—— TLS 模式矩阵、独占 Conn 事务、`fetch_page` 分页兜底、
   PG 真惰性流多批 / 早停 / 提前丢弃后的连接复用
 
 ## 当前限制

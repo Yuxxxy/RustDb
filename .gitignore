@@ -3,3 +3,5 @@
 **/*.rs.bk
 *.log
 .DS_Store
+# 打包产物（scripts/package.ps1）
+/dist

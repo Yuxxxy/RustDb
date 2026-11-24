@@ -6,7 +6,7 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package.ps1 -Profile debug -SkipZip
 param(
   [string]$Profile = "release",
-  [string]$OutDir = "dist",
+  [string]$OutDir = "target/dist",
   [switch]$SkipBuild,
   [switch]$SkipZip
 )

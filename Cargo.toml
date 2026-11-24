@@ -1,22 +1,18 @@
 [workspace]
 resolver = "2"
 members = [
-    "app",
-    "shell",
-    "ui",
-    "cli",
-    "core",
-    "platform",
-    "bootstrap",
-    "db-api",
-    "db-sqlite",
-    "db-mysql",
-    "db-postgres",
-    "db-mssql",
-    "db-oracle",
-    "db-oracle-rust",
-    "db-tunnel",
-    "sql-lang",
+    # 可执行入口
+    "apps/desktop",
+    "apps/cli",
+    # 应用层
+    "crates/bootstrap",
+    "crates/core",
+    "crates/platform",
+    "crates/shell",
+    "crates/sql-lang",
+    "crates/ui",
+    # 驱动层（新驱动加到 crates/db/ 即可）
+    "crates/db/*",
 ]
 
 [workspace.package]
@@ -80,19 +76,19 @@ base64 = "0.22"
 getrandom = "0.3"
 
 # --- 内部 crate ---
-rustdb-core = { path = "core" }
-rustdb-platform = { path = "platform" }
-rustdb-bootstrap = { path = "bootstrap" }
-rustdb-ui = { path = "ui" }
-rustdb-shell = { path = "shell" }
-rustdb-db-api = { path = "db-api" }
-rustdb-db-sqlite = { path = "db-sqlite" }
-rustdb-db-mysql = { path = "db-mysql" }
-rustdb-db-postgres = { path = "db-postgres" }
-rustdb-db-mssql = { path = "db-mssql" }
-rustdb-db-oracle = { path = "db-oracle" }
-rustdb-db-tunnel = { path = "db-tunnel" }
-rustdb-sql-lang = { path = "sql-lang" }
+rustdb-core = { path = "crates/core" }
+rustdb-platform = { path = "crates/platform" }
+rustdb-bootstrap = { path = "crates/bootstrap" }
+rustdb-ui = { path = "crates/ui" }
+rustdb-shell = { path = "crates/shell" }
+rustdb-db-api = { path = "crates/db/api" }
+rustdb-db-sqlite = { path = "crates/db/sqlite" }
+rustdb-db-mysql = { path = "crates/db/mysql" }
+rustdb-db-postgres = { path = "crates/db/postgres" }
+rustdb-db-mssql = { path = "crates/db/mssql" }
+rustdb-db-oracle = { path = "crates/db/oracle" }
+rustdb-db-tunnel = { path = "crates/db/tunnel" }
+rustdb-sql-lang = { path = "crates/sql-lang" }
 
 [profile.release]
 lto = "thin"

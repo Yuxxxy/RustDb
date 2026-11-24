@@ -98,7 +98,7 @@ RustDb **不是** Fork，而是同一套 UI 方法论的第二个产品：
 | --- | --- | --- | --- |
 | 产品名 | RustSql | **RustDb** | 标题栏、日志、状态文案、文档标题 |
 | 二进制 | `rustdb.exe` | **`rustdb.exe`** | `app` crate 的 `[[bin]]` |
-| crate 包名 | `rustdb-{core,ui,shell,platform,db-api,db-sqlite,db-mysql,db-postgres,db-mssql,db-oracle,sql-lang}` | **`rustdb-…`** | 目录名不变（`core/`、`ui/`…），只改包名 |
+| crate 包名 | `rustdb-{core,ui,shell,platform,db-api,db-sqlite,db-mysql,db-postgres,db-mssql,db-oracle,sql-lang}` | **`rustdb-…`** | 包名不变；目录已收敛到 `crates/`、`apps/`（见 6.4） |
 | Rust 模块路径 | `rustdb_core` / `rustdb_ui` … | **`rustdb_core`** / **`rustdb_ui`** … | 包名连字符自动映射下划线 |
 | 环境变量 | `RUSTDB_DEMO` / `RUSTDB_LIVE_TESTS` / `RUSTDB_DEV_DB` / `RUSTDB_DEMO_SCHEMA` / `RUSTDB_DEMO_MENU` / `RUSTDB_DEMO_OBJ_MENU` | **`RUSTDB_*`** | 旧变量一律不再识别，见下方「不兼容项」 |
 | 数据目录 | `%APPDATA%\RustSql`（macOS `~/Library/Application Support/RustSql`，Linux `~/.config/rustdb`） | **`RustDb` / `rustdb`** | 见下方「一次性迁移」 |
@@ -311,7 +311,7 @@ RustDb **不是** Fork，而是同一套 UI 方法论的第二个产品：
 | F-47 | 错误自修复     | P1  | 语法/权限错误最多自动重试 1 次，且必须在 UI 标注「已重试」                                                        |
 | F-48a | AI 会话持久化  | P0  | 会话列表落 `ai_sessions.json`；跨重启恢复；可重命名/删除（补录，见 11.8）                          |
 | F-48b | AI 流式输出    | P0  | OpenAI 兼容端点用 SSE 逐段推 `AiEvent::Delta`；离线 provider 仍整段返回（补录，见 11.8）         |
-| F-50a | 红队用例集     | P0  | 注入 / 越权 / 破坏性 / 拒绝后重试 四类，见 `core/tests/agent_redteam.rs`（补录，见 11.8）         |
+| F-50a | 红队用例集     | P0  | 注入 / 越权 / 破坏性 / 拒绝后重试 四类，见 `crates/core/tests/agent_redteam.rs`（补录，见 11.8）         |
 | F-48 | 会话持久化     | P0  | 多轮对话、历史列表、重命名/删除、跨重启恢复                                                                   |
 | F-49 | 上下文选择     | P1  | 可挂载：当前 SQL、选中文本、结果集采样、指定表结构                                                              |
 | F-50 | Agent 审计  | P0  | 每次工具调用记录：工具名、参数摘要、SQL、影响行数、耗时、RunId                                                      |
@@ -505,92 +505,34 @@ RustDb **不是** Fork，而是同一套 UI 方法论的第二个产品：
 
 ### 6.4 目录结构
 
+根目录只保留四个文件夹：可执行入口进 `apps/`，库进 `crates/`，驱动再收一级 `crates/db/`。
+workspace 的 `members` 用 `apps/*` + `crates/*` + `crates/db/*`，新增驱动不需要再改根清单。
+
 ```
 RustDb/
 ├── Cargo.toml                  # workspace（resolver=2）
-├── docs/
-│   └── RustDb-需求开发文档.md
-├── app/
-│   ├── Cargo.toml
-│   ├── build.rs                # 图标 / 资源
-│   └── src/main.rs             # 组合根：注册驱动、启动 shell
-├── shell/
-│   └── src/
-│       ├── app.rs              # Application::new、Root、TitleBar 装配
-│       └── actions.rs          # 全局 Actions（NewQuery/Execute/CloseTab…）
-├── ui/
-│   └── src/
-│       ├── lib.rs
-│       ├── theme.rs            # 复用 RustShell：Token → gpui-component Theme
-│       ├── main_view.rs        # 三列卡片布局 + 面板调度
-│       ├── main_view/          # 拆分子模块（对齐 RustShell 的拆分方式）
-│       │   ├── ui_state.rs     # 按域分组的 UI 状态（conn/panel/editor/ai/io）
-│       │   ├── dialogs.rs      # 连接对话框、确认框、参数框
-│       │   ├── actions.rs      # 视图级动作
-│       │   └── layout_persist.rs
-│       ├── activity_bar.rs     # 6 个面板图标 + 底部语言/主题/设置
-│       ├── connections_panel.rs# 连接树（Tree + 右键菜单）
-│       ├── objects_panel.rs    # 对象树（懒加载）
-│       ├── sql_workspace.rs    # 标签 + 编辑器 + 结果区
-│       ├── editor/
-│       │   ├── mod.rs          # 编辑器外壳（EditorState + 高亮层）
-│       │   ├── highlight.rs    # SQL 词法高亮
-│       │   └── completion.rs   # 补全弹层
-│       ├── grid/
-│       │   ├── mod.rs          # 虚拟网格（行/列虚拟化）
-│       │   ├── cell.rs         # 单元格渲染与编辑器
-│       │   └── selection.rs    # 区域选择、复制
-│       ├── ai_panel.rs         # 对话、工具卡、确认卡（复用 RustShell）
-│       ├── settings_panel.rs   # 外观/编辑器/AI/快捷键/账户
-│       ├── dashboard_panel.rs  # 概览
-│       ├── notice.rs           # 统一提示条
-│       ├── plot_chart.rs       # 结果集轻量图表（P2）
-│       └── test_support.rs     # 源码护栏测试（剥注释/切测试模块）
-├── core/
-│   └── src/
-│       ├── lib.rs
-│       ├── events.rs           # AppEvent 统一事件（本文件是契约）
-│       ├── commands.rs         # Command / CommandAck
-│       ├── session/
-│       │   ├── mod.rs          # SessionActor、SessionHandle
-│       │   ├── registry.rs     # 活跃会话表、生命周期
-│       │   ├── txn.rs          # 事务状态机
-│       │   └── cancel.rs       # CancelToken
-│       ├── results/
-│       │   ├── mod.rs          # ResultStore、ResultSetId、分页
-│       │   └── export.rs       # 流式导出
-│       ├── metadata/
-│       │   ├── mod.rs          # 元数据缓存、失效策略
-│       │   └── snapshot.rs     # 树快照（供 UI 比对）
-│       ├── profile.rs          # ConnectionProfile、分组、导入导出
-│       ├── persistence.rs      # settings / connections / history / chats
-│       ├── agent/
-│       │   ├── mod.rs          # 循环、Run 生命周期
-│       │   ├── tools.rs        # 工具定义与参数 schema
-│       │   ├── policy.rs       # 风险分级与确认策略
-│       │   ├── context.rs      # schema 摘要 / 结果采样 / token 预算
-│       │   └── audit.rs        # 审计日志
-│       ├── i18n.rs
-│       └── error.rs            # CoreError → 用户可读文案
-├── db-api/
-│   └── src/
-│       ├── lib.rs
-│       ├── driver.rs           # Driver / DriverFactory / DriverRegistry
-│       ├── session.rs          # Session / ExecuteRequest / RowStream
-│       ├── metadata.rs         # MetadataProvider + 统一 IR
-│       ├── dialect.rs          # Dialect trait + 分页/DDL 策略
-│       ├── capabilities.rs     # Capabilities 位图/结构体
-│       ├── value.rs            # Value / ColumnMeta / RowBatch
-│       ├── error.rs            # DriverError / Kind / SqlState
-│       └── quote.rs            # 标识符引用与字面量转义
-├── db-mysql/  db-postgres/  db-sqlite/  db-mssql/  db-oracle/
-├── sql-lang/
-│   └── src/{lexer.rs, splitter.rs, classifier.rs, complete.rs, format.rs}
-├── platform/
-│   └── src/{paths.rs, secret.rs, logging.rs, single_instance.rs, dialog.rs, tray.rs}
-└── assets/
-    └── icons/                  # Lucide SVG（沿用 RustShell 的图标管线）
+├── apps/
+│   ├── desktop/                # bin: rustdb（build.rs + src/main.rs 组合根）
+│   └── cli/                    # bin: rustdb-cli
+├── crates/
+│   ├── bootstrap/              # 驱动注册 + 配置 / 历史存储（desktop 与 cli 共用）
+│   ├── shell/                  # GPUI Application / Window / Root / Actions
+│   ├── ui/
+│   │   └── src/main_view/      # 40 个 impl MainView 模块 + tests_*（按功能域拆分）
+│   ├── core/                   # 会话 Actor、事件总线、结果存储、迁移、Agent、导出 …
+│   │   └── src/page.rs         # 服务端分页的方言兜底
+│   ├── platform/               # 路径、日志、崩溃恢复
+│   ├── sql-lang/               # 词法、语句切分、分类、参数、脚本
+│   └── db/
+│       ├── api/                # Driver / Session / Metadata / Dialect / Value 契约
+│       ├── postgres/  mysql/  sqlite/  mssql/  oracle/  oracle-rust/
+│       └── tunnel/             # SSH 隧道 / 代理
+├── docs/                       # 需求文档、UI 规范、M1–M6 验证报告
+└── scripts/                    # 打包脚本 + 真库环境
 ```
+
+> 迁移说明：`docs/M1`–`M6-验证报告.md` 是当时快照，正文里的 `core/…`、`ui/…` 按当时布局书写，
+> 与当前 `crates/…` 一一对应，不回改历史报告。
 
 ### 6.5 线程与并发模型
 
@@ -677,7 +619,7 @@ RustDb/
 ### 7.2 连接配置
 
 ```rust
-// core/src/profile.rs
+// crates/core/src/profile.rs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionProfile {
     pub id: ProfileId,                 // ULID，稳定不变
@@ -708,7 +650,7 @@ pub struct ConnectionProfile {
 ### 7.3 驱动与注册表
 
 ```rust
-// db-api/src/driver.rs
+// crates/db/api/src/driver.rs
 #[async_trait::async_trait]
 pub trait DriverFactory: Send + Sync {
     fn kind(&self) -> DbKind;
@@ -753,7 +695,7 @@ impl DriverRegistry {
 会话是「一条连接 + 事务上下文 + 取消能力」的唯一入口。
 
 ```rust
-// db-api/src/session.rs
+// crates/db/api/src/session.rs
 #[async_trait::async_trait]
 pub trait Session: Send + Sync {
     fn id(&self) -> SessionId;
@@ -813,7 +755,7 @@ pub struct RowBatch {
 ### 7.5 统一元数据 IR
 
 ```rust
-// db-api/src/metadata.rs
+// crates/db/api/src/metadata.rs
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
     /// 物理「库」：MySQL database / PG database / SQLite main|attached / MSSQL database
@@ -885,7 +827,7 @@ pub struct ColumnInfo {
 ### 7.6 值模型
 
 ```rust
-// db-api/src/value.rs
+// crates/db/api/src/value.rs
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Null,
@@ -958,7 +900,7 @@ pub struct ResultSet {
 ### 7.8 方言策略对象
 
 ```rust
-// db-api/src/dialect.rs
+// crates/db/api/src/dialect.rs
 pub trait Dialect: Send + Sync {
     fn kind(&self) -> DbKind;
 
@@ -1117,7 +1059,7 @@ pub struct MigrationStatement {
 | 4  | `impl Dialect` + `DdlGenerator`        | 分页/引用/类型映射单测通过                 |
 | 5  | 填 `Capabilities`                       | 能力矩阵测试：声明为 true 的项必须有实现        |
 | 6  | 错误映射                                   | 至少覆盖 10 类 `DriverErrorKind`    |
-| 7  | `app/src/main.rs` 注册一行                 | 新建连接下拉出现，无需改 UI                |
+| 7  | `apps/desktop/src/main.rs` 注册一行                 | 新建连接下拉出现，无需改 UI                |
 | 8  | 文档回填矩阵                                 | 本章表格更新                         |
 
 ---
@@ -1220,7 +1162,7 @@ UI ─────────────────────────�
 ```
 
 ```rust
-// core/src/commands.rs
+// crates/core/src/commands.rs
 #[derive(Debug, Clone)]
 pub enum Command {
     // 连接
@@ -1290,7 +1232,7 @@ pub enum CommandReject {
 ### 9.3 事件信封
 
 ```rust
-// core/src/events.rs
+// crates/core/src/events.rs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventEnvelope {
     /// 全局单调递增，仅用于诊断与日志排序，不用于业务判断
@@ -1647,7 +1589,7 @@ impl EventBus {
 ### 9.9 UI 桥接（与 RustShell 一致）
 
 ```rust
-// ui/src/main_view.rs
+// crates/ui/src/main_view.rs
 fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
     let mut drained = 0;
     let mut dirty = false;
@@ -1783,7 +1725,7 @@ pub struct AuditRecord {
 | 内容区三列卡片        | `卡片间 gap 6px`、`圆角 8px`、`1px border_subtle` | `CARD_GAP` / `CARD_RADIUS`       |
 | 全局字号           | 基准 15px（组件库 rem 基准），正文 13px，辅助 11px        | `theme.rs::font_size`            |
 | 图标             | Lucide 全量（`gpui-kit-assets`），不混用其他图标集      | RustShell 图标管线                   |
-| 主题             | 深色 / 浅色 / 跟随系统，Token 唯一来源                  | `core/theme.rs`                  |
+| 主题             | 深色 / 浅色 / 跟随系统，Token 唯一来源                  | `crates/core/theme.rs`                  |
 
 **与 RustShell 的三处有意差异**：
 
@@ -2181,7 +2123,7 @@ pub struct AuditRecord {
 ### 10.15 快捷键（对齐 Navicat 18）
 
 键位以 Navicat 18 官方 Hot Keys 为准（Common / Main Window / Query Editor / Data Editor）。
-全局按键由一个观察者统一分派（`ui/src/main_view/shortcuts.rs`），焦点在编辑器 / 输入框内同样生效；
+全局按键由一个观察者统一分派（`crates/ui/src/main_view/shortcuts.rs`），焦点在编辑器 / 输入框内同样生效；
 打开的模态面板（连接编辑器 / 转储 / 导入 / 参数 …）期间不接全局键，避免改到背后的标签页。
 
 | 作用域 | 快捷键 | 动作 |
@@ -2216,7 +2158,7 @@ pub struct AuditRecord {
 
 ### 10.16 i18n 与无障碍
 
-- 所有用户可见文案走 `i18n::t("中文")`，英文词条集中在 `core/i18n.rs`，禁止在 UI 里写英文长句。
+- 所有用户可见文案走 `i18n::t("中文")`，英文词条集中在 `crates/core/i18n.rs`，禁止在 UI 里写英文长句。
 - 数据库对象名、SQL、错误原文**不翻译**。
 - 对比度：正文 ≥ 4.5:1，次要文字 ≥ 3:1（Token 表已按此校过）。
 - 键盘可达：所有菜单项、按钮、树节点可 Tab 到达；对话框焦点陷阱；`Esc` 关闭浮层。
@@ -2297,7 +2239,7 @@ pub struct AuditRecord {
 
 ### 11.2 上下文构建
 
-模型看到的上下文由 `core/agent/context.rs` 统一组装，**绝不把整个库的结构一次性塞进去**。
+模型看到的上下文由 `crates/core/agent/context.rs` 统一组装，**绝不把整个库的结构一次性塞进去**。
 
 | 上下文块      | 内容                            | 预算（token） | 触发               |
 | --------- | ----------------------------- | --------- | ---------------- |
@@ -2327,7 +2269,7 @@ id bigint PK, name text, type text
 
 ### 11.3 工具清单
 
-所有工具定义在 `core/agent/tools.rs`，参数用 JSON Schema 描述，返回结构化 JSON + 一段人类可读摘要。
+所有工具定义在 `crates/core/agent/tools.rs`，参数用 JSON Schema 描述，返回结构化 JSON + 一段人类可读摘要。
 
 | 工具 | 风险 | 参数 | 返回 | 限制 |
 | --- | --- | --- | --- | --- |
@@ -2488,7 +2430,7 @@ pub async fn run(run_id: RunId, input: UserInput, ctx: RunContext) -> Result<(),
 - 结构：`AiSession { id, title, updated_at, messages: [{ role, content }] }`；按 `updated_at` 倒序展示，上限 50 条。
 - 恢复：启动时载入最近一次会话到右栏；「新对话」清空当前会话但保留历史。
 
-**红队用例（F-50a）**：`core/tests/agent_redteam.rs` 四类
+**红队用例（F-50a）**：`crates/core/tests/agent_redteam.rs` 四类
 
 | 类别 | 用例 | 期望 |
 |---|---|---|
@@ -2621,7 +2563,7 @@ AiEvent::Completed(tokens=…)
 
 **落地位置**：风险在 `AgentEngine::drive` 里按审查结果定级（确认卡带「审查：…」摘要）；
 `execute_tool` 对 `run_read_query` / `run_write_query` 再审查一次，阻断项不执行、记一条失败审计并把原因回给模型。
-只读工具里塞写语句仍走原拒绝路径（不弹确认）。测试：`core/src/review.rs` 10 例 +
+只读工具里塞写语句仍走原拒绝路径（不弹确认）。测试：`crates/core/src/review.rs` 10 例 +
 `sqlite_flow::agent_review_blocks_multi_statement_smuggling`（多语句夹带被拒且表未删）。
 
 ### 11.14 生产连接与临时写解锁（F-89 落地）
@@ -3095,7 +3037,7 @@ AiEvent::Completed(tokens=…)
 ### 12.3 密钥管理
 
 ```rust
-// platform/src/secret.rs
+// crates/platform/src/secret.rs
 pub trait SecretStore: Send + Sync {
     fn get(&self, key: &str) -> Result<Option<Zeroizing<String>>, SecretError>;
     fn set(&self, key: &str, value: &str) -> Result<(), SecretError>;
@@ -3527,17 +3469,17 @@ M-01~M-14 全部达标，且连续 3 次发布候选版本测量结果稳定（�
 
 | RustShell 文件             | RustDb 对应               | 复用方式                                    |
 | ------------------------ | ------------------------ | --------------------------------------- |
-| `core/src/theme.rs`      | `core/src/theme.rs`      | 原样复制 + 追加 SQL/网格 Token                  |
-| `ui/src/theme.rs`        | `ui/src/theme.rs`        | 原样复制，改 `APP_NAME` 与图标                   |
-| `ui/src/activity_bar.rs` | `ui/src/activity_bar.rs` | 改 `PanelKind` 六项与图标映射                   |
-| `ui/src/main_view.rs`    | `ui/src/main_view.rs`    | 保留 TitleBar / CARD_GAP / Resizable 三列结构 |
-| `ui/src/notice.rs`       | 同名                       | 原样                                      |
-| `ui/src/ai_panel.rs`     | 同名                       | 改工具卡内容与确认卡字段                            |
-| `core/src/agent/*`       | 同名                       | 复用循环骨架，替换工具集与策略                         |
-| `core/src/events.rs`     | 同名                       | 复用「统一枚举 + source tag」结构，替换变体            |
-| `platform/src/secret.rs` | 同名                       | 原样（keyring 抽象）                          |
-| `platform/src/paths.rs`  | 同名                       | 改应用名与目录                                 |
-| `ui/src/test_support.rs` | 同名                       | 原样（源码护栏扫描）                              |
+| `crates/core/src/theme.rs`      | `crates/core/src/theme.rs`      | 原样复制 + 追加 SQL/网格 Token                  |
+| `crates/ui/src/theme.rs`        | `crates/ui/src/theme.rs`        | 原样复制，改 `APP_NAME` 与图标                   |
+| `crates/ui/src/activity_bar.rs` | `crates/ui/src/activity_bar.rs` | 改 `PanelKind` 六项与图标映射                   |
+| `crates/ui/src/main_view.rs`    | `crates/ui/src/main_view.rs`    | 保留 TitleBar / CARD_GAP / Resizable 三列结构 |
+| `crates/ui/src/notice.rs`       | 同名                       | 原样                                      |
+| `crates/ui/src/ai_panel.rs`     | 同名                       | 改工具卡内容与确认卡字段                            |
+| `crates/core/src/agent/*`       | 同名                       | 复用循环骨架，替换工具集与策略                         |
+| `crates/core/src/events.rs`     | 同名                       | 复用「统一枚举 + source tag」结构，替换变体            |
+| `crates/platform/src/secret.rs` | 同名                       | 原样（keyring 抽象）                          |
+| `crates/platform/src/paths.rs`  | 同名                       | 改应用名与目录                                 |
+| `crates/ui/src/test_support.rs` | 同名                       | 原样（源码护栏扫描）                              |
 
 ### 18.3 参考资料
 
@@ -3623,7 +3565,7 @@ M-01~M-14 全部达标，且连续 3 次发布候选版本测量结果稳定（�
 
 ### 19.7 扩展数据源约束（F-102~F-106，P3）
 
-- 统一通过 `db-api` 扩展，不修改 core/UI 的方言分支；能力矩阵决定 UI 元素。
+- 统一通过 `db-api` 扩展，不修改 crates/core/UI 的方言分支；能力矩阵决定 UI 元素。
 - 每个数据源独立 crate / 可选组件，默认不编译进主包；懒加载，不参与冷启动与空闲内存预算。
 - 只读优先；写入、批量删除、清库等操作必须有独立确认与审计。
 - 未实现或未验证的能力显式禁用，禁止用「空结果」冒充成功。
@@ -3643,7 +3585,7 @@ M-01~M-14 全部达标，且连续 3 次发布候选版本测量结果稳定（�
 | `foreign_key_pivot` | 有可用外键元数据可跳转 | 隐藏跳转入口 |
 | `explain_visual` | 执行计划可结构化展示 | 回退原始文本 |
 
-> 其余增补能力（SQL 文件、导入、传输、对比、文档、备份、MCP、CLI）属于 core/平台能力，不作为驱动能力位；但执行写入时仍须查询连接的只读/生产标记。
+> 其余增补能力（SQL 文件、导入、传输、对比、文档、备份、MCP、CLI）属于 crates/core/平台能力，不作为驱动能力位；但执行写入时仍须查询连接的只读/生产标记。
 
 #### 19.8.2 命令与事件（草案）
 
@@ -3691,7 +3633,7 @@ M-01~M-14 全部达标，且连续 3 次发布候选版本测量结果稳定（�
 3. **驱动适配**：六方言逐个实现能力位与降级；契约测试同步扩展。
 4. **UI**：按 10.17 页面规格接入；所有入口由能力位控制。
 5. **安全能力**：MCP/CLI/插件/云同步放在 M6 后半与 M8，先权限后功能。
-6. **P3 数据源**：最后一个里程碑，独立 crate/可选组件，不反向依赖 core/UI。
+6. **P3 数据源**：最后一个里程碑，独立 crate/可选组件，不反向依赖 crates/core/UI。
 
 ### 19.12 明确边界
 
@@ -3713,7 +3655,7 @@ M-01~M-14 全部达标，且连续 3 次发布候选版本测量结果稳定（�
 | --- | --- | --- | --- | --- | --- |
 | X-01 | Oracle 用官方纯 Rust `oracledb`（免 Instant Client） | `db-oracle-rust` spike 已建（`oracledb =26.0.0-beta.4`，锁精确版本）：专用 OS 线程独占同步 `Connection`、异步侧仅等 `oneshot`；NUMBER 精确十进制、CLOB/BLOB、DATE/TIMESTAMP/TZ 映射已实现并有单测；取消仍无旁路接口（能力位 `None`），改用 `set_call_timeout` 并映射 `Timeout`；元数据未移植，true live 往返待环境 | 通过 live 后再补元数据并切换注册，旧 `oracle`(ODPI-C) 驱动保留可回退 | F-04、R-01、AC-01/02/04 | M7（spike 可与 M6 并行） |
 | X-02 | 服务端分页契约 `fetch_page(PageRequest)` | `Capabilities.server_side_filter` 恒 false，表数据只有 `LIMIT` | `db-api` 增 `PageRequest{page,page_size,order_by,filter}` + `Session::fetch_page`；**方言翻译在驱动内**，驱动必须追加主键兜底排序；NULL 排序位置写进契约 | F-70、AC-20/29、R-24 | M7 |
-| X-03 | 导入/导出拆独立实现（不复用 UI 拼接） | 只有 `ui/src/csv.rs` | 新建 `core/src/export.rs`（后续可独立 crate）：`ExportFormat::{Tsv,Csv,Json,Markdown,SqlInsert,SqlUpdate}`，按页喂 `write_rows`；**必须含公式防护**（参照实现缺失） | F-72、F-74、AC-30 | M6（文本格式先行） |
+| X-03 | 导入/导出拆独立实现（不复用 UI 拼接） | 只有 `crates/ui/src/csv.rs` | 新建 `crates/core/src/export.rs`（后续可独立 crate）：`ExportFormat::{Tsv,Csv,Json,Markdown,SqlInsert,SqlUpdate}`，按页喂 `write_rows`；**必须含公式防护**（参照实现缺失） | F-72、F-74、AC-30 | M6（文本格式先行） |
 | X-04 | i18n 迁移到 `rust-i18n`（编译期 YAML） | 手写词条表 14 条，硬编码中文未迁移 | 保留 `t(key)` 薄封装，底层换 `rust-i18n`，按模块迁移；缺失 key 回落 + 告警 + `log-miss-tr` | F-54、AC-14、R-22 | M7 |
 | X-05 | SSH/SOCKS 隧道独立 crate | `db-tunnel` 已建并接上 UI（F-91）：known_hosts（含 hashed / 通配）先于凭据校验、多层建链与层号错误、认证有序回退链（私钥 → 私钥+口令 → 口令 → none）、本地 `127.0.0.1:<随机端口>` 转发、密钥未知 / 变更的确认浮层（确认前不发凭据）、连接配置增删改并落盘；agent 认证待补，SOCKS5 / HTTP CONNECT 代理归 F-91a | 新建 `db-tunnel`（`russh`，不用 ssh2/C 库），产出 `AsyncRead+AsyncWrite` 流；**known_hosts 校验先于任何凭据发送**，多层按配置顺序建链、失败定位到层 | F-91、19.6、R-24 无关 | M7 |
 

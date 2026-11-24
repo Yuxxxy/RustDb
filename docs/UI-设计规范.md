@@ -1,6 +1,6 @@
 # RustDb UI 设计规范 v1.0
 
-> **适用范围**：`ui/` 全部视图、组件与主题映射；`core/src/theme.rs` 的 Token 定义；`core/src/layout.rs` 的界面偏好持久化。
+> **适用范围**：`crates/ui/` 全部视图、组件与主题映射；`crates/core/src/theme.rs` 的 Token 定义；`crates/core/src/layout.rs` 的界面偏好持久化。
 > **代码基线**：`e78ffa4`（2026-11-12 核对，与 `origin/main` 一致）。
 > **与需求文档的关系**：`docs/RustDb-需求开发文档.md` 第 10 章定义视觉方向与基础 Token，本文件是它的**可执行细化与验收口径**。
 > 基础 Token 的十六进制值仍以需求文档 10.3 为准（**禁止改值**）；字号、对比度、组件状态以本文件为准。
@@ -25,7 +25,7 @@
 
 ## 1. 设计原则
 
-1. **Token 唯一来源**：颜色一律经 `theme::current(cx)` → `hex(t.xxx)`；`ui/src` 内禁止十六进制字面量。
+1. **Token 唯一来源**：颜色一律经 `theme::current(cx)` → `hex(t.xxx)`；`crates/ui/src` 内禁止十六进制字面量。
 2. **基础层冻结**：`border_subtle` / `bg_*` / `fg_*` 等基础值禁止改动（与 RustShell 保持一致）。对比度不足时**新增扩展 Token**，不覆盖旧值。
 3. **可访问性内建**：正文 ≥ 4.5:1，非文本 UI 边界 ≥ 3:1（WCAG 2.1 AA / 1.4.11），键盘可达、焦点可见、命中区 ≥ 24×24。
 4. **8pt 栅格**：间距取 4 / 8 / 12 / 16 / 24 / 32，圆角只保留 6 / 8 / 10 三档，禁止 `px(3.)` 这类零散值用于布局。
@@ -39,9 +39,9 @@
 
 | 层 | 位置 | 规则 |
 | --- | --- | --- |
-| 基础层 | `core/src/theme.rs::ThemeTokens` 现有字段 | 冻结，禁止改值；Dark / Light 必须成对 |
+| 基础层 | `crates/core/src/theme.rs::ThemeTokens` 现有字段 | 冻结，禁止改值；Dark / Light 必须成对 |
 | 扩展层 | 同结构体新增字段（带 `#[serde(default)]` 语义） | 本轮新增，用于修复对比度与语义前景 |
-| 组件层 | `ui/src/theme.rs::apply_theme_mode` | 把上游 Token 映射到 `gpui-component::ThemeColors`，业务代码不直接碰 |
+| 组件层 | `crates/ui/src/theme.rs::apply_theme_mode` | 把上游 Token 映射到 `gpui-component::ThemeColors`，业务代码不直接碰 |
 
 ### 2.2 基础层（冻结值，摘自需求文档 10.3）
 
@@ -183,10 +183,10 @@
 
 ```bash
 # 1) 字号与像素字面量扫描
-python -c "import re,glob,collections; f=glob.glob('ui/src/**/*.rs',recursive=True); s=''.join(open(x,encoding='utf8').read() for x in f); c=collections.Counter(map(float,re.findall(r'text_size\(px\(([0-9.]+)\)\)',s))); print('kinds',len(c),'calls',sum(c.values()),'lt12',sum(v for k,v in c.items() if k<12))"
+python -c "import re,glob,collections; f=glob.glob('crates/ui/src/**/*.rs',recursive=True); s=''.join(open(x,encoding='utf8').read() for x in f); c=collections.Counter(map(float,re.findall(r'text_size\(px\(([0-9.]+)\)\)',s))); print('kinds',len(c),'calls',sum(c.values()),'lt12',sum(v for k,v in c.items() if k<12))"
 
 # 2) 颜色字面量扫描（应为空；主题文件除外）
-python -c "import re,glob; f=glob.glob('ui/src/**/*.rs',recursive=True); print([x for x in f if re.search(r'0x[0-9A-Fa-f]{6}',open(x,encoding='utf8').read())])"
+python -c "import re,glob; f=glob.glob('crates/ui/src/**/*.rs',recursive=True); print([x for x in f if re.search(r'0x[0-9A-Fa-f]{6}',open(x,encoding='utf8').read())])"
 
 # 3) 编译、格式与 UI 用例
 cargo fmt --all -- --check
@@ -198,7 +198,7 @@ cargo test -p rustdb-ui --lib
 | --- | --- | --- |
 | `text_size` 字面量调用 | 369 处 / 10 种 / 357 处 < 12px | **0 处**（全部走 `TS_*`）/ 3 级在用 / < 12px = 0 |
 | `px(...)` 硬编码常量 | 950 处 / 98 种值 | 587 处 / 89 种值（P2：布局类收敛到 8pt 栅格） |
-| `ui/src` 十六进制色值 | 0 | 0 |
+| `crates/ui/src` 十六进制色值 | 0 | 0 |
 | 结构性边界对比度 | 1.45–1.55 | 卡片 / 工具栏 / 输入框 / 状态栏 / 对话框改 `border_strong`：3.77–4.55 |
 | 危险按钮文字对比度 | 3.35（Dark） | 5.65（Dark）/ 5.36（Light） |
 | ghost 悬停文字对比度 | 1.00（Dark，与卡片背景同色，悬停时标签整个消失） | 深色改 `fg_primary`：裸底 13.7–16.0 / accent@50% 复合底 5.5–5.8；浅色 `on_accent` 对实心 accent 5.19 |
@@ -218,8 +218,8 @@ cargo test -p rustdb-ui --lib
 
 | 编号 | 项 | 状态 | 落地证据 / 未完成原因 |
 | --- | --- | --- | --- |
-| P0-2 | 扩展 Token | ✅ 已落地 | `core/theme.rs` 新增 `border_strong` / `on_danger_resolved`；`ui/theme.rs` 映射；卡片、工具栏、状态栏、对话框接线 |
-| P0-1 | TypeScale + 护栏 | ✅ 已落地 | `ui/design.rs` 4 级 Token；369 处字面量全替换；`no_hardcoded_text_size` 扫描用例 |
+| P0-2 | 扩展 Token | ✅ 已落地 | `crates/core/theme.rs` 新增 `border_strong` / `on_danger_resolved`；`crates/ui/theme.rs` 映射；卡片、工具栏、状态栏、对话框接线 |
+| P0-1 | TypeScale + 护栏 | ✅ 已落地 | `crates/ui/design.rs` 4 级 Token；369 处字面量全替换；`no_hardcoded_text_size` 扫描用例 |
 | P0-3 | 危险按钮文字 | ✅ 已落地 | Dark 5.65:1 / Light 5.36:1，生产徽标同步 |
 | P0-4 | 焦点态 | ✅ 已落地 | 保留 `focus_ring = false`；核对 gpui-component 0.8 `focus_style`：聚焦时 `border_color` 自动换 `theme.ring`(accent)。本轮把**默认**描边由 1.5:1 提到 ≥3.77:1，两态均可辨 |
 | P0-5 | 网格 | ✅ 已落地 | `GridDensity` 三档（22/25/30）落 `layout.json`；diff @12%；废弃斑马纹 + 整行 hover；选区 18% + accent 描边；列头类型角标 |
@@ -230,26 +230,26 @@ cargo test -p rustdb-ui --lib
 | P1 | 工具栏 < 900px 折叠 | ✅ 已落地 | `TOOLBAR_COMPACT_W = 900`；判定用 `on_prepaint` **实测**工作区宽（侧栏被 flex 压缩且不回写 layout，视口估算偏小 79.9px，会误折叠 vw≈1130–1209）；只读预览 / 打开 / 保存收进「更多 ▾」，复用 `MenuEntry` + 全局按键观察者；库选择器省略号吸收余量、折叠态去掉两条装饰分隔线。**< 1024px 仍会裁切**，见 §11.4 |
 | P1 | 导出触发器 | ✅ 已落地 | 手写 `div + on_mouse_down` 换 `Button`：Idle / Hover / Focus / Open 四态由组件提供，`tooltip` 说明可用格式，`track_focus` + 全局按键观察者打通 Enter / ↑ / ↓ / Home / End / Esc；菜单高亮项与 hover 同底色 |
 | P1 | AI 气泡 | ✅ 已落地 | 角色标签 + `border_strong` 描边 + 运行中禁用发送；长会话 ≥50 条走 `VirtualList` 虚拟化（高度估算 + 可见项实测回写 + 贴底跟随），见 §11.5 |
-| P1 | 编辑器可拖拽分隔 | ✅ 已落地 | `core/layout.rs` 新增 `editor_height` + 6 个常量与 `clamp_editor_height`（`#[serde(default)]` 兼容旧配置）；`workspace.rs` 单一 setter 接线拖拽 / 键盘 / 双击 / 设置页复位；拖拽期遮罩防误选字；`layout.json` 只在松手时写一次 |
+| P1 | 编辑器可拖拽分隔 | ✅ 已落地 | `crates/core/layout.rs` 新增 `editor_height` + 6 个常量与 `clamp_editor_height`（`#[serde(default)]` 兼容旧配置）；`workspace.rs` 单一 setter 接线拖拽 / 键盘 / 双击 / 设置页复位；拖拽期遮罩防误选字；`layout.json` 只在松手时写一次 |
 | P2 | 命令面板 / 状态栏常驻字段 / 设置搜索 / i18n 全量 | 🔶 部分 | 状态栏常驻字段已落地（见 §11.6）；命令面板 / 设置搜索 / i18n 全量排期 |
 
-**本轮改动文件**：`core/{theme,layout,lib}.rs`、`ui/{design,theme,lib}.rs`、
-`ui/main_view.rs` 及 29 个 `ui/src/**` 视图文件（字号收敛）、
-`ui/src/main_view/{result_view,settings_panel,workspace,status_bar,sidebar,ai_column,routine_panel}.rs`、
+**本轮改动文件**：`crates/core/{theme,layout,lib}.rs`、`crates/ui/{design,theme,lib}.rs`、
+`crates/ui/main_view.rs` 及 29 个 `crates/ui/src/**` 视图文件（字号收敛）、
+`crates/ui/src/main_view/{result_view,settings_panel,workspace,status_bar,sidebar,ai_column,routine_panel}.rs`、
 `docs/UI-设计规范.md`。
-**P1-① 追加**：`ui/src/main_view/{workspace,render,lifecycle,settings_panel,tests_layout}.rs`、
-`ui/src/main_view.rs`、`core/src/{layout,lib}.rs`（单文件多处改动走 `.tmp/p1_editor_split.py` 字节级精确补丁）。
-**P1-② 追加**：`ui/src/{design,main_view}.rs`、
-`ui/src/main_view/{lifecycle,sidebar,result_view,result_tabs,routine_panel,events,tests_layout}.rs`
+**P1-① 追加**：`crates/ui/src/main_view/{workspace,render,lifecycle,settings_panel,tests_layout}.rs`、
+`crates/ui/src/main_view.rs`、`crates/core/src/{layout,lib}.rs`（单文件多处改动走 `.tmp/p1_editor_split.py` 字节级精确补丁）。
+**P1-② 追加**：`crates/ui/src/{design,main_view}.rs`、
+`crates/ui/src/main_view/{lifecycle,sidebar,result_view,result_tabs,routine_panel,events,tests_layout}.rs`
 （走 `.tmp/p1_loading.py`）。
-**P1-③ 追加**：`ui/src/main_view.rs`（`MenuEntry.highlight` + `export_focus` / `export_hover`）、
-`ui/src/main_view/{workspace,grid,lifecycle,tests_layout}.rs`（走 `.tmp/p1_export_button.py`、
+**P1-③ 追加**：`crates/ui/src/main_view.rs`（`MenuEntry.highlight` + `export_focus` / `export_hover`）、
+`crates/ui/src/main_view/{workspace,grid,lifecycle,tests_layout}.rs`（走 `.tmp/p1_export_button.py`、
 `.tmp/p1_export_key2.py`）。
-**P1-④ 追加**：`core/src/{layout,lib}.rs`（`TOOLBAR_COMPACT_W`）、
-`ui/src/main_view.rs`（`toolbar_menu` / `toolbar_focus` / `toolbar_hover` / `measured_workspace_w`、
+**P1-④ 追加**：`crates/core/src/{layout,lib}.rs`（`TOOLBAR_COMPACT_W`）、
+`crates/ui/src/main_view.rs`（`toolbar_menu` / `toolbar_focus` / `toolbar_hover` / `measured_workspace_w`、
 3 个 `MenuAction`、共用 `menu_hover_move`）、
-`ui/src/main_view/{workspace,render,lifecycle,tests_layout}.rs`、
-`ui/src/theme.rs`（ghost 悬停文字色深色分支 + 对比度护栏，见 §11.4 回归记录五）。
+`crates/ui/src/main_view/{workspace,render,lifecycle,tests_layout}.rs`、
+`crates/ui/src/theme.rs`（ghost 悬停文字色深色分支 + 对比度护栏，见 §11.4 回归记录五）。
 
 **提交边界**：P0 全项 + P1-① = `c206c1a`；P1-② = `6c6e52c`；P1-③ + P1-④ + ghost 悬停修复仍在工作区、未提交。
 
@@ -273,7 +273,7 @@ cargo test -p rustdb-ui --lib
 | 全工作区编译 | `cargo check --workspace --all-targets` | 通过（11 个 crate） |
 | UI 单元测试 | `cargo test -p rustdb-ui --lib` | **155 passed / 0 failed**（148 + P1-④ 6 条折叠 / 阈值 / 键盘 / 裁切用例 + 1 条 ghost 悬停对比度护栏） |
 | core 单元测试 | `cargo test -p rustdb-core --lib` | **334 passed / 0 failed**（330 + P1-① 4 条高度夹取用例） |
-| 设计系统扫描 | `python .tmp/ui_verify.py` | 字号字面量 0；`ui/src` 十六进制色值 0；6 组对比度全部 PASS |
+| 设计系统扫描 | `python .tmp/ui_verify.py` | 字号字面量 0；`crates/ui/src` 十六进制色值 0；6 组对比度全部 PASS |
 | 真机视觉 | PrintWindow 截图 + 像素直方图（`.tmp/p4_diag.ps1` / `p4_final.ps1`） | 悬停标签可见：idle / 悬停亮像素 6373 / 6373（修复前 6373 / 6122）；恢复真实用户配置后 1200×820 启动、折叠态无裁切 |
 
 **实测验收数字**：`text_size` 字面量 0，Token 调用 367 处
@@ -319,7 +319,7 @@ cargo test -p rustdb-ui --lib
 不依赖组件内部测量；夹取只影响编辑器上限，结果区不足时由 `RESULT_HEIGHT_MIN` 兜底。
 未做：分隔条自身 tooltip（`div` 无 `Button::tooltip`），快捷键提示改由「设置 → 外观 → 工作区」承载，P2 补统一 tooltip 组件。
 
-**验收用例**（`ui/src/main_view/tests_layout.rs`）：
+**验收用例**（`crates/ui/src/main_view/tests_layout.rs`）：
 - `editor_splitter_drag_persists_height`：两帧拖拽 + 遮罩出现/消失 + `layout.json` 持久化；
 - `editor_splitter_double_click_resets`：双击复位且不残留遮罩；
 - `editor_height_keyboard_nudge_and_reset`：`Ctrl+Alt+↑/↓/0` 夹取与复位。
@@ -385,7 +385,7 @@ core 侧 4 条：默认值 / 夹取与结果区保底 / 序列化与旧配置回
 **护栏**：该断言（正方形 + 24~34 高度 + 宽度 ≥24）留在 `export_format_menu_lists_all_formats` 里，
 以后任何人调小触发器都会被测试拦住。
 
-**验收用例**（`ui/src/main_view/tests_layout.rs`）：
+**验收用例**（`crates/ui/src/main_view/tests_layout.rs`）：
 - `export_format_menu_lists_all_formats`：鼠标点击开菜单、11 个格式项齐全、命中区尺寸护栏、执行后关闭；
 - `export_format_menu_is_keyboard_reachable`：Enter 打开（默认高亮第 1 项）→ ↓ 两次到 JSON → Enter 执行
   → 再开 → Esc 收起。
@@ -394,7 +394,7 @@ core 侧 4 条：默认值 / 夹取与结果区保底 / 序列化与旧配置回
 
 | 口径 | 值 |
 | --- | --- |
-| 阈值 | `core/layout.rs::TOOLBAR_COMPACT_W = 900`，判定对象是**工具栏可用宽**，不是窗口宽 |
+| 阈值 | `crates/core/layout.rs::TOOLBAR_COMPACT_W = 900`，判定对象是**工具栏可用宽**，不是窗口宽 |
 | 宽度来源 | `on_prepaint` 实测工作区根容器宽 → `measured_workspace_w`；视口估算仅用于首帧兜底 |
 | 测量层 | 工作区根 `v_flex().size_full()`——宽度由卡片决定、不随工具栏内容变化，因此测量与折叠判定不会互相振荡 |
 | 补帧 | 只在折叠判定**真的翻转**时 `cx.notify()`；宽度变化 < 0.5px 直接忽略，避免逐帧重绘 |
@@ -471,7 +471,7 @@ AI 开时两者相差 ≤0.1px（AI 列没被压缩），所以问题只在侧�
 - 最紧配置下库名只剩约 62.5px（含图标与内边距），**只能靠省略号辨认，且目前没有 tooltip**
   （库选择器是 `div`，用不了 `Button::tooltip`）；统一 tooltip 组件仍是 P2 缺口（同 §11.1）。
 
-**验收用例**（`ui/src/main_view/tests_layout.rs`，本轮 +6）：
+**验收用例**（`crates/ui/src/main_view/tests_layout.rs`，本轮 +6）：
 - `toolbar_collapses_secondary_actions_below_900`：宽/窄两态的平铺与折叠、判定宽 == 实测宽、
   「更多 ▾」命中区 24~34 高且宽 ≥24、常驻项不消失；
 - `toolbar_compact_threshold_is_900`：把 `measured_workspace_w` 钉在 899.5 / 900 / 900.5，
@@ -494,7 +494,7 @@ AI 开时两者相差 ≤0.1px（AI 列没被压缩），所以问题只在侧�
 `accent_foreground`（button.rs hovered 分支），主题此前把它映射成 `on_accent`(#0D1117)，
 恰等于深色卡片背景；caret 走 `normal_style.fg.opacity(0.75)` 所以单独存活，
 造成「只剩箭头」的观感。「取消」「只读预览」共用同一 `.ghost() + .label()` 模式，
-属主题既有缺陷，非 P1-④ 引入。修复：`ui/src/theme.rs` 深色分支把 `accent_foreground`
+属主题既有缺陷，非 P1-④ 引入。修复：`crates/ui/src/theme.rs` 深色分支把 `accent_foreground`
 改取 `fg_primary`，浅色保留 `on_accent`（浅色悬停底是实心 accent，白字正确）。
 应用未使用 gpui-component 的 MenuItem / Toggle / Calendar 等组件，重映射无副作用。
 
@@ -504,7 +504,7 @@ AI 开时两者相差 ≤0.1px（AI 列没被压缩），所以问题只在侧�
 （`Dark 悬停文字 #0D1117 对悬停底 #335C8B 对比度 2.74 < 4.5`）。
 教训：对比度验收必须覆盖**悬停态**文字色，只查静态态会漏掉同色缺陷。
 
-**验收用例**（+1）：`ui/src/theme.rs` 上述护栏；真机截图对照
+**验收用例**（+1）：`crates/ui/src/theme.rs` 上述护栏；真机截图对照
 `.tmp/p4shots/` 的 m1 / m3（修复前）与 d1 / d2 / d5（修复后）。
 
 ### §11.5 P1-⑤ AI 长会话虚拟化（本轮追加）
@@ -619,7 +619,7 @@ SSH / 终端 / SFTP 业务语义一律不带。对照结论：主区 `flex_1 + m
 `h_6` 替换自定义控件写死高（RustDb 没有 RustShell 那种自绘分段控件，`design::chip` 已走 `Button::small()`）。
 
 **验证**：`cargo test -p rustdb-ui --lib` **172 passed / 0 failed**（本轮 +5 条护栏）；
-`cargo test --workspace` 全绿。§11.8 的改动只涉及 `ui/src`，不改任何数据链路。
+`cargo test --workspace` 全绿。§11.8 的改动只涉及 `crates/ui/src`，不改任何数据链路。
 
 ---
 
@@ -629,10 +629,10 @@ SSH / 终端 / SFTP 业务语义一律不带。对照结论：主区 `flex_1 + m
 
 | 层 | 文件 | 职责 |
 | --- | --- | --- |
-| core（纯函数） | `core/src/window_bounds.rs` | `WindowBoundsRecord`（f32 逻辑像素）+ `fitted_to` / `pick_screen`；不依赖 gpui |
-| 配置 | `core/src/layout.rs` | `LayoutSettings::window_bounds`，`#[serde(default)]` 保证老 `layout.json` 不解析失败 |
-| ui（采集） | `ui/src/main_view/window_persist.rs` | `observe_window_bounds` + render 每帧兜底 → 内存；poll 里 2s 节流写盘；`on_app_quit` 立即 flush |
-| shell（恢复） | `shell/src/app.rs` | 开窗**前** `resolve_window_bounds`，多屏取重叠最大者，收进可见区，避免先居中再跳的闪烁 |
+| core（纯函数） | `crates/core/src/window_bounds.rs` | `WindowBoundsRecord`（f32 逻辑像素）+ `fitted_to` / `pick_screen`；不依赖 gpui |
+| 配置 | `crates/core/src/layout.rs` | `LayoutSettings::window_bounds`，`#[serde(default)]` 保证老 `layout.json` 不解析失败 |
+| ui（采集） | `crates/ui/src/main_view/window_persist.rs` | `observe_window_bounds` + render 每帧兜底 → 内存；poll 里 2s 节流写盘；`on_app_quit` 立即 flush |
+| shell（恢复） | `crates/shell/src/app.rs` | 开窗**前** `resolve_window_bounds`，多屏取重叠最大者，收进可见区，避免先居中再跳的闪烁 |
 
 **关键取舍（缺一不可）**：
 
@@ -690,8 +690,8 @@ hover 一直消不掉。确认这两个蓝框其实是 **§11.8 移植进来的�
 
 | 项 | 处理 | 涉及文件 |
 | --- | --- | --- |
-| 「最近」分组 | 侧栏不再渲染该节，也不再记录。`ProfileObjectState::recent` / `MAX_RECENT` / `record_recent()` 全部删除；老 `object_state.json` 里的 `recent` 键由 serde 静默忽略、回写时不再出现 | `ui/src/main_view/{sidebar,objects,bulk,tests_grid}.rs`、`platform/src/object_state.rs` |
-| 选中高亮 | 连接行与库行的 `when(is_active / is_current, bg 18% + border accent)` 删除；accent 图标色 / 文字色回落常规色；hover 改为对所有行无条件生效 —— 鼠标移开即恢复，不会再把选中误认成 hover | `ui/src/main_view/sidebar.rs` |
+| 「最近」分组 | 侧栏不再渲染该节，也不再记录。`ProfileObjectState::recent` / `MAX_RECENT` / `record_recent()` 全部删除；老 `object_state.json` 里的 `recent` 键由 serde 静默忽略、回写时不再出现 | `crates/ui/src/main_view/{sidebar,objects,bulk,tests_grid}.rs`、`crates/platform/src/object_state.rs` |
+| 选中高亮 | 连接行与库行的 `when(is_active / is_current, bg 18% + border accent)` 删除；accent 图标色 / 文字色回落常规色；hover 改为对所有行无条件生效 —— 鼠标移开即恢复，不会再把选中误认成 hover | `crates/ui/src/main_view/sidebar.rs` |
 
 **保留**：左侧绿点（`connection_dot_color()`）仍表达连接状态，状态栏也照常显示；
 置顶分组、对象搜索、分组展开不受影响。结果 tab / 工作区 tab 的选中高亮**不动**
@@ -721,7 +721,7 @@ hover 一直消不掉。确认这两个蓝框其实是 **§11.8 移植进来的�
 
 | 项 | 改造 | 涉及文件 |
 | --- | --- | --- |
-| hover 穿透 | 浮层新增 `table-scrim`（透明 + `occlude()` + 空点击监听），面板本体也加 `occlude()`；面板绘制在遮罩之上，按钮点击照常命中，遮罩只拦背后元素 | `ui/src/main_view/render.rs`、`designer.rs` |
+| hover 穿透 | 浮层新增 `table-scrim`（透明 + `occlude()` + 空点击监听），面板本体也加 `occlude()`；面板绘制在遮罩之上，按钮点击照常命中，遮罩只拦背后元素 | `crates/ui/src/main_view/render.rs`、`designer.rs` |
 | 面板骨架 | 560×420 → 680×480，圆角 8 → 12，`border_subtle` → `border_strong`；48px 标题栏（28px accent 图标块 + 15px SEMIBOLD 标题 + 12px 副标题「表结构 · N 列 · 6 个页签」）、38px 页签栏、46px 底栏 | `designer.rs::render_table_panel` |
 | 页签 | 手写 div 页签 → 复用 `design::chip()`（`Button::small().ghost()/primary()`），选中 primary、其余 ghost；保留 `designer-tab-*` 调试选择器 | `designer.rs::render_designer_tabs` |
 | 分区标题 | 新增 `designer_section()` 统一 13px SEMIBOLD 标题 + 12px 灰色说明，六个页签与只读结构视图全部挂载 | `designer.rs` |
