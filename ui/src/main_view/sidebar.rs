@@ -1,5 +1,6 @@
 //! 侧栏与导航：连接树（含对象搜索 / 置顶）、历史、文件、帮助与参数面板。
 
+use super::db_icon::db_icon;
 use super::*;
 
 impl MainView {
@@ -387,9 +388,14 @@ impl MainView {
                                 .bg(hex(crate::design::connection_dot_color(&t, is_active))),
                         )
                         .child(
-                            Icon::new(IconName::Database)
-                                .small()
-                                .text_color(hex(t.fg_muted)),
+                            div()
+                                .id(SharedString::from(format!("conn-icon-{}", profile.id)))
+                                .debug_selector({
+                                    let id = profile.id.clone();
+                                    let kind = profile.driver.key();
+                                    move || format!("db-icon-{kind}-{id}")
+                                })
+                                .child(db_icon(profile.driver, super::db_icon::DB_ICON_SIZE)),
                         )
                         .child(
                             div()
@@ -443,6 +449,7 @@ impl MainView {
                     continue;
                 }
                 let namespaces = self.namespaces.clone();
+                let driver_kind = self.session_kind();
                 for ns in namespaces {
                     let key = ns_key(&ns);
                     // 搜索时所有库展开，命中结果直接可见。
@@ -457,6 +464,7 @@ impl MainView {
                     let open_ns = ns.clone();
                     let row_key = key.clone();
                     let row_key_ns = ns.clone();
+                    let icon_selector = format!("db-icon-ns-{row_key}");
                     tree = tree.child(
                         h_flex()
                             .id(SharedString::from(format!("db-{key}")))
@@ -537,9 +545,9 @@ impl MainView {
                                     ),
                             )
                             .child(
-                                Icon::new(IconName::Database)
-                                    .small()
-                                    .text_color(hex(t.fg_muted)),
+                                div()
+                                    .debug_selector(move || icon_selector.clone())
+                                    .child(db_icon(driver_kind, super::db_icon::DB_ICON_SIZE)),
                             )
                             .child(
                                 div()

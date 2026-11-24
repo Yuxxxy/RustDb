@@ -61,6 +61,8 @@ mod compare_panel;
 mod connections;
 /// 数据对比面板（F-78）。
 mod data_compare_panel;
+/// 数据库类型品牌图标（连接树 / 库切换器）。
+mod db_icon;
 /// 表设计器（列 / 索引 / 外键 / 检查 / 触发器）。
 mod designer;
 /// 数据库文档面板（F-87）。
@@ -101,6 +103,8 @@ mod result_view;
 mod routine_panel;
 /// 设置面板（外观 / 布局 / 工具 / 连接 / 关于）。
 mod settings_panel;
+/// Navicat 兼容快捷键（键位表 / 分派 / 帮助浮层）。
+mod shortcuts;
 /// 侧栏与导航（连接树 / 历史 / 文件 / 帮助）。
 mod sidebar;
 /// 状态栏与标题栏。
@@ -316,6 +320,13 @@ struct DesignerState {
     draft: rustdb_core::DesignerDraft,
     /// 当前页签。
     tab: rustdb_core::DesignerTab,
+    /// Navicat 的「SQL 预览」页：不改 core 的页签枚举，UI 单独记一格。
+    sql_preview: bool,
+    /// 当前选中的字段 / 索引 / 外键 / 检查约束（「下方面板」与工具栏操作对象）。
+    selected_column: usize,
+    selected_index: usize,
+    selected_fk: usize,
+    selected_check: usize,
     /// 保存前校验结论。
     issues: Vec<rustdb_core::ValidationIssue>,
     /// 上次迁移失败：明细 + 恢复建议。
@@ -583,6 +594,10 @@ struct HostKeyPrompt {
 struct DesignerInputs {
     column_name: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     column_type: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    /// 下方面板（选中字段的属性编辑）。
+    field_name: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    field_type: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
+    field_default: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     index_name: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     index_columns: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
     fk_name: Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>,
@@ -672,6 +687,35 @@ impl DesignerInputs {
                     ));
                 }
             }
+        }
+    }
+
+    /// 下方面板的三个输入框：第一次进入字段页时按当前选中列建好。
+    fn ensure_field(
+        &mut self,
+        column: Option<&rustdb_core::ColumnDraft>,
+        window: &mut Window,
+        cx: &mut Context<MainView>,
+    ) {
+        if self.field_name.is_none() {
+            self.field_name =
+                Some(designer_input(window, cx, "字段名", column.map(|c| c.name.as_str())));
+        }
+        if self.field_type.is_none() {
+            self.field_type = Some(designer_input(
+                window,
+                cx,
+                "类型，如 varchar(50)",
+                column.map(|c| c.type_text.as_str()),
+            ));
+        }
+        if self.field_default.is_none() {
+            self.field_default = Some(designer_input(
+                window,
+                cx,
+                "默认值（可空）",
+                column.and_then(|c| c.default.as_deref()),
+            ));
         }
     }
 }
@@ -866,29 +910,6 @@ fn routine_kind_of(kind: ObjectKind) -> Option<rustdb_core::RoutineKind> {
     }
 }
 
-/// 拖拽排序载荷：gpui 的拖拽预览需要一个可渲染实体。
-#[derive(Clone)]
-struct ColumnDrag {
-    index: usize,
-    label: String,
-}
-
-impl Render for ColumnDrag {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = current(cx);
-        div()
-            .px_2()
-            .py_1()
-            .rounded(px(4.))
-            .border_1()
-            .border_color(hex(t.accent))
-            .bg(hex(t.bg_elevated))
-            .text_size(px(crate::design::TS_CAPTION))
-            .text_color(hex(t.fg_primary))
-            .child(SharedString::from(self.label.clone()))
-    }
-}
-
 /// 「打开表」后的编辑目标：表路径 + 主键列名（由 TableDetail 异步补全）。
 #[derive(Clone)]
 struct TableEditTarget {
@@ -989,16 +1010,10 @@ pub(crate) enum MenuAction {
     EditRoutine(rustdb_db_api::ObjectPath),
     /// 表：分区管理（F-85）。
     ManagePartitions(rustdb_db_api::ObjectPath),
-    /// 表：字段血缘（F-88）。
-    ShowLineage(rustdb_db_api::ObjectPath),
-    /// 表 / 视图：统计行数。
-    CountRows(rustdb_db_api::ObjectPath),
-    /// 表：转储 SQL（DDL + 数据骨架）。
+    /// 表：转储 SQL 文件（Navicat 式：结构和数据 / 仅结构，落盘为可回放 SQL）。
     DumpSql(rustdb_db_api::ObjectPath),
     /// 表：从文件导入数据（F-74）。
     ImportTable(rustdb_db_api::ObjectPath),
-    /// 表：维护（OPTIMIZE / VACUUM）。
-    MaintainTable(rustdb_db_api::ObjectPath),
     /// 表 / 视图：重命名。
     RenameObject(rustdb_db_api::ObjectPath),
     /// 对象面板：置顶 / 取消置顶。
@@ -1035,6 +1050,8 @@ pub(crate) enum MenuAction {
     OpenSqlFile,
     /// P1-④：工具栏折叠项 —— 保存当前 SQL。
     SaveSqlFile,
+    /// 键盘快捷键帮助（Navicat 兼容键位表）。
+    ShowShortcuts,
 }
 
 /// 历史面板的日期快捷范围。
@@ -1713,6 +1730,23 @@ impl DumpPanel {
     }
 }
 
+/// Navicat 式「转储 SQL 文件」：单表选项面板，导出结构与数据或仅结构，落盘为可回放 SQL。
+#[derive(Clone)]
+pub(crate) struct TableDumpPanel {
+    path: rustdb_db_api::ObjectPath,
+    session: SessionId,
+    /// true = 结构和数据；false = 仅结构（Navicat 的两个转储入口）。
+    with_data: bool,
+    include_drops: bool,
+    dest: PathBuf,
+    running: bool,
+    finished: bool,
+    rows: u64,
+    bytes: u64,
+    failed: usize,
+    error: Option<String>,
+}
+
 /// F-75：跨库数据传输面板。源 = 当前会话，目标按连接配置临时建链。
 #[derive(Clone)]
 pub(crate) struct TransferPanel {
@@ -2311,6 +2345,8 @@ pub struct MainView {
     compare_config_path: PathBuf,
     /// F-76：整库逻辑导出面板。
     dump: Option<DumpPanel>,
+    /// Navicat 式单表「转储 SQL 文件」面板。
+    table_dump: Option<TableDumpPanel>,
     /// F-75：跨库数据传输面板。
     transfer: Option<TransferPanel>,
     /// F-78：数据对比与同步面板。
@@ -2425,6 +2461,8 @@ pub struct MainView {
     exchange: Option<ExchangePanel>,
     /// 设置面板（低频入口收纳）。
     settings_open: bool,
+    /// 键盘快捷键帮助浮层（F1 / Ctrl+Shift+/）。
+    shortcuts_open: bool,
     /// F-02：连接编辑器（新建 / 编辑连接配置）。
     conn_editor: Option<ConnEditor>,
     /// F-91：待确认的主机密钥。
@@ -2975,3 +3013,5 @@ mod tests_helpers;
 mod tests_layout;
 #[cfg(test)]
 mod tests_panels;
+#[cfg(test)]
+mod tests_shortcuts;

@@ -2057,20 +2057,6 @@ impl Core {
         }
     }
 
-    /// 「转储 SQL」的骨架：DDL 用「查看 DDL」，数据用查询导出（写进编辑器，不落盘）。
-    pub fn dump_sql(
-        &self,
-        session_id: &SessionId,
-        path: &rustdb_db_api::ObjectPath,
-    ) -> Option<String> {
-        let kind = self.session_kind(session_id)?;
-        let from = object_from_clause(kind, path);
-        Some(format!(
-            "-- {label}\n-- 转储骨架：DDL 用「查看 DDL」取得，数据查询可导出为 CSV\nSELECT * FROM {from};",
-            label = path.display_label()
-        ))
-    }
-
     /// 「新建表 / 视图 / 函数」的 SQL 模板（Navicat 风格：直接给出可改的骨架）。
     pub fn new_object_template(kind: DbKind, object: rustdb_db_api::ObjectKind) -> String {
         let quote = |ident: &str| match kind {
@@ -3671,7 +3657,11 @@ async fn write_dump(
                 let mut request = PageRequest::new(path.clone());
                 request.page = page;
                 request.page_size = batch as u32;
-                match session.fetch_page(&request).await {
+                // 必须走 Core 的分页入口：驱动未实现 `fetch_page`（MySQL / PostgreSQL
+                // 目前都是）时，它会用方言分页 SQL + 主键 tiebreak 兜底。
+                // 直接调 `session.fetch_page` 会让转储在第一个数据页就报
+                // “当前数据库不支持该功能：服务端分页”。
+                match core.fetch_page(sid, &request).await {
                     Ok(result) => {
                         let has_more = result.has_more;
                         if columns.is_empty() {
@@ -3829,6 +3819,27 @@ mod tests {
         assert_eq!(
             object_select_sql(DbKind::Sqlite, &path(Some("main"), None, "orders"), 200),
             "SELECT *\nFROM \"orders\"\nLIMIT 200;"
+        );
+    }
+
+    /// 回归护栏：转储取数据必须走 `Core::fetch_page`（带方言分页兜底）。
+    ///
+    /// 直接调 `session.fetch_page` 时，MySQL / PostgreSQL 的驱动都返回
+    /// `Unsupported`，转储在第一个数据页就失败，面板显示
+    /// “当前数据库不支持该功能：服务端分页”。
+    #[test]
+    fn dump_reads_rows_through_paging_fallback() {
+        let source = include_str!("core.rs");
+        let production = source.split("#[cfg(test)]").next().unwrap_or(source);
+        let start = production.find("async fn write_dump").expect("缺少 write_dump");
+        let block = &production[start..];
+        assert!(
+            block.contains("core.fetch_page(sid, &request)"),
+            "转储必须走 Core::fetch_page，否则 MySQL/PG 会报「服务端分页」不支持"
+        );
+        assert!(
+            !block.contains("session.fetch_page(&request)"),
+            "write_dump 不允许直接调驱动 fetch_page"
         );
     }
 

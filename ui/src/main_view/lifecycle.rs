@@ -246,6 +246,7 @@ impl MainView {
             compare: None,
             compare_config_path,
             dump: None,
+            table_dump: None,
             transfer: None,
             data_compare: None,
             data_compare_config_path,
@@ -278,6 +279,7 @@ impl MainView {
             partition: None,
             exchange: None,
             settings_open: false,
+            shortcuts_open: false,
             conn_editor: None,
             host_key_prompt: None,
             agent,
@@ -358,6 +360,11 @@ impl MainView {
         let escape_key = cx.observe_keystrokes(|view, event, window, cx| {
             if event.keystroke.key == "escape" {
                 view.handle_escape(cx);
+                return;
+            }
+            // Navicat 兼容快捷键（含 Ctrl+R / Ctrl+Q 等）：统一在这里分派，
+            // 焦点落在编辑器或输入框时同样生效。
+            if view.handle_shortcut(&event.keystroke, window, cx) {
                 return;
             }
             // P1-③：导出菜单的键盘闭环（打开 / 移高亮 / 执行）也走这条全局

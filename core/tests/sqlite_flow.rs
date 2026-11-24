@@ -375,6 +375,69 @@ fn dump_exports_selected_tables_and_replays() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// 单表「转储 SQL 文件」的端到端落盘：Navicat 风格文件可直接回放到同一库。
+#[test]
+fn dump_navicat_style_file_replays() {
+    let mut registry = DriverRegistry::new();
+    registry.register(rustdb_db_sqlite::SqliteFactory::new());
+    let core = Core::new(registry);
+    let (session, mut events) = connect_demo(&core);
+    let ns = rustdb_db_api::Namespace {
+        catalog: Some(std::sync::Arc::from("main")),
+        schema: None,
+    };
+    // 独立扩展名，避免与同文件的其它 dump 用例在并行测试里撞到同一临时文件。
+    let path = unique_dump_path("navicat.sql");
+    let options = rustdb_core::DumpOptions {
+        style: rustdb_core::DumpStyle::Navicat,
+        include_drops: true,
+        include_objects: false,
+        ..Default::default()
+    };
+    core.request_dump(&session, ns, vec!["orders".into()], options, path.clone());
+
+    let finished = wait_until(&mut events, Duration::from_secs(5), |event| {
+        matches!(
+            event,
+            AppEvent::Dump(rustdb_core::DumpEvent::Finished { .. })
+        )
+    });
+    assert!(finished, "5s 内没有收到 DumpEvent::Finished");
+
+    let script = std::fs::read_to_string(&path).expect("转储文件应存在");
+    assert!(script.starts_with("/*\n-- RustDb SQL 转储文件"), "{script}");
+    assert!(script.contains("-- 内容：结构和数据"), "{script}");
+    assert!(script.contains("-- Table structure for orders"), "{script}");
+    assert!(script.contains("DROP TABLE IF EXISTS \"orders\""), "{script}");
+    assert!(script.contains("-- Records of orders"), "{script}");
+    assert!(script.contains("INSERT INTO \"orders\""), "{script}");
+    assert!(script.contains("-- 转储结束"), "{script}");
+
+    let query_id = core.execute(&session, &script).expect("回放提交失败");
+    let mut replay_error: Option<String> = None;
+    let replayed = wait_until(&mut events, Duration::from_secs(5), |event| match event {
+        AppEvent::Query(QueryEvent::Completed { query_id: id, .. }) => id == &query_id,
+        AppEvent::Query(QueryEvent::Failed {
+            query_id: id,
+            error,
+        }) => {
+            if id == &query_id {
+                replay_error = Some(format!("{error:?}"));
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    });
+    assert!(replayed, "回放未完成");
+    assert!(
+        replay_error.is_none(),
+        "回放失败：{replay_error:?}\n{script}"
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
 #[test]
 fn dump_gzip_and_missing_session() {
     let mut registry = DriverRegistry::new();

@@ -1093,7 +1093,10 @@ impl MainView {
                                 column.meta.name.to_string(),
                                 column.meta.native_type.clone(),
                             );
-                            column_draft.nullable = column.meta.nullable;
+                            // 主键隐含 NOT NULL：即使驱动元数据给了 nullable，也按主键语义收敛。
+                            column_draft.nullable = column.meta.nullable && !column.is_primary_key;
+                            column_draft.primary_key = column.is_primary_key;
+                            column_draft.default = column.default.clone();
                             column_draft
                         })
                         .collect();
@@ -1144,6 +1147,11 @@ impl MainView {
                         triggers: detail.triggers.clone(),
                         draft,
                         tab: rustdb_core::DesignerTab::Columns,
+                        sql_preview: false,
+                        selected_column: 0,
+                        selected_index: 0,
+                        selected_fk: 0,
+                        selected_check: 0,
                         issues: Vec::new(),
                         failure: None,
                         inputs: DesignerInputs::default(),
@@ -1180,10 +1188,18 @@ impl MainView {
                 self.status_kind = StatusKind::Error;
                 true
             }
-            // F-76：导出进度只更新面板，不写历史 / 标签页。
+            // F-76 / Navicat 转储：导出进度只更新面板，不写历史 / 标签页。
             AppEvent::Dump(event) => {
+                if let Some(table_dump) = self.table_dump.as_mut() {
+                    if let Some((status, kind)) =
+                        super::dump_panel::update_table_dump(table_dump, event)
+                    {
+                        self.status = status;
+                        self.status_kind = kind;
+                    }
+                }
                 let Some(panel) = self.dump.as_mut() else {
-                    return false;
+                    return self.table_dump.is_some();
                 };
                 match event {
                     DumpEvent::Started {

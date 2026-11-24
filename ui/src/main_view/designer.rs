@@ -2,6 +2,37 @@
 
 use super::*;
 
+/// 工具条右侧的一句话说明，避免用户不知道当前页签该点哪里。
+fn designer_status_hint(designer: &DesignerState) -> String {
+    match designer.tab {
+        rustdb_core::DesignerTab::Columns => {
+            format!("选中字段后可在下方修改属性 · 共 {} 个字段", designer.draft.columns.len())
+        }
+        rustdb_core::DesignerTab::Indexes => "在下方填写索引名与列，点「添加索引」".into(),
+        rustdb_core::DesignerTab::ForeignKeys => "新增外键需逐条「保存」后才下发".into(),
+        rustdb_core::DesignerTab::Checks => "在下方填写约束名与表达式".into(),
+        rustdb_core::DesignerTab::Triggers => "触发器只读，编辑请使用例程源码面板".into(),
+        rustdb_core::DesignerTab::Options => "存储引擎 / 排序规则 / 表注释（按方言支持）".into(),
+    }
+}
+
+/// 从 `varchar(50)` / `numeric(12,2)` 拆出 Navicat 网格里的「类型 / 长度 / 小数位」。
+fn type_parts(type_text: &str) -> (String, String, String) {
+    let text = type_text.trim();
+    let Some(open) = text.find('(') else {
+        return (text.to_string(), String::new(), String::new());
+    };
+    let Some(close) = text.rfind(')') else {
+        return (text.to_string(), String::new(), String::new());
+    };
+    let base = text[..open].trim().to_string();
+    let args = &text[open + 1..close];
+    let mut parts = args.split(',');
+    let length = parts.next().unwrap_or("").trim().to_string();
+    let decimals = parts.next().unwrap_or("").trim().to_string();
+    (base, length, decimals)
+}
+
 impl MainView {
     /// 设计器分区标题：统一的 13px 半粗标题 + 12px 灰色说明。
     fn designer_section(
@@ -33,7 +64,8 @@ impl MainView {
             .into_any_element()
     }
 
-    /// 表设计器面板：六个页签（列 / 索引 / 外键 / 检查约束 / 触发器 / 选项）+ DDL 预览与执行。
+    /// Navicat 风格的表设计器：占满工作区（连接树保留），页签 + 工具栏 +
+    /// 字段网格 + 属性面板 + SQL 预览 + 状态栏。
     pub(crate) fn render_table_panel(
         &mut self,
         window: &mut Window,
@@ -43,27 +75,38 @@ impl MainView {
         let Some((label, detail)) = self.table_panel.clone() else {
             return div().into_any_element();
         };
-        // 输入框按当前页签懒创建（需要 window）。
         let tab = self.designer.as_ref().map(|designer| designer.tab);
+        let sql_preview = self
+            .designer
+            .as_ref()
+            .is_some_and(|designer| designer.sql_preview);
+        // 输入框按当前页签懒创建（需要 window）。
         if let Some(designer) = self.designer.as_mut() {
             let options = designer.draft.options.clone();
+            let field = designer.draft.columns.get(designer.selected_column).cloned();
             designer.inputs.ensure(
                 tab.unwrap_or(rustdb_core::DesignerTab::Columns),
                 &options,
                 window,
                 cx,
             );
+            designer.inputs.ensure_field(field.as_ref(), window, cx);
         }
 
         let tabs_bar = self.render_designer_tabs(cx);
-        let body = match tab {
-            Some(rustdb_core::DesignerTab::Columns) => self.render_designer_columns(cx),
-            Some(rustdb_core::DesignerTab::Indexes) => self.render_designer_indexes(cx),
-            Some(rustdb_core::DesignerTab::ForeignKeys) => self.render_designer_foreign_keys(cx),
-            Some(rustdb_core::DesignerTab::Checks) => self.render_designer_checks(cx),
-            Some(rustdb_core::DesignerTab::Triggers) => self.render_designer_triggers(cx),
-            Some(rustdb_core::DesignerTab::Options) => self.render_designer_options(cx),
-            None => self.render_structure_body(&detail, cx),
+        let toolbar = self.render_designer_toolbar(cx);
+        let body = if sql_preview {
+            self.render_designer_sql_preview(cx)
+        } else {
+            match tab {
+                Some(rustdb_core::DesignerTab::Columns) => self.render_designer_columns(cx),
+                Some(rustdb_core::DesignerTab::Indexes) => self.render_designer_indexes(cx),
+                Some(rustdb_core::DesignerTab::ForeignKeys) => self.render_designer_foreign_keys(cx),
+                Some(rustdb_core::DesignerTab::Checks) => self.render_designer_checks(cx),
+                Some(rustdb_core::DesignerTab::Triggers) => self.render_designer_triggers(cx),
+                Some(rustdb_core::DesignerTab::Options) => self.render_designer_options(cx),
+                None => self.render_structure_body(&detail, cx),
+            }
         };
         let issues = self
             .designer
@@ -83,48 +126,33 @@ impl MainView {
                 Some(designer_needs_rebuild(kind, designer))
             })
             .unwrap_or(false);
-
         let column_count = detail.columns.len();
-        let tab_count = rustdb_core::DesignerTab::ALL.len();
 
         v_flex()
             .id("table-panel")
             .debug_selector(|| "table-panel".to_string())
-            .w(px(680.))
-            .h(px(480.))
-            .rounded(px(12.))
-            .border_1()
-            .border_color(hex(t.border_strong))
-            .bg(hex(t.bg_elevated))
+            .size_full()
+            .min_h_0()
+            .min_w_0()
+            .bg(hex(t.bg_base))
             .occlude()
             .overflow_hidden()
-            // 吃掉面板内的点击，避免穿透到遮罩把面板关掉。
             .on_click(cx.listener(|_, _, _, _| {}))
             .child(
                 h_flex()
-                    .h(px(48.))
+                    .h(px(40.))
                     .flex_shrink_0()
-                    .px_4()
-                    .gap_3()
+                    .px_3()
+                    .gap_2()
                     .items_center()
                     .border_b_1()
                     .border_color(hex(t.border_subtle))
-                    .child(
-                        div()
-                            .w(px(28.))
-                            .h(px(28.))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded(px(7.))
-                            .bg(crate::theme::to_hsla(t.accent).opacity(0.14))
-                            .child(Icon::new(IconName::Table).small().text_color(hex(t.accent))),
-                    )
+                    .child(Icon::new(IconName::Table).small().text_color(hex(t.accent)))
                     .child(
                         v_flex()
                             .flex_1()
                             .min_w_0()
-                            .gap(px(2.))
+                            .gap(px(1.))
                             .child(
                                 div()
                                     .text_size(px(crate::design::TS_BASE))
@@ -139,16 +167,27 @@ impl MainView {
                                     .text_color(hex(t.fg_muted))
                                     .text_ellipsis()
                                     .child(SharedString::from(format!(
-                                        "表结构 · {column_count} 列 · {tab_count} 个页签"
+                                        "表设计器 · {column_count} 个字段"
                                     ))),
                             ),
                     )
+                    .when(self.designer.is_some(), |row| {
+                        row.child(
+                            div().debug_selector(|| "designer-save".to_string()).child(
+                                Button::new("designer-save-btn")
+                                    .small()
+                                    .icon(IconName::Save)
+                                    .label("保存")
+                                    .on_click(cx.listener(|view, _, _, cx| view.designer_apply(cx))),
+                            ),
+                        )
+                    })
                     .child(
                         div()
                             .id("table-panel-close")
                             .debug_selector(|| "table-panel-close".to_string())
-                            .w(px(28.))
-                            .h(px(28.))
+                            .w(px(26.))
+                            .h(px(26.))
                             .flex()
                             .items_center()
                             .justify_center()
@@ -165,54 +204,259 @@ impl MainView {
                     ),
             )
             .when(tab.is_some(), |panel| panel.child(tabs_bar))
+            .when(tab.is_some() && !sql_preview, |panel| panel.child(toolbar))
             .child(
                 div()
                     .flex_1()
                     .min_h_0()
-                    .px_3()
-                    .py_2()
-                    .overflow_y_scrollbar()
-                    .scroll_bounce(false)
+                    .min_w_0()
+                    .overflow_hidden()
                     .child(body),
             )
             .child(self.render_designer_footer(issues, failure, rebuild, cx))
             .into_any_element()
     }
 
-    /// 设计器页签栏：复用全局 chip 组件做分段控件（选中 primary、其余 ghost）。
+    /// Navicat 式下划线页签：字段 / 索引 / 外键 / 检查 / 触发器 / 选项 / SQL 预览。
     pub(crate) fn render_designer_tabs(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let t = current(cx);
         let active = self
             .designer
             .as_ref()
             .map(|designer| designer.tab)
             .unwrap_or(rustdb_core::DesignerTab::Columns);
+        let preview = self
+            .designer
+            .as_ref()
+            .is_some_and(|designer| designer.sql_preview);
         let mut row = h_flex()
-            .h(px(38.))
+            .h(px(32.))
             .flex_shrink_0()
-            .px_3()
+            .px_2()
+            .gap(px(2.))
+            .items_stretch()
+            .border_b_1()
+            .border_color(hex(t.border_subtle));
+        for tab in rustdb_core::DesignerTab::ALL {
+            let label = tab.label();
+            let on = !preview && tab == active;
+            row = row.child(
+                div()
+                    .id(SharedString::from(format!("designer-tab-{label}")))
+                    .debug_selector({
+                        let selector = format!("designer-tab-{label}");
+                        move || selector.clone()
+                    })
+                    .h_full()
+                    .px_3()
+                    .flex()
+                    .items_center()
+                    .cursor_pointer()
+                    .text_size(px(crate::design::TS_BODY))
+                    .text_color(hex(if on { t.accent } else { t.fg_secondary }))
+                    .border_b_2()
+                    .border_color(hex(if on { t.accent } else { t.bg_base }))
+                    .hover(|s| s.bg(hex(t.bg_elevated)))
+                    .on_click(cx.listener(move |view, _, _, cx| {
+                        if let Some(designer) = view.designer.as_mut() {
+                            designer.tab = tab;
+                            designer.sql_preview = false;
+                        }
+                        cx.notify();
+                    }))
+                    .child(SharedString::from(label)),
+            );
+        }
+        row.child(
+            div()
+                .id("designer-tab-sql")
+                .debug_selector(|| "designer-tab-SQL 预览".to_string())
+                .h_full()
+                .px_3()
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .text_size(px(crate::design::TS_BODY))
+                .text_color(hex(if preview { t.accent } else { t.fg_secondary }))
+                .border_b_2()
+                .border_color(hex(if preview { t.accent } else { t.bg_base }))
+                .hover(|s| s.bg(hex(t.bg_elevated)))
+                .on_click(cx.listener(|view, _, _, cx| {
+                    if let Some(designer) = view.designer.as_mut() {
+                        designer.sql_preview = true;
+                    }
+                    cx.notify();
+                }))
+                .child("SQL 预览"),
+        )
+        .into_any_element()
+    }
+
+    /// 工具栏按钮：Navicat 的页签工具条（图标 + 文字，统一 hover/focus 态）。
+    fn designer_tool(
+        id: &'static str,
+        label: &'static str,
+        icon: IconName,
+        tip: &'static str,
+        cx: &mut Context<Self>,
+        action: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static,
+    ) -> gpui_kit::AnyElement {
+        div()
+            .debug_selector(move || id.to_string())
+            .child(
+                Button::new(id)
+                    .small()
+                    .ghost()
+                    .icon(icon)
+                    .label(label)
+                    .tooltip(tip)
+                    .on_click(cx.listener(move |view, _event, window, cx| {
+                        action(view, window, cx)
+                    })),
+            )
+            .into_any_element()
+    }
+
+    /// 页签工具条：按当前页签换动作；字段页提供 Navicat 的增 / 插 / 删 / 键 / 上下移。
+    pub(crate) fn render_designer_toolbar(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let t = current(cx);
+        let (tab, hint) = self
+            .designer
+            .as_ref()
+            .map(|designer| (designer.tab, designer_status_hint(designer)))
+            .unwrap_or((rustdb_core::DesignerTab::Columns, String::new()));
+        let divider = || div().w(px(1.)).h(px(16.)).mx_1().bg(hex(t.border_subtle));
+        let mut row = h_flex()
+            .h(px(34.))
+            .flex_shrink_0()
+            .px_2()
             .gap_1()
             .items_center()
             .border_b_1()
-            .border_color(hex(current(cx).border_subtle));
-        for tab in rustdb_core::DesignerTab::ALL {
-            let selector = format!("designer-tab-{}", tab.label());
-            let label = tab.label();
-            row = row.child(crate::design::chip(
-                selector,
-                label,
-                tab == active,
-                cx.listener(move |view, _, _, cx| {
-                    if let Some(designer) = view.designer.as_mut() {
-                        designer.tab = tab;
-                    }
-                    cx.notify();
-                }),
-            ));
+            .border_color(hex(t.border_subtle));
+        match tab {
+            rustdb_core::DesignerTab::Columns => {
+                row = row
+                    .child(Self::designer_tool(
+                        "designer-field-add",
+                        "添加字段",
+                        IconName::ListPlus,
+                        "在末尾追加字段",
+                        cx,
+                        |view, window, cx| view.designer_insert_column(false, window, cx),
+                    ))
+                    .child(Self::designer_tool(
+                        "designer-field-insert",
+                        "插入字段",
+                        IconName::CopyPlus,
+                        "在选中字段后插入",
+                        cx,
+                        |view, window, cx| view.designer_insert_column(true, window, cx),
+                    ))
+                    .child(Self::designer_tool(
+                        "designer-field-delete",
+                        "删除字段",
+                        IconName::Trash,
+                        "从草稿删除选中字段（保存后删列）",
+                        cx,
+                        |view, window, cx| view.designer_delete_selected_column(window, cx),
+                    ))
+                    .child(divider())
+                    .child(Self::designer_tool(
+                        "designer-field-pk",
+                        "主键",
+                        IconName::KeyRound,
+                        "切换选中字段的主键标记",
+                        cx,
+                        |view, _, cx| view.designer_toggle_column_pk(cx),
+                    ))
+                    .child(Self::designer_tool(
+                        "designer-field-up",
+                        "上移",
+                        IconName::ArrowUp,
+                        "上移选中字段",
+                        cx,
+                        |view, _, cx| view.designer_move_selected_column(-1, cx),
+                    ))
+                    .child(Self::designer_tool(
+                        "designer-field-down",
+                        "下移",
+                        IconName::ArrowDown,
+                        "下移选中字段",
+                        cx,
+                        |view, _, cx| view.designer_move_selected_column(1, cx),
+                    ));
+            }
+            rustdb_core::DesignerTab::Indexes
+            | rustdb_core::DesignerTab::ForeignKeys
+            | rustdb_core::DesignerTab::Checks => {
+                row = row.child(Self::designer_tool(
+                    "designer-row-delete",
+                    "删除选中行",
+                    IconName::Trash,
+                    "删除当前页签选中的草稿行",
+                    cx,
+                    |view, _, cx| view.designer_delete_selected_row(cx),
+                ));
+            }
+            _ => {}
         }
-        row.into_any_element()
+        row.child(div().flex_1())
+            .child(
+                div()
+                    .min_w_0()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .text_color(hex(t.fg_muted))
+                    .text_ellipsis()
+                    .child(SharedString::from(hint)),
+            )
+            .into_any_element()
     }
 
-    /// 设计器底栏：校验结论 / 失败明细 + 预览、执行（右对齐主次按钮）。
+    /// SQL 预览页：直接展示即将执行的 DDL，不另起预览弹窗。
+    pub(crate) fn render_designer_sql_preview(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let t = current(cx);
+        let text = match self.designer_plan() {
+            Ok(plan) if plan.is_empty() => "-- 没有待执行的改动".to_string(),
+            Ok(plan) => plan.executable_sql().join("\n\n"),
+            Err(message) => format!("-- {message}"),
+        };
+        div()
+            .id("designer-sql-preview")
+            .debug_selector(|| "designer-sql-preview".to_string())
+            .size_full()
+            .min_h_0()
+            .p_3()
+            .overflow_scroll()
+            .child(
+                v_flex()
+                    .gap_2()
+                    .children(text.split("\n\n").enumerate().map(|(index, sql)| {
+                        h_flex()
+                            .gap_3()
+                            .items_start()
+                            .child(
+                                div()
+                                    .w(px(28.))
+                                    .text_align(gpui_kit::TextAlign::Right)
+                                    .text_size(px(crate::design::TS_CAPTION))
+                                    .text_color(hex(t.fg_muted))
+                                    .child(SharedString::from(format!("{}", index + 1))),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .text_size(px(crate::design::TS_BODY))
+                                    .text_color(hex(t.fg_primary))
+                                    .child(SharedString::from(sql.to_string())),
+                            )
+                    })),
+            )
+            .into_any_element()
+    }
+
+    /// 设计器状态栏：左侧校验/失败说明，右侧预览与保存。
     pub(crate) fn render_designer_footer(
         &mut self,
         issues: Vec<rustdb_core::ValidationIssue>,
@@ -253,7 +497,7 @@ impl MainView {
             (
                 IconName::Check,
                 t.fg_muted,
-                vec!["先预览，再执行".to_string()],
+                vec!["就绪 · 保存后写入数据库".to_string()],
             )
         };
         if rebuild {
@@ -284,9 +528,9 @@ impl MainView {
             );
 
         h_flex()
-            .h(px(46.))
+            .h(px(42.))
             .flex_shrink_0()
-            .px_4()
+            .px_3()
             .gap_2()
             .items_center()
             .border_t_1()
@@ -301,7 +545,8 @@ impl MainView {
                                 Button::new("designer-preview-btn")
                                     .small()
                                     .ghost()
-                                    .label("预览 DDL")
+                                    .icon(IconName::Eye)
+                                    .label("预览 SQL")
                                     .on_click(cx.listener(|view, _, _, cx| {
                                         view.designer_preview(cx);
                                     })),
@@ -311,7 +556,8 @@ impl MainView {
                         div().debug_selector(|| "designer-apply".to_string()).child(
                             Button::new("designer-apply-btn")
                                 .small()
-                                .label("执行")
+                                .icon(IconName::Save)
+                                .label("保存")
                                 .on_click(cx.listener(|view, _, _, cx| {
                                     view.designer_apply(cx);
                                 })),
@@ -445,49 +691,74 @@ impl MainView {
             .into_any_element()
     }
 
-    /// 设计器「列」页签：草稿可增删、可拖拽排序。
+    /// Navicat 字段页：上方字段网格 + 下方「字段属性」面板。
     pub(crate) fn render_designer_columns(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let t = current(cx);
         let Some(designer) = self.designer.as_ref() else {
             return div().into_any_element();
         };
-        let before_names: Vec<String> = designer
-            .before
-            .iter()
-            .map(|column| column.meta.name.to_string())
-            .collect();
         let columns = designer.draft.columns.clone();
+        let before = designer.before.clone();
+        let selected = designer
+            .selected_column
+            .min(columns.len().saturating_sub(1));
+        let field_inputs = (
+            designer.inputs.field_name.clone(),
+            designer.inputs.field_type.clone(),
+            designer.inputs.field_default.clone(),
+        );
 
-        let mut list = v_flex().gap(px(2.));
+        let head_cell = |width: f32, label: &'static str| {
+            div()
+                .w(px(width))
+                .flex_shrink_0()
+                .text_size(px(crate::design::TS_CAPTION))
+                .child(label)
+        };
+        let header = h_flex()
+            .h(px(26.))
+            .w_full()
+            .min_w(px(760.))
+            .px_2()
+            .items_center()
+            .bg(hex(t.bg_elevated))
+            .border_b_1()
+            .border_color(hex(t.border_subtle))
+            .text_color(hex(t.fg_muted))
+            .child(head_cell(30., "#"))
+            .child(head_cell(150., "名"))
+            .child(head_cell(110., "类型"))
+            .child(head_cell(56., "长度"))
+            .child(head_cell(56., "小数位"))
+            .child(head_cell(66., "不是 null"))
+            .child(head_cell(72., "自动递增"))
+            .child(head_cell(46., "键"))
+            .child(head_cell(130., "默认值"))
+            .child(div().flex_1().min_w(px(120.)).child("注释"));
+
+        let cell = |width: f32, text: String, color: u32| {
+            div()
+                .w(px(width))
+                .flex_shrink_0()
+                .px_1()
+                .text_size(px(crate::design::TS_CAPTION))
+                .text_color(hex(color))
+                .text_ellipsis()
+                .child(SharedString::from(text))
+        };
+        let mut rows = v_flex().w_full().min_w(px(760.));
         for (index, draft) in columns.iter().enumerate() {
-            let name = draft.name.clone();
-            let type_name = draft.type_text.clone();
-            let is_new = !before_names.iter().any(|n| n.eq_ignore_ascii_case(&name));
-            let mut flags: Vec<gpui_kit::AnyElement> = Vec::new();
-            if !draft.nullable {
-                flags.push(
-                    gpui_kit::component::tag::Tag::warning().small()
-                        .child("NOT NULL")
-                        .into_any_element(),
-                );
-            }
-            if let Some(default) = draft.default.as_deref() {
-                flags.push(
-                    gpui_kit::component::tag::Tag::secondary().small()
-                        .child(SharedString::from(default.to_string()))
-                        .into_any_element(),
-                );
-            }
-            if is_new {
-                flags.push(
-                    gpui_kit::component::tag::Tag::success().small()
-                        .child("新增")
-                        .into_any_element(),
-                );
-            }
-            let drag_label = name.clone();
-            let weak = cx.weak_entity();
-            list = list.child(
+            let (base, length, decimals) = type_parts(&draft.type_text);
+            let old = before
+                .iter()
+                .find(|column| column.meta.name.eq_ignore_ascii_case(&draft.name));
+            let comment = old
+                .and_then(|column| column.comment.clone())
+                .unwrap_or_default();
+            let auto_increment = old.is_some_and(|column| column.is_auto_increment);
+            let on = index == selected;
+            let not_null_id = SharedString::from(format!("designer-not-null-{index}"));
+            rows = rows.child(
                 h_flex()
                     .id(SharedString::from(format!("designer-column-{index}")))
                     .debug_selector({
@@ -495,137 +766,299 @@ impl MainView {
                         move || selector.clone()
                     })
                     .h(px(28.))
-                    .px_3()
-                    .gap_2()
+                    .w_full()
+                    .min_w(px(760.))
+                    .px_2()
                     .items_center()
                     .border_b_1()
                     .border_color(hex(t.border_subtle))
-                    // 拖放回调只给 `&mut App`（没有 `cx.listener`），靠弱引用回写视图。
-                    .on_drop::<ColumnDrag>(move |drag, _, cx| {
-                        let _ = weak.update(cx, |view, cx| {
-                            view.designer_move_column(drag.index, index, cx);
-                        });
-                    })
+                    .when(on, |row| row.bg(crate::theme::to_hsla(t.accent).opacity(0.14)))
+                    .when(!on, |row| row.hover(|s| s.bg(hex(t.bg_elevated))))
+                    .on_click(cx.listener(move |view, _, window, cx| {
+                        view.designer_select_column(index, window, cx);
+                    }))
+                    .child(cell(
+                        30.,
+                        format!("{}", index + 1),
+                        t.fg_muted,
+                    ))
+                    .child(cell(
+                        150.,
+                        draft.name.clone(),
+                        if draft.primary_key { t.accent } else { t.fg_primary },
+                    ))
+                    .child(cell(110., base, t.fg_secondary))
+                    .child(cell(56., length, t.fg_secondary))
+                    .child(cell(56., decimals, t.fg_secondary))
+                    .child(
+                        div().w(px(66.)).flex_shrink_0().flex().justify_center().child(
+                            gpui_kit::component::checkbox::Checkbox::new(not_null_id)
+                                .checked(!draft.nullable)
+                                .tooltip("不是 null")
+                                .on_click(cx.listener(move |view, checked, _, cx| {
+                                    view.designer_set_column_null(index, *checked, cx);
+                                })),
+                        ),
+                    )
                     .child(
                         div()
-                            .id(SharedString::from(format!("designer-grip-{index}")))
-                            .debug_selector({
-                                let selector = format!("designer-grip-{index}");
-                                move || selector.clone()
-                            })
-                            .w(px(14.))
-                            .h(px(16.))
+                            .w(px(72.))
+                            .flex_shrink_0()
                             .flex()
-                            .items_center()
                             .justify_center()
-                            .cursor_move()
-                            .on_drag(
-                                ColumnDrag {
-                                    index,
-                                    label: drag_label.clone(),
-                                },
-                                |drag, _, _, cx| {
-                                    cx.new(|_| ColumnDrag {
-                                        index: drag.index,
-                                        label: drag.label.clone(),
-                                    })
-                                },
-                            )
-                            .child(
-                                Icon::new(IconName::GripVertical)
+                            .child(if auto_increment {
+                                Icon::new(IconName::Check)
                                     .small()
-                                    .text_color(hex(t.fg_muted)),
-                            ),
+                                    .text_color(hex(t.success))
+                                    .into_any_element()
+                            } else {
+                                div().into_any_element()
+                            }),
                     )
                     .child(
                         div()
-                            .w(px(140.))
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(t.fg_primary))
-                            .text_ellipsis()
-                            .child(SharedString::from(name)),
-                    )
-                    .child(
-                        div()
-                            .w(px(120.))
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(t.fg_secondary))
-                            .text_ellipsis()
-                            .child(SharedString::from(type_name)),
-                    )
-                    .child(h_flex().flex_1().min_w_0().gap_1().children(flags))
-                    .child(
-                        div()
-                            .id(SharedString::from(format!("designer-drop-{index}")))
-                            .debug_selector({
-                                let selector = format!("designer-drop-{index}");
-                                move || selector.clone()
-                            })
-                            .w(px(24.))
-                            .h(px(24.))
+                            .w(px(46.))
+                            .flex_shrink_0()
                             .flex()
-                            .items_center()
                             .justify_center()
-                            .rounded(px(6.))
-                            .cursor_pointer()
-                            .hover(|s| s.bg(crate::theme::to_hsla(t.accent).opacity(0.10)))
-                            .on_click(cx.listener(move |view, _, _, cx| {
-                                view.designer_drop_column(index, cx);
-                            }))
-                            .child(Icon::new(IconName::Close).small().text_color(hex(t.danger))),
+                            .child(if draft.primary_key {
+                                Icon::new(IconName::KeyRound)
+                                    .small()
+                                    .text_color(hex(t.warning))
+                                    .into_any_element()
+                            } else {
+                                div().into_any_element()
+                            }),
+                    )
+                    .child(cell(
+                        130.,
+                        draft.default.clone().unwrap_or_default(),
+                        t.fg_secondary,
+                    ))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(120.))
+                            .px_1()
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.fg_muted))
+                            .text_ellipsis()
+                            .child(SharedString::from(comment)),
                     ),
             );
         }
 
-        let mut add_row = h_flex().h(px(32.)).px_3().gap_2().items_center();
-        if let Some(designer) = self.designer.as_ref() {
-            if let (Some(name_input), Some(type_input)) = (
-                designer.inputs.column_name.clone(),
-                designer.inputs.column_type.clone(),
-            ) {
-                add_row = add_row
+        let grid = v_flex()
+            .flex_1()
+            .min_h_0()
+            .min_w_0()
+            .overflow_x_scrollbar()
+            .child(header)
+            .when(columns.is_empty(), |view| {
+                view.child(crate::design::empty_state(
+                    cx,
+                    IconName::Table,
+                    "还没有字段",
+                    "点上方「添加字段」新增一行",
+                ))
+            })
+            .when(!columns.is_empty(), |view| {
+                view.child(div().flex_1().min_h_0().overflow_y_scrollbar().child(rows))
+            });
+
+        let mut panel = v_flex()
+            .h(px(160.))
+            .flex_shrink_0()
+            .border_t_1()
+            .border_color(hex(t.border_subtle))
+            .bg(hex(t.bg_elevated))
+            .p_3()
+            .gap_2()
+            .child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
                     .child(
                         div()
-                            .w(px(140.))
-                            .child(gpui_kit::component::input::Input::new(&name_input).small()),
+                            .text_size(px(crate::design::TS_BODY))
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                            .text_color(hex(t.fg_primary))
+                            .child("字段属性"),
                     )
                     .child(
                         div()
-                            .w(px(120.))
-                            .child(gpui_kit::component::input::Input::new(&type_input).small()),
-                    );
-            }
-        }
-        add_row = add_row
-            .child(
-                div().debug_selector(|| "designer-add".to_string()).child(
-                    Button::new("designer-add-btn")
-                        .small()
-                        .label("添加列")
-                        .on_click(cx.listener(|view, _, window, cx| {
-                            view.designer_add_column(window, cx);
-                        })),
-                ),
-            )
-            .child(div().flex_1());
-
-        v_flex()
-            .child(Self::designer_section("列", "拖动左侧手柄调整顺序", cx))
-            .child(
-                h_flex()
-                    .h(px(26.))
-                    .px_3()
-                    .bg(hex(t.bg_overlay))
+                            .text_size(px(crate::design::TS_CAPTION))
+                            .text_color(hex(t.fg_muted))
+                            .child(SharedString::from(if columns.is_empty() {
+                                String::new()
+                            } else {
+                                format!("第 {} 行", selected + 1)
+                            })),
+                    ),
+            );
+        if !columns.is_empty() {
+            let (name_input, type_input, default_input) = field_inputs;
+            let current = &columns[selected];
+            let (base, length, decimals) = type_parts(&current.type_text);
+            let old = before
+                .iter()
+                .find(|column| column.meta.name.eq_ignore_ascii_case(&current.name));
+            let comment = old
+                .and_then(|column| column.comment.clone())
+                .unwrap_or_default();
+            let auto_increment = old.is_some_and(|column| column.is_auto_increment);
+            let field_label = |label: &'static str| {
+                div()
+                    .mb(px(2.))
                     .text_size(px(crate::design::TS_CAPTION))
                     .text_color(hex(t.fg_muted))
-                    .child(div().w(px(14.)))
-                    .child(div().w(px(140.)).child("列名"))
-                    .child(div().w(px(120.)).child("类型"))
-                    .child(div().flex_1().child("约束"))
-                    .child(div().w(px(18.))),
-            )
-            .child(list)
-            .child(add_row)
+                    .child(label)
+            };
+            panel = panel
+                .child(
+                    h_flex()
+                        .gap_3()
+                        .items_start()
+                        .child(
+                            v_flex().w(px(210.)).child(field_label("名")).child(match name_input {
+                                Some(input) => Input::new(&input).small().into_any_element(),
+                                None => div().into_any_element(),
+                            }),
+                        )
+                        .child(
+                            v_flex().w(px(210.)).child(field_label("类型")).child(match type_input {
+                                Some(input) => Input::new(&input).small().into_any_element(),
+                                None => div().into_any_element(),
+                            }),
+                        )
+                        .child(
+                            v_flex().w(px(210.)).child(field_label("默认值")).child(match default_input {
+                                Some(input) => Input::new(&input).small().into_any_element(),
+                                None => div().into_any_element(),
+                            }),
+                        ),
+                )
+                .child(
+                    h_flex()
+                        .gap_3()
+                        .items_start()
+                        .child(
+                            v_flex()
+                                .w(px(210.))
+                                .child(field_label("长度"))
+                                .child(
+                                    div()
+                                        .text_size(px(crate::design::TS_CAPTION))
+                                        .text_color(hex(t.fg_secondary))
+                                        .child(SharedString::from(if length.is_empty() {
+                                            "—".to_string()
+                                        } else {
+                                            length
+                                        })),
+                                ),
+                        )
+                        .child(
+                            v_flex()
+                                .w(px(210.))
+                                .child(field_label("小数位"))
+                                .child(
+                                    div()
+                                        .text_size(px(crate::design::TS_CAPTION))
+                                        .text_color(hex(t.fg_secondary))
+                                        .child(SharedString::from(if decimals.is_empty() {
+                                            "—".to_string()
+                                        } else {
+                                            decimals
+                                        })),
+                                ),
+                        )
+                        .child(
+                            v_flex()
+                                .w(px(210.))
+                                .child(field_label("自动递增"))
+                                .child(
+                                    div()
+                                        .text_size(px(crate::design::TS_CAPTION))
+                                        .text_color(hex(if auto_increment { t.success } else { t.fg_muted }))
+                                        .child(if auto_increment { "是" } else { "否" }),
+                                ),
+                        )
+                        .child(
+                            v_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .child(field_label("注释"))
+                                .child(
+                                    div()
+                                        .text_size(px(crate::design::TS_CAPTION))
+                                        .text_color(hex(t.fg_secondary))
+                                        .text_ellipsis()
+                                        .child(SharedString::from(if comment.is_empty() {
+                                            "—".to_string()
+                                        } else {
+                                            comment
+                                        })),
+                                ),
+                        ),
+                )
+                .child(
+                    h_flex()
+                        .gap_4()
+                        .items_center()
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .items_center()
+                                .child(
+                                    gpui_kit::component::checkbox::Checkbox::new("designer-field-not-null")
+                                        .label("不是 null")
+                                        .checked(!current.nullable)
+                                        .on_click(cx.listener(|view, checked, _, cx| {
+                                            let index = view
+                                                .designer
+                                                .as_ref()
+                                                .map(|d| d.selected_column)
+                                                .unwrap_or(0);
+                                            view.designer_set_column_null(index, *checked, cx);
+                                        })),
+                                )
+                                .child(
+                                    gpui_kit::component::checkbox::Checkbox::new("designer-field-pk")
+                                        .label("主键")
+                                        .checked(current.primary_key)
+                                        .on_click(cx.listener(|view, _, _, cx| {
+                                            view.designer_toggle_column_pk(cx);
+                                        })),
+                                ),
+                        )
+                        .child(
+                            div().debug_selector(|| "designer-field-apply".to_string()).child(
+                                Button::new("designer-field-apply-btn")
+                                    .small()
+                                    .label("应用属性")
+                                    .on_click(cx.listener(|view, _, _, cx| {
+                                        view.designer_apply_field(cx);
+                                    })),
+                            ),
+                        )
+                        .child(div().flex_1())
+                        .child(
+                            div()
+                                .text_size(px(crate::design::TS_CAPTION))
+                                .text_color(hex(t.fg_muted))
+                                .text_ellipsis()
+                                .child(SharedString::from(format!("类型基名：{base}"))),
+                        ),
+                );
+        }
+
+        v_flex()
+            .id("designer-field-grid")
+            .debug_selector(|| "designer-field-grid".to_string())
+            .size_full()
+            .min_h_0()
+            .child(grid)
+            .child(panel)
             .into_any_element()
     }
 
@@ -1200,78 +1633,6 @@ impl MainView {
             .into_any_element()
     }
 
-    /// 设计器：把输入框里的「列名 + 类型」加入草稿。
-    pub(crate) fn designer_add_column(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(designer) = self.designer.as_mut() else {
-            return;
-        };
-        let name = designer
-            .inputs
-            .column_name
-            .as_ref()
-            .map(|input| input.read(cx).value().trim().to_string())
-            .unwrap_or_default();
-        let type_text = designer
-            .inputs
-            .column_type
-            .as_ref()
-            .map(|input| input.read(cx).value().trim().to_string())
-            .unwrap_or_default();
-        if name.is_empty() || type_text.is_empty() {
-            self.status = "列名与类型都不能为空".into();
-            self.status_kind = StatusKind::Error;
-            cx.notify();
-            return;
-        }
-        if designer
-            .draft
-            .columns
-            .iter()
-            .any(|draft| draft.name.eq_ignore_ascii_case(&name))
-        {
-            self.status = format!("列 {name} 已存在");
-            self.status_kind = StatusKind::Error;
-            cx.notify();
-            return;
-        }
-        designer
-            .draft
-            .columns
-            .push(rustdb_core::ColumnDraft::new(name, type_text));
-        self.designer_clear_inputs(&["column_name", "column_type"], window, cx);
-        self.status = "已加入草稿（尚未执行）".into();
-        self.status_kind = StatusKind::Ok;
-        cx.notify();
-    }
-
-    /// 设计器：从草稿里移除一列（现状列会在迁移计划里变成 DROP）。
-    pub(crate) fn designer_drop_column(&mut self, index: usize, cx: &mut Context<Self>) {
-        let Some(designer) = self.designer.as_mut() else {
-            return;
-        };
-        if index >= designer.draft.columns.len() {
-            return;
-        }
-        let removed = designer.draft.columns.remove(index);
-        self.status = format!("已在草稿中移除 {}（执行后会删列）", removed.name);
-        self.status_kind = StatusKind::Idle;
-        cx.notify();
-    }
-
-    /// 设计器：拖拽排序（把 from 位置的列挪到 to）。
-    pub(crate) fn designer_move_column(&mut self, from: usize, to: usize, cx: &mut Context<Self>) {
-        let Some(designer) = self.designer.as_mut() else {
-            return;
-        };
-        if from == to {
-            return;
-        }
-        rustdb_core::reorder_columns(&mut designer.draft.columns, from, to);
-        self.status = "已调整列顺序".into();
-        self.status_kind = StatusKind::Idle;
-        cx.notify();
-    }
-
     /// 设计器：加入一条索引草稿。
     pub(crate) fn designer_add_index(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(designer) = self.designer.as_mut() else {
@@ -1840,6 +2201,283 @@ impl MainView {
         if errors > 0 {
             self.status = format!("{errors} 处问题待修正");
             self.status_kind = StatusKind::Error;
+        }
+        cx.notify();
+    }
+
+    /// 把选中字段同步到下方属性面板（点行 / 增删 / 换列后调用）。
+    fn sync_field_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (column, slots) = {
+            let Some(designer) = self.designer.as_ref() else {
+                return;
+            };
+            let index = designer.selected_column.min(designer.draft.columns.len().saturating_sub(1));
+            (
+                designer.draft.columns.get(index).cloned(),
+                (
+                    designer.inputs.field_name.clone(),
+                    designer.inputs.field_type.clone(),
+                    designer.inputs.field_default.clone(),
+                ),
+            )
+        };
+        let Some(column) = column else {
+            return;
+        };
+        for (slot, value) in [
+            (slots.0, column.name.as_str()),
+            (slots.1, column.type_text.as_str()),
+            (slots.2, column.default.as_deref().unwrap_or("")),
+        ] {
+            if let Some(input) = slot {
+                input.update(cx, |state, cx| state.set_value(value, window, cx));
+            }
+        }
+    }
+
+    /// 点字段网格的行：选中并把属性填进下方面板。
+    pub(crate) fn designer_select_column(
+        &mut self,
+        index: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(designer) = self.designer.as_mut() {
+            if index >= designer.draft.columns.len() {
+                return;
+            }
+            designer.selected_column = index;
+        }
+        self.sync_field_inputs(window, cx);
+        cx.notify();
+    }
+
+    /// Navicat「添加字段 / 插入字段」：插入一个可直接改属性的新行。
+    pub(crate) fn designer_insert_column(
+        &mut self,
+        after_selected: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(designer) = self.designer.as_mut() else {
+            return;
+        };
+        let mut name = "new_column".to_string();
+        let mut suffix = 1;
+        while designer
+            .draft
+            .columns
+            .iter()
+            .any(|column| column.name.eq_ignore_ascii_case(&name))
+        {
+            name = format!("new_column_{suffix}");
+            suffix += 1;
+        }
+        let at = if after_selected {
+            (designer.selected_column + 1).min(designer.draft.columns.len())
+        } else {
+            designer.draft.columns.len()
+        };
+        designer
+            .draft
+            .columns
+            .insert(at, rustdb_core::ColumnDraft::new(name.clone(), "TEXT"));
+        designer.selected_column = at;
+        self.status = format!("已插入字段 {name}（保存后写入数据库）");
+        self.status_kind = StatusKind::Idle;
+        self.sync_field_inputs(window, cx);
+        cx.notify();
+    }
+
+    /// Navicat「删除字段」：从草稿移除选中行（保存后才会下发 DROP）。
+    pub(crate) fn designer_delete_selected_column(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let removed = {
+            let Some(designer) = self.designer.as_mut() else {
+                return;
+            };
+            if designer.draft.columns.is_empty() {
+                return;
+            }
+            let index = designer.selected_column.min(designer.draft.columns.len() - 1);
+            let removed = designer.draft.columns.remove(index);
+            designer.selected_column = index.min(designer.draft.columns.len().saturating_sub(1));
+            removed
+        };
+        self.sync_field_inputs(window, cx);
+        self.status = format!("已从草稿移除 {}（保存后删列）", removed.name);
+        self.status_kind = StatusKind::Idle;
+        cx.notify();
+    }
+
+    /// Navicat「主键」：切换选中字段的键标记（进入迁移计划）。
+    pub(crate) fn designer_toggle_column_pk(&mut self, cx: &mut Context<Self>) {
+        let message = {
+            let Some(designer) = self.designer.as_mut() else {
+                return;
+            };
+            let Some(column) = designer.draft.columns.get_mut(designer.selected_column) else {
+                return;
+            };
+            column.primary_key = !column.primary_key;
+            if column.primary_key {
+                column.nullable = false;
+            }
+            format!(
+                "{}：主键已{}",
+                column.name,
+                if column.primary_key { "勾选" } else { "取消" }
+            )
+        };
+        self.status = message;
+        self.status_kind = StatusKind::Idle;
+        cx.notify();
+    }
+
+    /// 字段网格的「不是 null」勾选框（true = 勾选，不是 null）。
+    pub(crate) fn designer_set_column_null(
+        &mut self,
+        index: usize,
+        not_null: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(designer) = self.designer.as_mut() else {
+            return;
+        };
+        if let Some(column) = designer.draft.columns.get_mut(index) {
+            column.nullable = !not_null;
+        }
+        self.status = "可空属性已更新（保存后写入数据库）".into();
+        self.status_kind = StatusKind::Idle;
+        cx.notify();
+    }
+
+    /// Navicat「上移 / 下移」。
+    pub(crate) fn designer_move_selected_column(
+        &mut self,
+        delta: isize,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(designer) = self.designer.as_mut() else {
+            return;
+        };
+        let len = designer.draft.columns.len();
+        let from = designer.selected_column;
+        let to = (from as isize + delta).clamp(0, len.saturating_sub(1) as isize) as usize;
+        if from == to || len < 2 {
+            return;
+        }
+        rustdb_core::reorder_columns(&mut designer.draft.columns, from, to);
+        designer.selected_column = to;
+        self.status = "字段顺序已调整".into();
+        self.status_kind = StatusKind::Idle;
+        cx.notify();
+    }
+
+    ///「应用属性」：把下方面板的输入写回选中字段草稿。
+    pub(crate) fn designer_apply_field(&mut self, cx: &mut Context<Self>) {
+        let (name, type_text, default_text) = {
+            let Some(designer) = self.designer.as_ref() else {
+                return;
+            };
+            let read = |slot: &Option<gpui_kit::Entity<gpui_kit::component::input::InputState>>| {
+                slot.as_ref()
+                    .map(|input| input.read(cx).value().trim().to_string())
+                    .unwrap_or_default()
+            };
+            (
+                read(&designer.inputs.field_name),
+                read(&designer.inputs.field_type),
+                read(&designer.inputs.field_default),
+            )
+        };
+        if name.is_empty() || type_text.is_empty() {
+            self.status = "字段名与类型都不能为空".into();
+            self.status_kind = StatusKind::Error;
+            cx.notify();
+            return;
+        }
+        let Some(designer) = self.designer.as_mut() else {
+            return;
+        };
+        let index = designer.selected_column;
+        if designer
+            .draft
+            .columns
+            .iter()
+            .enumerate()
+            .any(|(i, column)| i != index && column.name.eq_ignore_ascii_case(&name))
+        {
+            self.status = format!("字段 {name} 已存在");
+            self.status_kind = StatusKind::Error;
+            cx.notify();
+            return;
+        }
+        if let Some(column) = designer.draft.columns.get_mut(index) {
+            column.name = name.clone();
+            column.type_text = type_text;
+            column.default = if default_text.is_empty() {
+                None
+            } else {
+                Some(default_text)
+            };
+        }
+        self.status = format!("字段 {name} 属性已写入草稿");
+        self.status_kind = StatusKind::Idle;
+        cx.notify();
+    }
+
+    /// 索引 / 外键 / 检查页的工具栏删除：删当前选中行。
+    pub(crate) fn designer_delete_selected_row(&mut self, cx: &mut Context<Self>) {
+        let tab = self.designer.as_ref().map(|designer| designer.tab);
+        let index = match tab {
+            Some(rustdb_core::DesignerTab::Indexes) => self
+                .designer
+                .as_ref()
+                .map(|designer| designer.selected_index)
+                .unwrap_or(0),
+            Some(rustdb_core::DesignerTab::ForeignKeys) => self
+                .designer
+                .as_ref()
+                .map(|designer| designer.selected_fk)
+                .unwrap_or(0),
+            Some(rustdb_core::DesignerTab::Checks) => self
+                .designer
+                .as_ref()
+                .map(|designer| designer.selected_check)
+                .unwrap_or(0),
+            _ => return,
+        };
+        match tab {
+            Some(rustdb_core::DesignerTab::Indexes) => self.designer_drop_index(index, cx),
+            Some(rustdb_core::DesignerTab::ForeignKeys) => {
+                self.designer_remove_foreign_key(index, cx)
+            }
+            Some(rustdb_core::DesignerTab::Checks) => self.designer_drop_check(index, cx),
+            _ => {}
+        }
+        if let Some(designer) = self.designer.as_mut() {
+            match tab {
+                Some(rustdb_core::DesignerTab::Indexes) => {
+                    designer.selected_index = designer
+                        .selected_index
+                        .min(designer.draft.indexes.len().saturating_sub(1))
+                }
+                Some(rustdb_core::DesignerTab::ForeignKeys) => {
+                    designer.selected_fk = designer
+                        .selected_fk
+                        .min(designer.draft.foreign_keys.len().saturating_sub(1))
+                }
+                Some(rustdb_core::DesignerTab::Checks) => {
+                    designer.selected_check = designer
+                        .selected_check
+                        .min(designer.draft.checks.len().saturating_sub(1))
+                }
+                _ => {}
+            }
         }
         cx.notify();
     }

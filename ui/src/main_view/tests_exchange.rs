@@ -824,3 +824,94 @@ fn lineage_column_select_recomputes_report(cx: &mut gpui_kit::TestAppContext) {
     assert_eq!(selected.as_deref(), Some("user_id"));
     assert_eq!(upstream, 2, "应重算出外键与同名字段两条上游");
 }
+
+/// Navicat 式单表转储：二选一切换、DROP 开关、导出事件更新面板与状态栏。
+#[gpui_kit::test]
+fn table_dump_panel_switches_options_and_tracks_events(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.table_dump = Some(TableDumpPanel {
+                path: rustdb_db_api::ObjectPath::new(ns("main"), "users", ObjectKind::Table),
+                session: SessionId("test".into()),
+                with_data: true,
+                include_drops: true,
+                dest: std::env::temp_dir().join("users.sql"),
+                running: false,
+                finished: false,
+                rows: 0,
+                bytes: 0,
+                failed: 0,
+                error: None,
+            });
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    for selector in [
+        "table-dump-panel",
+        "table-dump-with-data",
+        "table-dump-structure-only",
+        "table-dump-drops",
+        "table-dump-run",
+    ] {
+        assert!(
+            vcx.debug_bounds(selector).is_some(),
+            "转储面板缺少 {selector}"
+        );
+    }
+    // 反馈：面板里的「保存为 / 浏览…」和「开始转储」弹出的保存对话框重复，已移除。
+    assert!(
+        vcx.debug_bounds("table-dump-browse").is_none(),
+        "保存位置只由「开始转储」的系统对话框决定，面板不应再有独立的保存为行"
+    );
+
+    let only = vcx
+        .debug_bounds("table-dump-structure-only")
+        .expect("缺少仅结构选项");
+    vcx.simulate_click(only.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
+    let drops = vcx.debug_bounds("table-dump-drops").expect("缺少 DROP 开关");
+    vcx.simulate_click(drops.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
+    let (with_data, include_drops) = vcx.update(|_, app| {
+        let panel = view.read(app).table_dump.clone().expect("面板应存在");
+        (panel.with_data, panel.include_drops)
+    });
+    assert!(!with_data, "应切到仅结构");
+    assert!(!include_drops, "应能关掉 DROP TABLE");
+
+    // 完成事件只更新面板与状态栏，不新建标签页。
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            let event = DumpEvent::Finished {
+                path: std::env::temp_dir().join("users.sql").display().to_string(),
+                tables: 1,
+                objects: 0,
+                rows: 7,
+                failed: 0,
+                bytes: 1024,
+            };
+            let outcome = view
+                .table_dump
+                .as_mut()
+                .and_then(|panel| super::dump_panel::update_table_dump(panel, &event));
+            if let Some((status, kind)) = outcome {
+                view.status = status;
+                view.status_kind = kind;
+            }
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+    let (rows, finished, status) = vcx.update(|_, app| {
+        let view = view.read(app);
+        let panel = view.table_dump.as_ref().expect("面板应存在");
+        (panel.rows, panel.finished, view.status.clone())
+    });
+    assert_eq!(rows, 7);
+    assert!(finished, "完成事件应落到面板");
+    assert!(status.contains("已转储"), "状态栏应报告完成，实际：{status}");
+}

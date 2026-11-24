@@ -395,39 +395,6 @@ impl MainView {
         cx.notify();
     }
 
-    /// 「统计行数」：生成 `SELECT COUNT(*)`，直接走正常查询链路（结果进网格）。
-    pub(crate) fn count_object(
-        &mut self,
-        path: rustdb_db_api::ObjectPath,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.obj_menu = None;
-        let Some(session) = self.session.clone() else {
-            self.status = "请先连接数据源".into();
-            self.status_kind = StatusKind::Error;
-            cx.notify();
-            return;
-        };
-        let Some(from) = self.core.object_from_clause(&session, &path) else {
-            self.status = "无法解析对象名".into();
-            self.status_kind = StatusKind::Error;
-            cx.notify();
-            return;
-        };
-        let sql = format!("SELECT COUNT(*) FROM {from};");
-
-        self.open_tab(path.ns.clone(), window, cx);
-        self.sql_input
-            .update(cx, |state, cx| state.set_value(sql.clone(), window, cx));
-        if let Some(tab) = self.tabs.get_mut(self.active_tab) {
-            tab.sql = sql;
-        }
-        self.diag_dirty = true;
-        self.query_count += 1;
-        self.run(window, cx);
-    }
-
     /// 刷新某命名空间的对象（丢弃缓存后重新拉取）。
     pub(crate) fn refresh_objects(&mut self, ns: Namespace, cx: &mut Context<Self>) {
         self.ns_menu = None;

@@ -1504,6 +1504,7 @@ fn shape_to_draft(kind: DbKind, shape: &ColumnShape, cross: bool) -> Result<Colu
         type_text,
         nullable: shape.nullable,
         default: shape.default.clone(),
+        primary_key: false,
     })
 }
 

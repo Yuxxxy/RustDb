@@ -17,6 +17,9 @@ pub struct ColumnDraft {
     pub type_text: String,
     pub nullable: bool,
     pub default: Option<String>,
+    /// 表设计器「键」列：主键标记（复合主键按勾选顺序组成）。
+    #[serde(default)]
+    pub primary_key: bool,
 }
 
 impl ColumnDraft {
@@ -26,11 +29,17 @@ impl ColumnDraft {
             type_text: type_text.into(),
             nullable: true,
             default: None,
+            primary_key: false,
         }
     }
 
     pub fn not_null(mut self) -> Self {
         self.nullable = false;
+        self
+    }
+
+    pub fn primary_key(mut self) -> Self {
+        self.primary_key = true;
         self
     }
 
@@ -385,6 +394,44 @@ pub fn plan_changes(
         )));
     }
 
+    // 4) 主键（Navicat 的「键」列）：按草稿勾选顺序重建主键。
+    let before_pk: Vec<String> = before
+        .iter()
+        .filter(|column| column.is_primary_key)
+        .map(|column| column.meta.name.to_string())
+        .collect();
+    let after_pk: Vec<String> = after
+        .iter()
+        .filter(|column| column.primary_key)
+        .map(|column| column.name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .collect();
+    if before_pk != after_pk {
+        match kind {
+            DbKind::Mysql | DbKind::Mariadb => {
+                if !before_pk.is_empty() {
+                    statements.push(MigrationStatement::destructive(
+                        format!("ALTER TABLE {table} DROP PRIMARY KEY;"),
+                        "删除主键前请确认没有依赖它的外键",
+                    ));
+                }
+                if !after_pk.is_empty() {
+                    let columns = after_pk
+                        .iter()
+                        .map(|name| quote(kind, name))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    statements.push(MigrationStatement::destructive(
+                        format!("ALTER TABLE {table} ADD PRIMARY KEY ({columns});"),
+                        "主键列必须非空且值唯一",
+                    ));
+                }
+            }
+            DbKind::Sqlite => unsupported.push("SQLite 主键变更需要重建表".into()),
+            _ => unsupported.push("该方言的主键变更请在 SQL 编辑器执行".into()),
+        }
+    }
+
     MigrationPlan {
         statements,
         unsupported,
@@ -411,6 +458,9 @@ pub fn columns_changed(before: &[ColumnInfo], after: &[ColumnDraft]) -> bool {
             return true;
         }
         if old.meta.nullable != draft.nullable {
+            return true;
+        }
+        if old.is_primary_key != draft.primary_key {
             return true;
         }
     }
@@ -1022,16 +1072,25 @@ pub fn plan_sqlite_rebuild(
         }
         defs.push(def);
     }
-    let primary: Vec<String> = before
+    // 主键以草稿勾选为准；老调用方没填 primary_key 时退回现状，保持兼容。
+    let mut primary: Vec<String> = after
         .iter()
-        .filter(|column| column.is_primary_key)
-        .map(|column| column.meta.name.to_string())
-        .filter(|name| {
-            after
-                .iter()
-                .any(|draft| draft.name.eq_ignore_ascii_case(name))
-        })
+        .filter(|column| column.primary_key)
+        .map(|column| column.name.trim().to_string())
+        .filter(|name| !name.is_empty())
         .collect();
+    if primary.is_empty() {
+        primary = before
+            .iter()
+            .filter(|column| column.is_primary_key)
+            .map(|column| column.meta.name.to_string())
+            .filter(|name| {
+                after
+                    .iter()
+                    .any(|draft| draft.name.eq_ignore_ascii_case(name))
+            })
+            .collect();
+    }
     if !primary.is_empty() {
         defs.push(format!(
             "PRIMARY KEY ({})",
@@ -1662,5 +1721,18 @@ mod tests {
             ColumnDraft::new("id", "bigint").not_null(),
         ];
         assert!(columns_changed(&before, &reordered));
+    }
+
+    #[test]
+    fn navicat_key_column_generates_mysql_primary_key_ddl() {
+        let before = vec![column("id", "bigint", false)];
+        let after = vec![ColumnDraft::new("id", "bigint").not_null().primary_key()];
+        let plan = plan_changes(DbKind::Mysql, &path(), &before, &after);
+        let sql = plan.executable_sql().join("\n");
+        assert!(sql.contains("ADD PRIMARY KEY (`id`)"), "{sql}");
+
+        let sqlite = plan_sqlite_rebuild(&sqlite_path(), &before, &after, &[], &[], &[]);
+        let sql = sqlite.executable_sql().join("\n");
+        assert!(sql.contains("PRIMARY KEY (\"id\")"), "{sql}");
     }
 }

@@ -79,7 +79,7 @@ pub use docs::{
 };
 pub use dump::{
     render_script as render_dump_script, DumpErrorMode, DumpInput, DumpObjectInput, DumpOptions,
-    DumpSummary, DumpTableInput, DumpWriter, TableDumpOutcome, DEFAULT_INSERT_BATCH,
+    DumpStyle, DumpSummary, DumpTableInput, DumpWriter, TableDumpOutcome, DEFAULT_INSERT_BATCH,
     MAX_DUMP_OBJECTS, MAX_DUMP_TABLES,
 };
 pub use edit::{parse_tsv, ChangeKind, ChangeSet, PlannedStatement, RowChange};

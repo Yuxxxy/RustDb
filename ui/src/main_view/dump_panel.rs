@@ -3,6 +3,8 @@ use super::*;
 impl MainView {
     /// F-76：打开逻辑导出面板。表清单来自已加载元数据，默认全选。
     pub(crate) fn open_dump_panel(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        // 与单表转储面板互斥，避免两个面板同时消费导出事件。
+        self.table_dump = None;
         let Some(session) = self.session.clone() else {
             self.set_status("请先连接数据源", StatusKind::Error, cx);
             return;
@@ -484,5 +486,342 @@ impl MainView {
             .child(selection)
             .child(actions)
             .into_any_element()
+    }
+}
+
+impl MainView {
+    /// Navicat 式「转储 SQL 文件」入口：单表面板，二选一「结构和数据 / 仅结构」。
+    pub(crate) fn open_table_dump(
+        &mut self,
+        path: rustdb_db_api::ObjectPath,
+        cx: &mut Context<Self>,
+    ) {
+        self.obj_menu = None;
+        // 与整库导出面板互斥，避免两个面板同时消费导出事件。
+        self.dump = None;
+        let Some(session) = self.session.clone() else {
+            self.set_status("请先连接数据源", StatusKind::Error, cx);
+            return;
+        };
+        let safe: String = path
+            .name
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let dest = crate::csv::export_dir().join(format!("{safe}.sql"));
+        self.table_dump = Some(TableDumpPanel {
+            path,
+            session,
+            with_data: true,
+            include_drops: true,
+            dest,
+            running: false,
+            finished: false,
+            rows: 0,
+            bytes: 0,
+            failed: 0,
+            error: None,
+        });
+        cx.notify();
+    }
+
+    pub(crate) fn table_dump_set_data(&mut self, with_data: bool, cx: &mut Context<Self>) {
+        if let Some(panel) = self.table_dump.as_mut() {
+            panel.with_data = with_data;
+            panel.finished = false;
+        }
+        cx.notify();
+    }
+
+    pub(crate) fn table_dump_toggle_drops(&mut self, cx: &mut Context<Self>) {
+        if let Some(panel) = self.table_dump.as_mut() {
+            panel.include_drops = !panel.include_drops;
+            panel.finished = false;
+        }
+        cx.notify();
+    }
+
+    /// 真正落盘：复用 F-76 流式导出引擎，按 Navicat 风格写 DROP / CREATE / INSERT。
+    /// 保存位置在点「开始转储」时由系统保存对话框确定，面板里不再单独提供路径行。
+    pub(crate) fn start_table_dump(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(panel) = self.table_dump.clone() else {
+            return;
+        };
+        if panel.running {
+            return;
+        }
+        let dir = panel
+            .dest
+            .parent()
+            .map(|parent| parent.to_path_buf())
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let suggested = panel
+            .dest
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string());
+        let prompt = cx.prompt_for_new_path(&dir, suggested.as_deref());
+        cx.spawn_in(window, async move |this, cx| {
+            let Ok(Ok(Some(path))) = prompt.await else {
+                return;
+            };
+            let _ = this.update_in(cx, |view, _, cx| {
+                let Some(panel) = view.table_dump.as_mut() else {
+                    return;
+                };
+                panel.dest = path.clone();
+                panel.running = true;
+                panel.finished = false;
+                panel.rows = 0;
+                panel.bytes = 0;
+                panel.failed = 0;
+                panel.error = None;
+                let options = rustdb_core::DumpOptions {
+                    include_structure: true,
+                    include_data: panel.with_data,
+                    include_objects: false,
+                    include_drops: panel.include_drops,
+                    gzip: false,
+                    batch_rows: rustdb_core::DEFAULT_INSERT_BATCH,
+                    error_mode: rustdb_core::DumpErrorMode::Comment,
+                    style: rustdb_core::DumpStyle::Navicat,
+                };
+                let session = panel.session.clone();
+                let ns = panel.path.ns.clone();
+                let table = panel.path.name.to_string();
+                let label = panel.path.name.to_string();
+                view.core
+                    .request_dump(&session, ns, vec![table], options, path);
+                view.set_status(format!("正在转储 {label}…"), StatusKind::Busy, cx);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Navicat 式转储面板（居中模态）。
+    pub(crate) fn render_table_dump_panel(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let t = current(cx);
+        let Some(panel) = self.table_dump.clone() else {
+            return div().into_any_element();
+        };
+        let chip = |id: &'static str, label: &'static str, on: bool| {
+            div()
+                .id(id)
+                .debug_selector(move || id.to_string())
+                .h(px(22.))
+                .px_3()
+                .flex()
+                .items_center()
+                .rounded(px(4.))
+                .cursor_pointer()
+                .border_1()
+                .border_color(hex(if on { t.accent } else { t.border_subtle }))
+                .when(on, |node| node.bg(crate::theme::to_hsla(t.accent).opacity(0.12)))
+                .text_size(px(crate::design::TS_CAPTION))
+                .text_color(hex(if on { t.accent } else { t.fg_muted }))
+                .child(label)
+        };
+        let header = h_flex()
+            .h(px(30.))
+            .gap_2()
+            .items_center()
+            .child(Icon::new(IconName::Download).small().text_color(hex(t.accent)))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                    .text_ellipsis()
+                    .child(SharedString::from(format!(
+                        "转储 SQL 文件 · {}",
+                        panel.path.display_label()
+                    ))),
+            )
+            .child(
+                div()
+                    .id("table-dump-close")
+                    .debug_selector(|| "table-dump-close".to_string())
+                    .w(px(18.))
+                    .h(px(18.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(3.))
+                    .cursor_pointer()
+                    .hover(|style| style.bg(hex(t.bg_overlay)))
+                    .on_click(cx.listener(|view, _, _, cx| {
+                        view.table_dump = None;
+                        cx.notify();
+                    }))
+                    .child(Icon::new(IconName::Close).small().text_color(hex(t.fg_muted))),
+            );
+        let modes = v_flex()
+            .gap_1()
+            .child(
+                div()
+                    .text_size(px(crate::design::TS_CAPTION))
+                    .text_color(hex(t.fg_muted))
+                    .child("导出内容"),
+            )
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(
+                        chip("table-dump-with-data", "结构和数据", panel.with_data).on_click(
+                            cx.listener(|view, _, _, cx| view.table_dump_set_data(true, cx)),
+                        ),
+                    )
+                    .child(
+                        chip("table-dump-structure-only", "仅结构", !panel.with_data).on_click(
+                            cx.listener(|view, _, _, cx| view.table_dump_set_data(false, cx)),
+                        ),
+                    )
+                    .child(
+                        chip("table-dump-drops", "含 DROP TABLE", panel.include_drops).on_click(
+                            cx.listener(|view, _, _, cx| view.table_dump_toggle_drops(cx)),
+                        ),
+                    ),
+            );
+        let progress = div()
+            .min_h(px(28.))
+            .text_size(px(crate::design::TS_CAPTION))
+            .text_color(hex(if panel.error.is_some() {
+                t.warning
+            } else {
+                t.fg_muted
+            }))
+            .whitespace_normal()
+            .child(SharedString::from(if let Some(error) = &panel.error {
+                format!("失败：{error}")
+            } else if panel.running {
+                format!("正在写入 {} · {} 行…", panel.dest.display(), panel.rows)
+            } else if panel.finished {
+                format!(
+                    "已写入 {} · {} 行{} · {}",
+                    panel.dest.display(),
+                    panel.rows,
+                    if panel.failed > 0 {
+                        format!(" · {} 项失败", panel.failed)
+                    } else {
+                        String::new()
+                    },
+                    rustdb_core::human_bytes(panel.bytes)
+                )
+            } else {
+                "生成可直接回放的 SQL 文件；导出不是一致性快照。".to_string()
+            }));
+        let actions = h_flex()
+            .gap_2()
+            .items_center()
+            .child(
+                div()
+                    .debug_selector(|| "table-dump-run".to_string())
+                    .child(
+                        Button::new("table-dump-run-btn")
+                            .small()
+                            .primary()
+                            .icon(IconName::Download)
+                            .label(if panel.running {
+                                "转储中…"
+                            } else {
+                                "开始转储"
+                            })
+                            .disabled(panel.running)
+                            .on_click(cx.listener(|view, _, window, cx| {
+                                view.start_table_dump(window, cx);
+                            })),
+                    ),
+            )
+            .child(div().flex_1())
+            .child(
+                Button::new("table-dump-close-btn")
+                    .small()
+                    .ghost()
+                    .label("关闭")
+                    .on_click(cx.listener(|view, _, _, cx| {
+                        view.table_dump = None;
+                        cx.notify();
+                    })),
+            );
+        v_flex()
+            .id("table-dump-panel")
+            .debug_selector(|| "table-dump-panel".to_string())
+            .occlude()
+            .w(px(480.))
+            .p_3()
+            .gap_2()
+            .rounded(px(8.))
+            .border_1()
+            .border_color(hex(t.border_subtle))
+            .bg(hex(t.bg_elevated))
+            .child(header)
+            .child(modes)
+            .child(progress)
+            .child(actions)
+            .into_any_element()
+    }
+}
+
+/// 把导出事件同步到单表转储面板；返回状态栏文案。
+pub(crate) fn update_table_dump(
+    panel: &mut TableDumpPanel,
+    event: &DumpEvent,
+) -> Option<(String, StatusKind)> {
+    match event {
+        DumpEvent::Started { .. } | DumpEvent::ObjectDone { .. } => None,
+        DumpEvent::TableDone { table, rows, error } => {
+            panel.rows += *rows;
+            if let Some(error) = error {
+                panel.failed += 1;
+                panel.error = Some(format!("{table}：{error}"));
+            }
+            Some((
+                format!("正在转储 {} · {} 行", panel.path.name, panel.rows),
+                StatusKind::Busy,
+            ))
+        }
+        DumpEvent::Finished {
+            path,
+            rows,
+            failed,
+            bytes,
+            ..
+        } => {
+            panel.running = false;
+            panel.finished = true;
+            panel.rows = *rows;
+            panel.failed = *failed;
+            panel.bytes = *bytes;
+            panel.dest = std::path::PathBuf::from(path);
+            if *failed == 0 {
+                panel.error = None;
+            }
+            Some((
+                format!(
+                    "已转储 {} · {} 行 · {}",
+                    panel.dest.display(),
+                    rows,
+                    rustdb_core::human_bytes(*bytes)
+                ),
+                if *failed == 0 {
+                    StatusKind::Ok
+                } else {
+                    StatusKind::Error
+                },
+            ))
+        }
+        DumpEvent::Failed { message } => {
+            panel.running = false;
+            panel.error = Some(message.clone());
+            Some((format!("转储失败：{message}"), StatusKind::Error))
+        }
     }
 }

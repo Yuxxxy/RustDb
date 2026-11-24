@@ -55,7 +55,7 @@ impl MainView {
                 cx,
                 IconName::Database,
                 "执行 SQL 后显示结果",
-                "Ctrl+Enter 执行 · 双击左侧表直接查看数据",
+                "Ctrl+R 执行（选区 / 全文）· 双击左侧表直接查看数据",
             );
         };
         let selected_range = selection_range(self.grid_selection, result);

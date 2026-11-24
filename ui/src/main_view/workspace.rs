@@ -1,5 +1,6 @@
 //! 工作区布局、标签栏、数据库/对象菜单、危险确认与 Esc 分发。
 
+use super::db_icon::db_icon;
 use super::*;
 
 /// 标签标题长度上限（RustShell `TAB_TITLE_MAX_CHARS` 移植）：从 RustShell 的运行反馈
@@ -23,7 +24,11 @@ impl MainView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> gpui_kit::AnyElement {
+        // Navicat 式「设计表」占用整个工作区（左侧连接树保留），不再是小浮层。
+        if self.table_panel.is_some() {
+            return self.render_table_panel(window, cx);
+        }
         let t = current(cx);
         let has_tab = self.active().is_some();
         let tab_bar = self.render_tab_bar(cx);
@@ -238,7 +243,7 @@ impl MainView {
                 cx,
                 IconName::Database,
                 "从左侧连接打开查询",
-                "Ctrl+T 新建查询 · Ctrl+O 打开 .sql",
+                "Ctrl+Q 新建查询 · Ctrl+O 打开 .sql · F1 快捷键",
             )
         };
 
@@ -260,6 +265,7 @@ impl MainView {
             .child(toolbar)
             .when_some(import_panel, |layout, panel| layout.child(panel))
             .child(body)
+            .into_any_element()
     }
 
     /// 工作区 body 的可用总高（编辑器 + 分隔条 + 结果区）。
@@ -368,17 +374,26 @@ impl MainView {
 
     /// 折叠进「更多 ▾」的动作清单。顺序与工具栏展开态一致。
     pub(crate) fn toolbar_menu_groups(&self) -> Vec<Vec<MenuEntry>> {
-        vec![vec![
-            MenuEntry::new(MenuAction::PreviewDml, "只读预览", IconName::Eye)
-                .key("more-preview-dml")
-                .hint("改写为 SELECT"),
-            MenuEntry::new(MenuAction::OpenSqlFile, "打开文件", IconName::FolderOpen)
-                .key("more-open-sql")
-                .hint("Ctrl+O"),
-            MenuEntry::new(MenuAction::SaveSqlFile, "保存 SQL", IconName::Save)
-                .key("more-save-sql")
-                .hint("Ctrl+S"),
-        ]]
+        vec![
+            vec![
+                MenuEntry::new(MenuAction::PreviewDml, "只读预览", IconName::Eye)
+                    .key("more-preview-dml")
+                    .hint("改写为 SELECT"),
+                MenuEntry::new(MenuAction::OpenSqlFile, "打开文件", IconName::FolderOpen)
+                    .key("more-open-sql")
+                    .hint("Ctrl+O"),
+                MenuEntry::new(MenuAction::SaveSqlFile, "保存 SQL", IconName::Save)
+                    .key("more-save-sql")
+                    .hint("Ctrl+S"),
+            ],
+            vec![MenuEntry::new(
+                MenuAction::ShowShortcuts,
+                "键盘快捷键",
+                IconName::Command,
+            )
+            .key("more-shortcuts")
+            .hint("F1")],
+        ]
     }
 
     /// 动作清单按分组展平 —— 与 `render_toolbar_menu` 的高亮序号同口径。
@@ -712,6 +727,7 @@ impl MainView {
             .map(ns_label)
             .unwrap_or_else(|| "选择库".into());
         let enabled = !self.namespaces.is_empty();
+        let driver_kind = self.session_kind();
         // 库选择器是工具栏里唯一可压缩的项：空间不足时靠标签省略号让位，
         // 而不是把右侧定宽的导出按钮挤出卡片（规范 §7 / §8「禁止溢出裁切」）。
         div().relative().min_w_0().child(
@@ -741,10 +757,9 @@ impl MainView {
                     cx.notify();
                 }))
                 .child(
-                    Icon::new(IconName::Database)
-                        .small()
-                        .flex_none()
-                        .text_color(hex(if enabled { t.accent } else { t.fg_muted })),
+                    div()
+                        .debug_selector(|| "db-icon-switcher".to_string())
+                        .child(db_icon(driver_kind, super::db_icon::DB_ICON_SIZE)),
                 )
                 .child(
                     div()
@@ -769,6 +784,7 @@ impl MainView {
     pub(crate) fn render_db_menu(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let t = current(cx);
         let current_key = self.active().and_then(|tab| tab.ns_key());
+        let driver_kind = self.session_kind();
         let mut menu = v_flex()
             .w(px(196.))
             .max_h(px(280.))
@@ -807,9 +823,12 @@ impl MainView {
                         cx.notify();
                     }))
                     .child(
-                        Icon::new(IconName::Database)
-                            .small()
-                            .text_color(hex(if active { t.accent } else { t.fg_muted })),
+                        div()
+                            .debug_selector({
+                                let selector = format!("db-icon-option-{key}");
+                                move || selector.clone()
+                            })
+                            .child(db_icon(driver_kind, super::db_icon::DB_ICON_SIZE)),
                     )
                     .child(
                         div()
@@ -967,14 +986,6 @@ impl MainView {
                         .key("obj-partitions"),
                     );
                 }
-                open.push(
-                    MenuEntry::new(
-                        MenuAction::ShowLineage(path.clone()),
-                        "字段血缘…",
-                        IconName::ArrowLeftRight,
-                    )
-                    .key("obj-lineage"),
-                );
             }
             if is_routine {
                 open.push(
@@ -988,40 +999,27 @@ impl MainView {
             }
             groups.push(open);
 
-            groups.push(vec![
-                MenuEntry::new(
-                    MenuAction::ShowDdl(path.clone()),
-                    "查看 DDL",
-                    IconName::SquareCode,
-                )
-                .key("obj-ddl"),
-                MenuEntry::new(
-                    MenuAction::DumpSql(path.clone()),
-                    "转储 SQL",
-                    IconName::Download,
-                )
-                .key("obj-dump"),
+            let mut tools = vec![
                 MenuEntry::new(
                     MenuAction::ImportTable(path.clone()),
                     "导入数据…",
                     IconName::FolderOpen,
                 )
                 .key("obj-import"),
-                MenuEntry::new(
-                    MenuAction::CountRows(path.clone()),
-                    "统计行数",
-                    IconName::Sigma,
-                )
-                .key("obj-count"),
-            ]);
+            ];
+            // 转储引擎按表取结构与数据，视图不提供该入口（避免生成空文件）。
             if is_table {
-                groups.push(vec![MenuEntry::new(
-                    MenuAction::MaintainTable(path.clone()),
-                    "维护表",
-                    IconName::Wrench,
-                )
-                .key("obj-maintain")]);
+                tools.insert(
+                    0,
+                    MenuEntry::new(
+                        MenuAction::DumpSql(path.clone()),
+                        "转储 SQL 文件…",
+                        IconName::Download,
+                    )
+                    .key("obj-dump"),
+                );
             }
+            groups.push(tools);
             groups.push(vec![MenuEntry::new(
                 MenuAction::RenameObject(path.clone()),
                 "重命名…",
@@ -1657,57 +1655,18 @@ impl MainView {
             MenuAction::ManagePartitions(path) => {
                 self.open_partitions(path, window, cx);
             }
-            MenuAction::ShowLineage(path) => {
-                self.open_lineage_panel(path, window, cx);
-            }
             MenuAction::ShowDdl(path) => {
                 self.show_ddl(path, cx);
             }
             MenuAction::EditRoutine(path) => {
                 self.open_routine(path, window, cx);
             }
-            MenuAction::CountRows(path) => {
-                self.count_object(path, window, cx);
-            }
+            // Navicat 式「转储 SQL 文件」：选项面板 + 真实 SQL 文件，而不是往编辑器塞骨架。
             MenuAction::DumpSql(path) => {
-                let Some(session) = self.session.clone() else {
-                    self.status = "请先连接数据源".into();
-                    self.status_kind = StatusKind::Error;
-                    cx.notify();
-                    return;
-                };
-                if let Some(sql) = self.core.dump_sql(&session, &path) {
-                    self.open_tab(path.ns.clone(), window, cx);
-                    self.insert_sql(sql, window, cx);
-                }
+                self.open_table_dump(path, cx);
             }
             MenuAction::ImportTable(path) => {
                 self.start_import(path, window, cx);
-            }
-            MenuAction::MaintainTable(path) => {
-                let Some(session) = self.session.clone() else {
-                    self.status = "请先连接数据源".into();
-                    self.status_kind = StatusKind::Error;
-                    cx.notify();
-                    return;
-                };
-                let Some(kind) = self.core.session_kind(&session) else {
-                    self.status = "无法识别连接类型，请重新连接".into();
-                    self.status_kind = StatusKind::Error;
-                    cx.notify();
-                    return;
-                };
-                match rustdb_core::Core::maintenance_sql(kind, &path) {
-                    Some(sql) => {
-                        self.open_tab(path.ns.clone(), window, cx);
-                        self.insert_sql(sql, window, cx);
-                    }
-                    None => {
-                        self.status = "该驱动暂不支持维护命令".into();
-                        self.status_kind = StatusKind::Idle;
-                        cx.notify();
-                    }
-                }
             }
             MenuAction::RenameObject(path) => {
                 self.ask_rename(path, cx);
@@ -1735,6 +1694,10 @@ impl MainView {
             }
             MenuAction::PreviewDml => {
                 self.preview_dml(cx);
+            }
+            MenuAction::ShowShortcuts => {
+                self.shortcuts_open = true;
+                cx.notify();
             }
             MenuAction::OpenSqlFile => {
                 self.open_sql_file(window, cx);
@@ -1898,6 +1861,12 @@ impl MainView {
             cx.notify();
             return;
         }
+        // 快捷键帮助浮层（F1 / Ctrl+Shift+/）。
+        if self.shortcuts_open {
+            self.shortcuts_open = false;
+            cx.notify();
+            return;
+        }
         if self.conn_editor.is_some() {
             self.conn_editor = None;
             self.status = "已取消编辑".into();
@@ -1952,6 +1921,12 @@ impl MainView {
         // F-76：导出面板（导出本身不可取消，关闭面板不打断后台写盘）。
         if self.dump.is_some() {
             self.dump = None;
+            cx.notify();
+            return;
+        }
+        // Navicat 转储面板：同样只关面板，不打断后台写盘。
+        if self.table_dump.is_some() {
+            self.table_dump = None;
             cx.notify();
             return;
         }

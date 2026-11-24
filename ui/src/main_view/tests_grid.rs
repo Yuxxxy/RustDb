@@ -511,6 +511,11 @@ fn table_designer_edits_drafts(cx: &mut gpui_kit::TestAppContext) {
                 triggers: None,
                 draft,
                 tab: rustdb_core::DesignerTab::Columns,
+                sql_preview: false,
+                selected_column: 0,
+                selected_index: 0,
+                selected_fk: 0,
+                selected_check: 0,
                 issues: Vec::new(),
                 failure: None,
                 inputs: DesignerInputs::default(),
@@ -521,10 +526,12 @@ fn table_designer_edits_drafts(cx: &mut gpui_kit::TestAppContext) {
     vcx.run_until_parked();
 
     assert!(
-        vcx.debug_bounds("designer-drop-0").is_some(),
-        "应有删列按钮"
+        vcx.debug_bounds("designer-field-delete").is_some(),
+        "应有删字段按钮"
     );
-    let drop = vcx.debug_bounds("designer-drop-0").expect("缺少删列按钮");
+    let drop = vcx
+        .debug_bounds("designer-field-delete")
+        .expect("缺少删字段按钮");
     vcx.simulate_click(drop.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
 
@@ -550,7 +557,7 @@ fn table_designer_switches_tabs(cx: &mut gpui_kit::TestAppContext) {
         "设计器页脚按钮不应溢出面板：panel={panel:?} preview={preview_btn:?} apply={apply_btn:?}"
     );
     for (selector, marker) in [
-        ("designer-tab-列", "designer-add"),
+        ("designer-tab-列", "designer-field-grid"),
         ("designer-tab-索引", "designer-index-add"),
         ("designer-tab-外键", "designer-fk-add"),
         ("designer-tab-检查约束", "designer-check-add"),
@@ -583,7 +590,7 @@ fn table_designer_reorders_columns(cx: &mut gpui_kit::TestAppContext) {
     let view = holder.borrow().clone().expect("view 未创建");
     vcx.update(|_, app| {
         view.update(app, |view, cx| {
-            view.designer_move_column(0, 1, cx);
+            view.designer_move_selected_column(1, cx);
         });
     });
     vcx.run_until_parked();
@@ -615,6 +622,11 @@ fn designer_rebuild_only_for_sqlite() {
         triggers: None,
         draft: rustdb_core::DesignerDraft::default(),
         tab: rustdb_core::DesignerTab::Columns,
+        sql_preview: false,
+        selected_column: 0,
+        selected_index: 0,
+        selected_fk: 0,
+        selected_check: 0,
         issues: Vec::new(),
         failure: None,
         inputs: DesignerInputs::default(),
@@ -1012,7 +1024,7 @@ fn object_context_menu_lists_actions(cx: &mut gpui_kit::TestAppContext) {
     });
     vcx.run_until_parked();
 
-    // 表 → 查询 / DDL / 统计 / 复制 / 导入 / 清空 / 删除。
+    // 表 → 查询 / 设计 / 转储 SQL 文件 / 复制 / 导入 / 清空 / 删除。
     let orders = vcx
         .debug_bounds("obj-main-orders")
         .expect("缺少 orders 节点");
@@ -1025,8 +1037,8 @@ fn object_context_menu_lists_actions(cx: &mut gpui_kit::TestAppContext) {
     assert!(vcx.debug_bounds("obj-scrim").is_some(), "应出现关闭遮罩");
     for action in [
         "menu-obj-open",
-        "menu-obj-ddl",
-        "menu-obj-count",
+        "menu-obj-design",
+        "menu-obj-dump",
         "menu-obj-copy",
         "menu-obj-copy-qualified",
         "menu-obj-import",
@@ -1034,6 +1046,18 @@ fn object_context_menu_lists_actions(cx: &mut gpui_kit::TestAppContext) {
         "menu-obj-drop",
     ] {
         assert!(vcx.debug_bounds(action).is_some(), "表菜单缺少 {action}");
+    }
+    // 用户明确移除的四项：字段血缘 / 统计行数 / 查看 DDL / 维护表。
+    for removed in [
+        "menu-obj-lineage",
+        "menu-obj-count",
+        "menu-obj-ddl",
+        "menu-obj-maintain",
+    ] {
+        assert!(
+            vcx.debug_bounds(removed).is_none(),
+            "表菜单不应再有 {removed}"
+        );
     }
 
     // 存储过程 → 看定义 / 复制 / 删除，没有查询与清空。

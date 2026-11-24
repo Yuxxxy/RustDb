@@ -58,8 +58,14 @@ impl Render for MainView {
                     }
                     "compare" => self.open_compare_panel(window, cx),
                     "dump" => self.open_dump_panel(window, cx),
+                    "table-dump" => {
+                        if let Some(path) = self.first_table_path() {
+                            self.open_table_dump(path, cx);
+                        }
+                    }
                     "optimize" => self.open_optimize_panel(cx),
                     "settings" => self.settings_open = true,
+                    "shortcuts" => self.shortcuts_open = true,
                     "exchange" => self.open_exchange_panel(window, cx),
                     "conn-editor" => self.open_conn_editor(None, window, cx),
                     "designer" => {
@@ -507,9 +513,62 @@ impl Render for MainView {
                             .child(panel),
                     )
             })
+            // Navicat 式「转储 SQL 文件」（居中模态）。
+            .when_some(self.table_dump.as_ref().map(|_| ()), |layout, _| {
+                let panel = self.render_table_dump_panel(cx);
+                layout
+                    .child(
+                        div()
+                            .id("table-dump-scrim")
+                            .debug_selector(|| "table-dump-scrim".to_string())
+                            .absolute()
+                            .inset_0()
+                            .occlude()
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
+                            .on_click(cx.listener(|view, _, _, cx| {
+                                view.table_dump = None;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(panel),
+                    )
+            })
+            // 键盘快捷键帮助（F1 / Ctrl+Shift+/）：Navicat 式居中浮层。
+            .when(self.shortcuts_open, |layout| {
+                let panel = self.render_shortcuts_panel(cx);
+                layout
+                    .child(
+                        div()
+                            .id("shortcuts-scrim")
+                            .debug_selector(|| "shortcuts-scrim".to_string())
+                            .absolute()
+                            .inset_0()
+                            .occlude()
+                            .bg(gpui_kit::hsla(0., 0., 0., 0.35))
+                            .on_click(cx.listener(|view, _, _, cx| {
+                                view.shortcuts_open = false;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(panel),
+                    )
+            })
             // F-75：跨库传输面板（居中模态）。
-            .when_some(self.transfer.as_ref().map(|_| ()), |layout, _| {
-                let panel = self.render_transfer_panel(cx);
+            .when_some(self.transfer.as_ref().map(|_| ()), |layout, _| {                let panel = self.render_transfer_panel(cx);
                 layout
                     .child(
                         div()
@@ -585,31 +644,8 @@ impl Render for MainView {
                             .child(panel),
                     )
             })
-            .when_some(self.table_panel.as_ref().map(|_| ()), |layout, _| {
-                let panel = self.render_table_panel(window, cx);
-                // 非模态面板：透明遮罩只吃掉鼠标、不关闭面板（面板在遮罩之上，
-                // 按钮点击照常命中）。没有这一层时 hover 会穿透到背后的结果表格，
-                // 表现为「鼠标划过面板，表格行却跟着高亮」。
-                layout
-                    .child(
-                        div()
-                            .id("table-scrim")
-                            .debug_selector(|| "table-scrim".to_string())
-                            .absolute()
-                            .inset_0()
-                            .occlude()
-                            .on_click(cx.listener(|_, _, _, _| {})),
-                    )
-                    .child(
-                        div()
-                            .absolute()
-                            .inset_0()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(panel),
-                    )
-            })
+            // 设计表面板现在由 render_workspace 占满工作区渲染：
+            // 背后不再有结果表格，因此不需要透明遮罩，也不会有 hover 穿透。
             // F-82：例程源码面板（非模态，右上角 ✕ 关闭）。
             .when_some(self.routine.as_ref().map(|_| ()), |layout, _| {
                 let panel = self.render_routine_panel(window, cx);

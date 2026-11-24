@@ -865,8 +865,8 @@ fn table_panel_shows_columns(cx: &mut gpui_kit::TestAppContext) {
 
     assert!(vcx.debug_bounds("table-panel").is_some(), "应渲染结构面板");
     assert!(
-        vcx.debug_bounds("table-scrim").is_some(),
-        "设计表必须有透明遮罩吃掉鼠标，否则 hover 会穿透到背后的结果表格"
+        vcx.debug_bounds("workspace-body").is_none(),
+        "设计表占用工作区时，背后的查询结果不应再渲染"
     );
     let close = vcx.debug_bounds("table-panel-close").expect("缺少关闭按钮");
     vcx.simulate_click(close.center(), gpui_kit::Modifiers::default());
@@ -1747,7 +1747,7 @@ fn menu_click_dispatches_actions(cx: &mut gpui_kit::TestAppContext) {
     });
     vcx.run_until_parked();
 
-    // 查看 DDL → 进入「正在读取」状态（说明 dispatch 走到了 show_ddl）。
+    // 转储 SQL 文件 → 打开 Navicat 式单表面板（结构和数据 / 仅结构 / DROP）。
     let orders = vcx
         .debug_bounds("obj-main-orders")
         .expect("缺少 orders 节点");
@@ -1757,13 +1757,29 @@ fn menu_click_dispatches_actions(cx: &mut gpui_kit::TestAppContext) {
         gpui_kit::Modifiers::default(),
     );
     vcx.run_until_parked();
-    let ddl = vcx.debug_bounds("menu-obj-ddl").expect("缺少查看 DDL");
-    vcx.simulate_click(ddl.center(), gpui_kit::Modifiers::default());
+    let dump = vcx
+        .debug_bounds("menu-obj-dump")
+        .expect("缺少转储 SQL 文件");
+    vcx.simulate_click(dump.center(), gpui_kit::Modifiers::default());
     vcx.run_until_parked();
-    let status = vcx.update(|_, app| view.read(app).status.clone());
     assert!(
-        status.contains("DDL"),
-        "查看 DDL 应进入读取状态，实际：{status}"
+        vcx.debug_bounds("table-dump-panel").is_some(),
+        "应打开转储面板"
+    );
+    for selector in [
+        "table-dump-with-data",
+        "table-dump-structure-only",
+        "table-dump-drops",
+        "table-dump-run",
+    ] {
+        assert!(
+            vcx.debug_bounds(selector).is_some(),
+            "转储面板缺少 {selector}"
+        );
+    }
+    assert!(
+        vcx.update(|_, app| view.read(app).obj_menu.is_none()),
+        "点完应关闭菜单"
     );
 }
 
@@ -2197,12 +2213,15 @@ fn toolbar_more_menu_is_keyboard_reachable(cx: &mut gpui_kit::TestAppContext) {
     assert_eq!(vcx.update(|_, app| view.read(app).toolbar_hover), Some(0));
     vcx.simulate_keystrokes("up");
     vcx.run_until_parked();
+    let last = vcx.update(|_, app| view.read(app).toolbar_menu_actions().len() - 1);
     assert_eq!(
         vcx.update(|_, app| view.read(app).toolbar_hover),
-        Some(2),
+        Some(last),
         "第一项再 ↑ 应循环到末项"
     );
 
+    vcx.simulate_keystrokes("home");
+    vcx.run_until_parked();
     vcx.simulate_keystrokes("enter");
     vcx.run_until_parked();
     let open = vcx.update(|_, app| view.read(app).toolbar_menu.is_some());
@@ -2527,26 +2546,67 @@ fn sidebar_rows_have_no_sticky_selection_highlight_and_no_recent_section() {
 }
 
 /// 用户反馈：鼠标划过设计表面板时，背后结果表格的行也跟着高亮。
-/// 原因是浮层没有命中体，hover 直接命中了下层网格。遮罩与面板都必须 occlude。
+/// 现在设计表直接占满工作区，背后不再渲染结果表格；面板本身仍用 occlude 兜底。
 #[test]
-fn table_panel_occludes_background_hover() {
+fn table_panel_occupies_workspace_and_occludes_hover() {
     let render = include_str!("render.rs");
     let production = render.split("#[cfg(test)]").next().unwrap_or(render);
-    let start = production
-        .find("self.table_panel.as_ref().map(|_| ())")
-        .expect("缺少设计表浮层");
-    let end = production[start..]
-        .find("// F-82：例程源码面板")
-        .expect("缺少浮层边界");
-    let block = &production[start..start + end];
-    assert!(block.contains("table-scrim"), "浮层必须有透明遮罩");
     assert!(
-        block.contains(".occlude()"),
-        "遮罩必须吃掉鼠标，否则 hover 穿透到背后表格"
+        !production.contains("table-scrim"),
+        "设计表已改为工作区页签，不应再有浮层遮罩"
+    );
+    let workspace = include_str!("workspace.rs");
+    assert!(
+        workspace.contains("if self.table_panel.is_some()") && workspace.contains("render_table_panel"),
+        "设计表必须占满工作区（左侧连接树保留）"
     );
     let designer = include_str!("designer.rs");
     assert!(
         designer.contains(".occlude()"),
-        "设计表面板本体也必须 occlude"
+        "设计表面板本身必须吃掉鼠标，避免 hover 穿透"
+    );
+    assert!(
+        designer.contains("designer-field-grid") && designer.contains("designer-sql-preview"),
+        "Navicat 布局必须有字段网格与 SQL 预览页"
+    );
+}
+
+/// 用户要求从表右键移除的四项不得回潮；转储 SQL 必须落到文件而非编辑器骨架。
+#[test]
+fn table_menu_removed_actions_do_not_return() {
+    let workspace = include_str!("workspace.rs");
+    let start = workspace
+        .find("pub(crate) fn object_menu_groups")
+        .expect("缺少对象右键菜单");
+    let end = workspace
+        .find("pub(crate) fn ns_menu_groups")
+        .expect("缺少库右键菜单边界");
+    let block = &workspace[start..end];
+    for removed in [
+        "字段血缘",
+        "统计行数",
+        "查看 DDL",
+        "维护表",
+        "MenuAction::ShowLineage",
+        "MenuAction::CountRows",
+        "MenuAction::MaintainTable",
+    ] {
+        assert!(!block.contains(removed), "表菜单不应再有 {removed}");
+    }
+    assert!(block.contains("转储 SQL 文件"), "应保留 Navicat 式转储入口");
+
+    let dump = include_str!("dump_panel.rs");
+    assert!(
+        dump.contains("DumpStyle::Navicat"),
+        "转储必须复用 Navicat 风格的可回放 SQL 渲染"
+    );
+    assert!(
+        dump.contains("prompt_for_new_path"),
+        "转储必须让用户选择保存文件，而不是塞进 SQL 编辑器"
+    );
+    // 反馈：面板里「保存为 / 浏览…」和「开始转储」的保存对话框重复，已整行移除。
+    assert!(
+        !dump.contains("\"保存为\"") && !dump.contains("table-dump-browse"),
+        "保存位置只由「开始转储」的系统对话框决定，面板不应再有独立的保存为行"
     );
 }

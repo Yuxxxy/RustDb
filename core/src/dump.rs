@@ -41,6 +41,16 @@ impl DumpErrorMode {
     }
 }
 
+/// 输出文件风格。`RustDb` 是 F-76 整库导出的紧凑风格；`Navicat` 是单表
+/// 「转储 SQL 文件」的分段注释 + MySQL 会话开关风格，文件可直接回放。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DumpStyle {
+    #[default]
+    RustDb,
+    Navicat,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DumpOptions {
     #[serde(default = "yes")]
@@ -57,6 +67,8 @@ pub struct DumpOptions {
     pub batch_rows: usize,
     #[serde(default = "default_error_mode")]
     pub error_mode: DumpErrorMode,
+    #[serde(default)]
+    pub style: DumpStyle,
 }
 
 fn yes() -> bool {
@@ -81,6 +93,7 @@ impl Default for DumpOptions {
             gzip: false,
             batch_rows: DEFAULT_INSERT_BATCH,
             error_mode: DumpErrorMode::Comment,
+            style: DumpStyle::RustDb,
         }
     }
 }
@@ -182,6 +195,32 @@ impl<W: Write> DumpWriter<W> {
     /// 头部：用途、命名空间、选项与「非一致性快照」警告。
     pub fn header(&mut self, namespace: &Namespace, skipped: usize) -> io::Result<()> {
         self.summary.skipped = skipped;
+        if self.options.style == DumpStyle::Navicat {
+            writeln!(self.out, "/*")?;
+            writeln!(self.out, "-- RustDb SQL 转储文件")?;
+            writeln!(self.out, "-- 源库：{}", namespace.display_label())?;
+            writeln!(
+                self.out,
+                "-- 内容：{}",
+                match (
+                    self.options.include_structure,
+                    self.options.include_data
+                ) {
+                    (true, true) => "结构和数据",
+                    (true, false) => "仅结构",
+                    (false, true) => "仅数据",
+                    (false, false) => "无内容",
+                }
+            )?;
+            writeln!(self.out, "-- 说明：非一致性快照；文件可直接回放。")?;
+            writeln!(self.out, "*/")?;
+            if matches!(self.driver, DbKind::Mysql | DbKind::Mariadb) {
+                writeln!(self.out, "SET NAMES utf8mb4;")?;
+                writeln!(self.out, "SET FOREIGN_KEY_CHECKS = 0;")?;
+            }
+            writeln!(self.out)?;
+            return Ok(());
+        }
         writeln!(self.out, "-- RustDb 逻辑导出")?;
         writeln!(self.out, "-- 命名空间：{}", namespace.display_label())?;
         writeln!(
@@ -241,7 +280,13 @@ impl<W: Write> DumpWriter<W> {
     /// 表头：注释、可选 `DROP`、结构 DDL。数据可随后分页调用 [`Self::insert_rows`]。
     pub fn begin_table(&mut self, table: &DumpTableInput) -> io::Result<()> {
         self.summary.tables += 1;
-        writeln!(self.out, "-- 表 {}", table.path.display_label())?;
+        if self.options.style == DumpStyle::Navicat {
+            writeln!(self.out, "-- ----------------------------")?;
+            writeln!(self.out, "-- Table structure for {}", table.path.name)?;
+            writeln!(self.out, "-- ----------------------------")?;
+        } else {
+            writeln!(self.out, "-- 表 {}", table.path.display_label())?;
+        }
         if let Some(error) = &table.ddl_error {
             self.failure(&format!(
                 "表 {} 的结构获取失败：{error}",
@@ -273,6 +318,12 @@ impl<W: Write> DumpWriter<W> {
                 }
                 None => {}
             }
+        }
+        if self.options.style == DumpStyle::Navicat && self.options.include_data {
+            writeln!(self.out)?;
+            writeln!(self.out, "-- ----------------------------")?;
+            writeln!(self.out, "-- Records of {}", table.path.name)?;
+            writeln!(self.out, "-- ----------------------------")?;
         }
         Ok(())
     }
@@ -418,7 +469,14 @@ impl<W: Write> DumpWriter<W> {
     }
 
     pub fn footer(&mut self) -> io::Result<()> {
-        writeln!(self.out, "-- 导出结束")?;
+        if self.options.style == DumpStyle::Navicat {
+            if matches!(self.driver, DbKind::Mysql | DbKind::Mariadb) {
+                writeln!(self.out, "SET FOREIGN_KEY_CHECKS = 1;")?;
+            }
+            writeln!(self.out, "-- 转储结束")?;
+        } else {
+            writeln!(self.out, "-- 导出结束")?;
+        }
         Ok(())
     }
 
@@ -745,5 +803,57 @@ mod tests {
             .batch_limit(DbKind::Sqlite),
             1
         );
+    }
+
+    #[test]
+    fn navicat_style_writes_replayable_structure_and_data() {
+        let mut source = input(vec![table(
+            "users",
+            &["id", "name"],
+            vec![vec![Value::Int(1), Value::Text("a".into())]],
+        )]);
+        source.driver = DbKind::Mysql;
+        let options = DumpOptions {
+            style: DumpStyle::Navicat,
+            include_drops: true,
+            ..DumpOptions::default()
+        };
+        let (script, summary) = render_script(&source, &options).unwrap();
+        assert!(script.starts_with("/*\n-- RustDb SQL 转储文件"), "{script}");
+        assert!(script.contains("-- 内容：结构和数据"), "{script}");
+        assert!(script.contains("SET NAMES utf8mb4;"), "{script}");
+        assert!(script.contains("SET FOREIGN_KEY_CHECKS = 0;"), "{script}");
+        assert!(script.contains("-- Table structure for users"), "{script}");
+        assert!(
+            script.contains("DROP TABLE IF EXISTS `main`.`users`;"),
+            "{script}"
+        );
+        assert!(script.contains("-- Records of users"), "{script}");
+        assert!(
+            script.contains("INSERT INTO `main`.`users` (`id`, `name`) VALUES (1, 'a');"),
+            "{script}"
+        );
+        assert!(script.contains("SET FOREIGN_KEY_CHECKS = 1;"), "{script}");
+        assert_eq!(summary.rows, 1);
+    }
+
+    #[test]
+    fn navicat_style_structure_only_omits_inserts() {
+        let mut source = input(vec![table(
+            "users",
+            &["id"],
+            vec![vec![Value::Int(1)]],
+        )]);
+        source.driver = DbKind::Mysql;
+        let options = DumpOptions {
+            style: DumpStyle::Navicat,
+            include_data: false,
+            ..DumpOptions::default()
+        };
+        let (script, summary) = render_script(&source, &options).unwrap();
+        assert!(script.contains("-- 内容：仅结构"), "{script}");
+        assert!(!script.contains("INSERT INTO"), "{script}");
+        assert!(!script.contains("-- Records of"), "{script}");
+        assert_eq!(summary.rows, 0);
     }
 }
