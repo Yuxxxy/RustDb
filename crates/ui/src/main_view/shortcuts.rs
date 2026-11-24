@@ -772,7 +772,7 @@ impl MainView {
                             .text_size(px(crate::design::TS_BASE))
                             .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .text_color(hex(t.fg_primary))
-                            .child("键盘快捷键 · Navicat 兼容"),
+                            .child("键盘快捷键"),
                     )
                     .child(
                         div()
@@ -816,7 +816,7 @@ impl MainView {
                                     .text_size(px(crate::design::TS_CAPTION))
                                     .text_color(hex(t.fg_muted))
                                     .whitespace_normal()
-                                    .child("键位对齐 Navicat 18 官方热键表；Esc 关闭。编辑器缩放（Ctrl+= / Ctrl+- / Ctrl+0）尚未接入字号设置。"),
+                                    .child("Esc 关闭。编辑器缩放（Ctrl+= / Ctrl+- / Ctrl+0）尚未接入字号设置。"),
                             ),
                     ),
             )
