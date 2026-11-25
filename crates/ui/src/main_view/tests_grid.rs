@@ -1024,7 +1024,7 @@ fn object_context_menu_lists_actions(cx: &mut gpui_kit::TestAppContext) {
     });
     vcx.run_until_parked();
 
-    // 表 → 查询 / 设计 / 转储 SQL 文件 / 复制 / 导入 / 清空 / 删除。
+    // 表 → 打开 / 设计 / 新建表 / 转储 / 执行脚本 / 导入 / 改名 / 清空 / 删除 / 复制。
     let orders = vcx
         .debug_bounds("obj-main-orders")
         .expect("缺少 orders 节点");
@@ -1038,15 +1038,25 @@ fn object_context_menu_lists_actions(cx: &mut gpui_kit::TestAppContext) {
     for action in [
         "menu-obj-open",
         "menu-obj-design",
+        "menu-obj-new-table",
         "menu-obj-dump",
-        "menu-obj-copy",
-        "menu-obj-copy-qualified",
+        "menu-obj-run-sql",
         "menu-obj-import",
+        "menu-obj-rename",
+        "menu-obj-pin",
         "menu-obj-truncate",
         "menu-obj-drop",
+        "menu-obj-copy",
+        "menu-obj-copy-qualified",
     ] {
         assert!(vcx.debug_bounds(action).is_some(), "表菜单缺少 {action}");
     }
+    // 右键即选中：选中态必须落在当前表上，且不能是 hover 那种临时高亮。
+    assert_eq!(
+        vcx.update(|_, app| view.read(app).tree_selection.clone()),
+        Some(TreeSelection::Object("main|Table|orders".into())),
+        "右键表应把它设为树选中项"
+    );
     // 用户明确移除的四项：字段血缘 / 统计行数 / 查看 DDL / 维护表。
     for removed in [
         "menu-obj-lineage",
@@ -1220,4 +1230,122 @@ fn objects_tree_search_pin_and_no_recent_section(cx: &mut gpui_kit::TestAppConte
 
     std::env::remove_var("RUSTDB_OBJECT_STATE_PATH");
     let _ = std::fs::remove_file(&state_path);
+}
+
+/// 连接树选中态：点对象/点库都能转移，且与 hover 独立（Navicat 式单击选中）。
+#[gpui_kit::test]
+fn tree_selection_moves_between_namespace_and_object(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.panel = PanelKind::Connections;
+            view.namespaces = vec![ns("main"), ns("shop")];
+            view.current_ns = Some(ns("main"));
+            view.session = Some(SessionId::new());
+            view.active_profile = Some("demo-sqlite".to_string());
+            let mut profile = rustdb_core::ConnectionProfile::demo_sqlite();
+            profile.id = "demo-sqlite".into();
+            profile.name = "本地示例".into();
+            view.profiles = vec![profile];
+            view.expanded_ns.insert("main".to_string());
+            // 分组展开状态会被其它用例的 object_state 环境变量影响，这里显式打开「表」。
+            view.group_state.insert(
+                object_group_key("demo-sqlite", "main", ObjectKind::Table),
+                true,
+            );
+            view.objects.insert(
+                "main".to_string(),
+                vec![ObjectSummary {
+                    path: ObjectPath::new(ns("main"), "orders", ObjectKind::Table),
+                    row_estimate: None,
+                    comment: None,
+                    has_primary_key: None,
+                }],
+            );
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    click(vcx, "obj-main-orders");
+    assert_eq!(
+        vcx.update(|_, app| view.read(app).tree_selection.clone()),
+        Some(TreeSelection::Object("main|Table|orders".into())),
+        "点表应选中该对象"
+    );
+
+    click(vcx, "db-main");
+    assert_eq!(
+        vcx.update(|_, app| view.read(app).tree_selection.clone()),
+        Some(TreeSelection::Namespace("main".into())),
+        "点库应把选中转移到库行"
+    );
+
+    click(vcx, "db-shop");
+    assert_eq!(
+        vcx.update(|_, app| view.read(app).tree_selection.clone()),
+        Some(TreeSelection::Namespace("shop".into())),
+        "点另一个库应转移选中，而不是叠加"
+    );
+}
+
+/// 库右键「转储 SQL 文件…」：直接为该库打开导出面板，而不是当前库。
+#[gpui_kit::test]
+fn namespace_menu_dump_opens_panel_for_that_namespace(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = test_view(cx);
+    vcx.run_until_parked();
+    let view = holder.borrow().clone().expect("view 未创建");
+    vcx.update(|_, app| {
+        view.update(app, |view, cx| {
+            view.panel = PanelKind::Connections;
+            view.namespaces = vec![ns("main"), ns("shop")];
+            view.current_ns = Some(ns("main"));
+            view.session = Some(SessionId::new());
+            view.active_profile = Some("demo-sqlite".to_string());
+            let mut profile = rustdb_core::ConnectionProfile::demo_sqlite();
+            profile.id = "demo-sqlite".into();
+            profile.name = "本地示例".into();
+            view.profiles = vec![profile];
+            view.expanded_ns.insert("main".to_string());
+            // 分组展开状态会被其它用例的 object_state 环境变量影响，这里显式打开「表」。
+            view.group_state.insert(
+                object_group_key("demo-sqlite", "main", ObjectKind::Table),
+                true,
+            );
+            view.objects.insert(
+                "main".to_string(),
+                vec![ObjectSummary {
+                    path: ObjectPath::new(ns("main"), "orders", ObjectKind::Table),
+                    row_estimate: None,
+                    comment: None,
+                    has_primary_key: None,
+                }],
+            );
+            cx.notify();
+        });
+    });
+    vcx.run_until_parked();
+
+    let db = vcx.debug_bounds("db-main").expect("缺少 main 库节点");
+    vcx.simulate_mouse_down(
+        db.center(),
+        gpui_kit::MouseButton::Right,
+        gpui_kit::Modifiers::default(),
+    );
+    vcx.run_until_parked();
+    let dump = vcx
+        .debug_bounds("menu-ns-dump")
+        .expect("库菜单缺少转储入口");
+    vcx.simulate_click(dump.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
+
+    let target = vcx.update(|_, app| {
+        view.read(app)
+            .dump
+            .as_ref()
+            .map(|panel| ns_label(&panel.namespace))
+    });
+    assert_eq!(target.as_deref(), Some("main"), "应针对右键的库打开导出面板");
 }

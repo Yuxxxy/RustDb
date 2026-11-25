@@ -1,20 +1,31 @@
 //! 整库逻辑导出面板（F-76）：结构/数据/对象选项与流式导出。
 use super::*;
 impl MainView {
-    /// F-76：打开逻辑导出面板。表清单来自已加载元数据，默认全选。
-    pub(crate) fn open_dump_panel(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        // 与单表转储面板互斥，避免两个面板同时消费导出事件。
-        self.table_dump = None;
-        let Some(session) = self.session.clone() else {
-            self.set_status("请先连接数据源", StatusKind::Error, cx);
-            return;
-        };
+    /// F-76：打开逻辑导出面板（当前库）。
+    pub(crate) fn open_dump_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(ns) = self
             .current_ns
             .clone()
             .or_else(|| self.active().and_then(|tab| tab.ns.clone()))
         else {
             self.set_status("请先选择数据库", StatusKind::Error, cx);
+            return;
+        };
+        self.open_dump_panel_for(ns, window, cx);
+    }
+
+    /// F-76：对指定库打开逻辑导出面板（库右键「转储 SQL 文件…」）。
+    /// 表清单来自已加载元数据，默认全选。
+    pub(crate) fn open_dump_panel_for(
+        &mut self,
+        ns: Namespace,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // 与单表转储面板互斥，避免两个面板同时消费导出事件。
+        self.table_dump = None;
+        let Some(session) = self.session.clone() else {
+            self.set_status("请先连接数据源", StatusKind::Error, cx);
             return;
         };
         let profile = self

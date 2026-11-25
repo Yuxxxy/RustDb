@@ -132,6 +132,9 @@ impl MainView {
         // 截图钩子：`RUSTDB_DEMO_OBJ_MENU=1` 在对象树加载完后直接展开表菜单。
         let demo_obj_menu =
             demo_autorun && std::env::var("RUSTDB_DEMO_OBJ_MENU").as_deref() == Ok("1");
+        // 截图钩子：`RUSTDB_DEMO_NS_MENU=1` 展开库右键菜单。
+        let demo_ns_menu =
+            demo_autorun && std::env::var("RUSTDB_DEMO_NS_MENU").as_deref() == Ok("1");
         // 截图钩子：`RUSTDB_DEMO_PANEL=transfer|data-compare` 在元数据到位后打开浮层。
         let demo_panel = demo_autorun
             .then(|| std::env::var("RUSTDB_DEMO_PANEL").ok())
@@ -222,6 +225,7 @@ impl MainView {
             object_loading_phase: HashMap::new(),
             query_loading_phase: HashMap::new(),
             expanded_ns: HashSet::new(),
+            tree_selection: None,
             group_state,
             object_filter: String::new(),
             object_input: None,
@@ -333,6 +337,7 @@ impl MainView {
             demo_schema,
             demo_switched: false,
             demo_obj_menu,
+            demo_ns_menu,
             demo_panel,
             demo_sidebar,
         };
@@ -750,6 +755,16 @@ impl MainView {
 
     /// 打开 `.sql` 文件：读盘后放进新标签（同一文件已打开则激活原标签）。
     pub(crate) fn open_sql_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_sql_file_in(None, window, cx);
+    }
+
+    /// 在指定库下打开 `.sql` 文件（库 / 表右键「执行 SQL 文件…」）。
+    pub(crate) fn open_sql_file_in(
+        &mut self,
+        ns: Option<Namespace>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let prompt = cx.prompt_for_paths(PathPromptOptions {
             files: true,
             directories: false,
@@ -763,7 +778,9 @@ impl MainView {
             let Some(path) = paths.pop() else {
                 return;
             };
-            let _ = this.update_in(cx, |view, window, cx| view.open_file_path(path, window, cx));
+            let _ = this.update_in(cx, |view, window, cx| {
+                view.open_file_path_in(path, ns.clone(), window, cx)
+            });
         })
         .detach();
     }
@@ -775,6 +792,19 @@ impl MainView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.load_sql_file_in(path, text, None, window, cx);
+    }
+
+    /// `ns` 显式指定标签绑定的库；`None` 时沿用当前库。
+    pub(crate) fn load_sql_file_in(
+        &mut self,
+        path: PathBuf,
+        text: String,
+        ns: Option<Namespace>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let tab_ns = ns.or_else(|| self.current_ns.clone());
         let statements = rustdb_sql_lang::split_statements_for(
             &text,
             rustdb_core::params::flavor_for(self.session_kind()),
@@ -793,7 +823,7 @@ impl MainView {
             self.save_text(cx);
             let id = self.next_tab_id;
             self.next_tab_id += 1;
-            let mut tab = SqlTab::new(id, self.current_ns.clone());
+            let mut tab = SqlTab::new(id, tab_ns);
             tab.file_path = Some(path.clone());
             tab.sql = text.clone();
             self.tabs.push(tab);

@@ -449,7 +449,6 @@ impl MainView {
                     continue;
                 }
                 let namespaces = self.namespaces.clone();
-                let driver_kind = self.session_kind();
                 for ns in namespaces {
                     let key = ns_key(&ns);
                     // 搜索时所有库展开，命中结果直接可见。
@@ -464,7 +463,10 @@ impl MainView {
                     let open_ns = ns.clone();
                     let row_key = key.clone();
                     let row_key_ns = ns.clone();
-                    let icon_selector = format!("db-icon-ns-{row_key}");
+                    let select_key = key.clone();
+                    let select_key_menu = key.clone();
+                    let selected = self.tree_selection.as_ref()
+                        == Some(&TreeSelection::Namespace(select_key.clone()));
                     tree = tree.child(
                         h_flex()
                             .id(SharedString::from(format!("db-{key}")))
@@ -479,11 +481,14 @@ impl MainView {
                             .items_center()
                             .rounded(px(5.))
                             .cursor_pointer()
-                            // 用户要求：库行同样不留选中高亮，hover 对所有行一律生效。
+                            // hover 是临时反馈；选中是点击后的稳定态，两者分开。
                             .hover(|s| s.bg(hex(t.bg_elevated)))
+                            .when(selected, |el| el.bg(hex(t.accent).opacity(0.16)))
                             // 单击展开 / 收起；双击打开 SQL 标签页。
                             .on_click(cx.listener(
                                 move |view, event: &gpui_kit::ClickEvent, window, cx| {
+                                    view.tree_selection =
+                                        Some(TreeSelection::Namespace(select_key.clone()));
                                     let double = matches!(
                                         event,
                                         gpui_kit::ClickEvent::Mouse(mouse) if mouse.down.click_count >= 2
@@ -499,6 +504,8 @@ impl MainView {
                                 gpui_kit::MouseButton::Right,
                                 cx.listener(
                                     move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
+                                        view.tree_selection =
+                                            Some(TreeSelection::Namespace(select_key_menu.clone()));
                                         view.ns_menu = Some(NamespaceMenu {
                                             ns: row_key_ns.clone(),
                                             at: event.position,
@@ -545,16 +552,16 @@ impl MainView {
                                     ),
                             )
                             .child(
-                                div()
-                                    .debug_selector(move || icon_selector.clone())
-                                    .child(db_icon(driver_kind, super::db_icon::DB_ICON_SIZE)),
+                                Icon::new(IconName::Database)
+                                    .small()
+                                    .text_color(hex(if selected { t.accent } else { t.fg_muted })),
                             )
                             .child(
                                 div()
                                     .flex_1()
                                     .min_w_0()
                                     .text_size(px(crate::design::TS_CAPTION))
-                                    .text_color(hex(t.fg_primary))
+                                    .text_color(hex(if selected { t.accent } else { t.fg_primary }))
                                     .text_ellipsis()
                                     .child(SharedString::from(ns_label(&ns))),
                             ),
@@ -1049,6 +1056,10 @@ impl MainView {
         let row_path = path.clone();
         let pin_path = path.clone();
         let menu_path = path.clone();
+        let row_key = object_key(&path);
+        let selected = self.tree_selection.as_ref()
+            == Some(&TreeSelection::Object(row_key.clone()));
+        let click_key = row_key.clone();
         h_flex()
             .group(SharedString::from(pin_group.clone()))
             .items_center()
@@ -1058,9 +1069,11 @@ impl MainView {
             .pr_2()
             .rounded(px(5.))
             .hover(|s| s.bg(hex(t.bg_elevated)))
+            .when(selected, |el| el.bg(hex(t.accent).opacity(0.16)))
             .on_mouse_down(
                 gpui_kit::MouseButton::Right,
                 cx.listener(move |view, event: &gpui_kit::MouseDownEvent, _, cx| {
+                    view.tree_selection = Some(TreeSelection::Object(row_key.clone()));
                     view.obj_menu = Some(ObjectMenu {
                         path: menu_path.clone(),
                         at: event.position,
@@ -1071,7 +1084,7 @@ impl MainView {
             .child(
                 Icon::new(kind_icon(kind))
                     .small()
-                    .text_color(hex(t.fg_muted)),
+                    .text_color(hex(if selected { t.accent } else { t.fg_muted })),
             )
             .child(
                 div()
@@ -1086,9 +1099,11 @@ impl MainView {
                     .gap_2()
                     .when(queryable, |el| el.cursor_pointer())
                     .on_click(cx.listener(move |view, _, window, cx| {
+                        view.tree_selection = Some(TreeSelection::Object(click_key.clone()));
                         if queryable {
                             view.preview_object(row_path.clone(), 200, window, cx);
                         }
+                        cx.notify();
                     }))
                     .child(
                         // 名称不参与压缩：窄侧栏下先让注释让位，名称必须读得全。
@@ -1096,7 +1111,7 @@ impl MainView {
                             .flex_none()
                             .max_w(px(160.))
                             .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(t.fg_primary))
+                            .text_color(hex(if selected { t.accent } else { t.fg_primary }))
                             .text_ellipsis()
                             .overflow_hidden()
                             .child(SharedString::from(name.clone())),
@@ -1315,6 +1330,17 @@ impl MainView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.open_file_path_in(path, None, window, cx);
+    }
+
+    /// 读盘打开文件；`ns` 用于「在某库下执行 SQL 文件」。
+    pub(crate) fn open_file_path_in(
+        &mut self,
+        path: PathBuf,
+        ns: Option<Namespace>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let reading = path.clone();
         cx.spawn_in(window, async move |this, cx| {
             let text = cx
@@ -1322,7 +1348,7 @@ impl MainView {
                 .spawn(async move { std::fs::read_to_string(&reading) })
                 .await;
             let _ = this.update_in(cx, |view, window, cx| match text {
-                Ok(text) => view.load_sql_file(path, text, window, cx),
+                Ok(text) => view.load_sql_file_in(path, text, ns.clone(), window, cx),
                 Err(error) => view.set_status(format!("打开失败：{error}"), StatusKind::Error, cx),
             });
         })

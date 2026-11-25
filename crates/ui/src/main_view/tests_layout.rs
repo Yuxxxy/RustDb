@@ -725,9 +725,25 @@ fn namespace_click_and_double_click(cx: &mut gpui_kit::TestAppContext) {
     );
     vcx.run_until_parked();
     assert!(vcx.debug_bounds("ns-scrim").is_some(), "应出现库菜单遮罩");
-    assert!(vcx.debug_bounds("menu-ns-open").is_some());
-    assert!(vcx.debug_bounds("menu-ns-refresh").is_some());
-    assert!(vcx.debug_bounds("menu-ns-copy").is_some());
+    for action in [
+        "menu-ns-open",
+        "menu-ns-new-query",
+        "menu-ns-new-table",
+        "menu-ns-new-view",
+        "menu-ns-new-func",
+        "menu-ns-new-proc",
+        "menu-ns-dump",
+        "menu-ns-run-sql",
+        "menu-ns-refresh",
+        "menu-ns-copy",
+    ] {
+        assert!(vcx.debug_bounds(action).is_some(), "库菜单缺少 {action}");
+    }
+    assert_eq!(
+        vcx.update(|_, app| view.read(app).tree_selection.clone()),
+        Some(TreeSelection::Namespace("main".into())),
+        "右键库应把它设为树选中项"
+    );
 
     let scrim = vcx.debug_bounds("ns-scrim").expect("缺少遮罩");
     vcx.simulate_click(scrim.center(), gpui_kit::Modifiers::default());
@@ -2525,17 +2541,19 @@ fn empty_state_text_never_spills_out_of_the_card(cx: &mut gpui_kit::TestAppConte
 /// 「最近」分组也不再渲染。这三条都是「看着像 hover 消不掉」的直接来源，
 /// 只靠运行期截图看不出来，用源码级断言钉住。
 #[test]
-fn sidebar_rows_have_no_sticky_selection_highlight_and_no_recent_section() {
+fn sidebar_rows_select_without_recent_section() {
     let src = include_str!("sidebar.rs");
     assert!(!src.contains("section(\"最近\")"), "「最近」分组不该再加回来");
     assert!(!src.contains("obj-recent"), "最近区选择器不该再加回来");
+    // 选中必须由状态驱动：无条件上色就是当年「hover 永远消不掉」的写法。
     assert!(
-        !src.contains("opacity(0.18)"),
-        "连接行 / 库行不该有 accent 18% 的选中底"
+        src.contains("TreeSelection::Namespace") && src.contains("TreeSelection::Object"),
+        "库行与对象行都必须接入 TreeSelection"
     );
+    let selected_style = ".when(selected, |el| el.bg(hex(t.accent).opacity(0.16)))";
     assert!(
-        !src.contains("let in_tab ="),
-        "in_tab 只服务于库行选中高亮，不应复活"
+        src.matches(selected_style).count() >= 2,
+        "库行与对象行的选中底色都必须挂在 selected 条件上"
     );
     // hover 必须对所有行生效：选中行若被排除，就会出现「高亮永驻、hover 不响应」。
     let hover_count = src.matches(".hover(|s| s.bg(hex(t.bg_elevated)))").count();

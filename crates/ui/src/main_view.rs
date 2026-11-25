@@ -966,6 +966,19 @@ struct NamespaceMenu {
     at: Point<gpui_kit::Pixels>,
 }
 
+/// 连接树当前选中项：库或对象二选一，保证屏幕上只有一行「选中」。
+///
+/// 与 hover 分开存：hover 是鼠标经过的临时反馈，选中是点击后的稳定状态。
+/// 早期把选中样式写成无条件 accent 底，看起来像「hover 永远消不掉」，才被移除；
+/// 现在只在 `tree_selection` 命中时上色，点另一行立刻转移。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum TreeSelection {
+    /// 库里节点；值为 `ns_key`。
+    Namespace(String),
+    /// 对象行；值为 `object_key`（`main|Table|orders`）。
+    Object(String),
+}
+
 /// 需要二次确认的破坏性动作。
 #[derive(Clone)]
 pub(crate) enum DangerAction {
@@ -1010,8 +1023,12 @@ pub(crate) enum MenuAction {
     EditRoutine(rustdb_db_api::ObjectPath),
     /// 表：分区管理（F-85）。
     ManagePartitions(rustdb_db_api::ObjectPath),
-    /// 表：转储 SQL 文件（Navicat 式：结构和数据 / 仅结构，落盘为可回放 SQL）。
+    /// 表：转储 SQL 文件（结构和数据 / 仅结构，落盘为可回放 SQL）。
     DumpSql(rustdb_db_api::ObjectPath),
+    /// 库：整库转储 SQL 文件（F-76）。
+    DumpDatabase(Namespace),
+    /// 库 / 表：在该库下执行 SQL 文件。
+    RunSqlFile(Namespace),
     /// 表：从文件导入数据（F-74）。
     ImportTable(rustdb_db_api::ObjectPath),
     /// 表 / 视图：重命名。
@@ -2298,6 +2315,10 @@ pub struct MainView {
     query_loading_phase: HashMap<u64, crate::design::LoadingPhase>,
     /// 连接树里展开的库节点。
     expanded_ns: HashSet<String>,
+    /// 连接树当前选中项（库或对象）；`None` 表示还没点过树。
+    tree_selection: Option<TreeSelection>,
+    /// 截图钩子：对象加载完后直接把库右键菜单摆出来。
+    demo_ns_menu: bool,
     /// 对象分组的展开状态（键 `连接|库|种类`）；未记录时默认只展开「表」。
     group_state: HashMap<String, bool>,
     /// F-84：对象面板搜索关键字（名称 + 注释）。

@@ -1,6 +1,5 @@
 //! 工作区布局、标签栏、数据库/对象菜单、危险确认与 Esc 分发。
 
-use super::db_icon::db_icon;
 use super::*;
 
 /// 标签标题长度上限（RustShell `TAB_TITLE_MAX_CHARS` 移植）：从 RustShell 的运行反馈
@@ -727,7 +726,6 @@ impl MainView {
             .map(ns_label)
             .unwrap_or_else(|| "选择库".into());
         let enabled = !self.namespaces.is_empty();
-        let driver_kind = self.session_kind();
         // 库选择器是工具栏里唯一可压缩的项：空间不足时靠标签省略号让位，
         // 而不是把右侧定宽的导出按钮挤出卡片（规范 §7 / §8「禁止溢出裁切」）。
         div().relative().min_w_0().child(
@@ -757,9 +755,10 @@ impl MainView {
                     cx.notify();
                 }))
                 .child(
-                    div()
-                        .debug_selector(|| "db-icon-switcher".to_string())
-                        .child(db_icon(driver_kind, super::db_icon::DB_ICON_SIZE)),
+                    Icon::new(IconName::Database)
+                        .small()
+                        .flex_none()
+                        .text_color(hex(if enabled { t.accent } else { t.fg_muted })),
                 )
                 .child(
                     div()
@@ -784,7 +783,6 @@ impl MainView {
     pub(crate) fn render_db_menu(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let t = current(cx);
         let current_key = self.active().and_then(|tab| tab.ns_key());
-        let driver_kind = self.session_kind();
         let mut menu = v_flex()
             .w(px(196.))
             .max_h(px(280.))
@@ -823,12 +821,9 @@ impl MainView {
                         cx.notify();
                     }))
                     .child(
-                        div()
-                            .debug_selector({
-                                let selector = format!("db-icon-option-{key}");
-                                move || selector.clone()
-                            })
-                            .child(db_icon(driver_kind, super::db_icon::DB_ICON_SIZE)),
+                        Icon::new(IconName::Database)
+                            .small()
+                            .text_color(hex(if active { t.accent } else { t.fg_muted })),
                     )
                     .child(
                         div()
@@ -951,13 +946,10 @@ impl MainView {
         let mut groups: Vec<Vec<MenuEntry>> = Vec::new();
 
         if selectable {
+            // 1) 打开 / 设计
             let mut open = vec![MenuEntry::new(
                 MenuAction::OpenData(path.clone()),
-                if is_table {
-                    "打开表"
-                } else {
-                    "打开视图"
-                },
+                if is_table { "打开表" } else { "打开视图" },
                 IconName::Play,
             )
             .key("obj-open")
@@ -999,18 +991,27 @@ impl MainView {
             }
             groups.push(open);
 
-            let mut tools = vec![
-                MenuEntry::new(
-                    MenuAction::ImportTable(path.clone()),
-                    "导入数据…",
-                    IconName::FolderOpen,
-                )
-                .key("obj-import"),
-            ];
-            // 转储引擎按表取结构与数据，视图不提供该入口（避免生成空文件）。
+            // 2) 新建 / 导入 / 转储 / 执行脚本
+            let mut tools: Vec<MenuEntry> = Vec::new();
             if is_table {
-                tools.insert(
-                    0,
+                tools.push(
+                    MenuEntry::new(
+                        MenuAction::NewObject(path.ns.clone(), ObjectKind::Table),
+                        "新建表",
+                        IconName::Table,
+                    )
+                    .key("obj-new-table"),
+                );
+                tools.push(
+                    MenuEntry::new(
+                        MenuAction::ImportTable(path.clone()),
+                        "导入数据…",
+                        IconName::FolderOpen,
+                    )
+                    .key("obj-import"),
+                );
+                // 转储引擎按表取结构与数据，视图不提供该入口（避免生成空文件）。
+                tools.push(
                     MenuEntry::new(
                         MenuAction::DumpSql(path.clone()),
                         "转储 SQL 文件…",
@@ -1019,27 +1020,45 @@ impl MainView {
                     .key("obj-dump"),
                 );
             }
+            tools.push(
+                MenuEntry::new(
+                    MenuAction::RunSqlFile(path.ns.clone()),
+                    "执行 SQL 文件…",
+                    IconName::FileUp,
+                )
+                .key("obj-run-sql"),
+            );
             groups.push(tools);
-            groups.push(vec![MenuEntry::new(
-                MenuAction::RenameObject(path.clone()),
-                "重命名…",
-                IconName::Pencil,
-            )
-            .key("obj-rename")]);
+
+            // 3) 改名 / 组织
             let pinned = self
                 .object_state
                 .profile(&self.object_profile_key())
                 .is_some_and(|state| state.is_pinned(&object_key(&path)));
-            groups.push(vec![MenuEntry::new(
-                MenuAction::TogglePin(path.clone()),
-                if pinned { "取消置顶" } else { "置顶" },
-                if pinned {
-                    IconName::PinOff
-                } else {
-                    IconName::Pin
-                },
-            )
-            .key("obj-pin")]);
+            groups.push(vec![
+                MenuEntry::new(
+                    MenuAction::RenameObject(path.clone()),
+                    "重命名…",
+                    IconName::Pencil,
+                )
+                .key("obj-rename"),
+                MenuEntry::new(
+                    MenuAction::TogglePin(path.clone()),
+                    if pinned { "取消置顶" } else { "置顶" },
+                    if pinned { IconName::PinOff } else { IconName::Pin },
+                )
+                .key("obj-pin"),
+            ]);
+
+            // 4) 清空（仅表）
+            if is_table {
+                groups.push(vec![MenuEntry::new(
+                    MenuAction::Truncate(path.clone()),
+                    "清空表",
+                    IconName::Eraser,
+                )
+                .key("obj-truncate")]);
+            }
         } else {
             if is_routine {
                 groups.push(vec![MenuEntry::new(
@@ -1055,15 +1074,6 @@ impl MainView {
                 IconName::SquareCode,
             )
             .key("obj-ddl")]);
-        }
-
-        if is_table {
-            groups.push(vec![MenuEntry::new(
-                MenuAction::Truncate(path.clone()),
-                "清空表",
-                IconName::Eraser,
-            )
-            .key("obj-truncate")]);
         }
 
         let can_drop = matches!(
@@ -1110,11 +1120,12 @@ impl MainView {
                 )
                 .key("ns-open"),
                 MenuEntry::new(
-                    MenuAction::RefreshNamespace(ns.clone()),
-                    "刷新",
-                    IconName::RefreshCw,
+                    MenuAction::NewQuery(ns.clone()),
+                    "新建查询",
+                    IconName::Terminal,
                 )
-                .key("ns-refresh"),
+                .key("ns-new-query")
+                .hint("Ctrl+Q"),
             ],
             vec![
                 MenuEntry::new(
@@ -1130,13 +1141,42 @@ impl MainView {
                 )
                 .key("ns-new-view"),
                 MenuEntry::new(
+                    MenuAction::NewObject(ns.clone(), ObjectKind::Function),
+                    "新建函数",
+                    IconName::SquareFunction,
+                )
+                .key("ns-new-func"),
+                MenuEntry::new(
                     MenuAction::NewObject(ns.clone(), ObjectKind::Procedure),
                     "新建存储过程",
-                    IconName::SquareFunction,
+                    IconName::Braces,
                 )
                 .key("ns-new-proc"),
             ],
-            vec![MenuEntry::new(MenuAction::Copy(name), "复制库名", IconName::Copy).key("ns-copy")],
+            vec![
+                MenuEntry::new(
+                    MenuAction::DumpDatabase(ns.clone()),
+                    "转储 SQL 文件…",
+                    IconName::Download,
+                )
+                .key("ns-dump"),
+                MenuEntry::new(
+                    MenuAction::RunSqlFile(ns.clone()),
+                    "执行 SQL 文件…",
+                    IconName::FileUp,
+                )
+                .key("ns-run-sql"),
+            ],
+            vec![
+                MenuEntry::new(
+                    MenuAction::RefreshNamespace(ns.clone()),
+                    "刷新",
+                    IconName::RefreshCw,
+                )
+                .key("ns-refresh"),
+                MenuEntry::new(MenuAction::Copy(name), "复制库名", IconName::Copy)
+                    .key("ns-copy"),
+            ],
         ]
     }
 
@@ -1664,6 +1704,12 @@ impl MainView {
             // Navicat 式「转储 SQL 文件」：选项面板 + 真实 SQL 文件，而不是往编辑器塞骨架。
             MenuAction::DumpSql(path) => {
                 self.open_table_dump(path, cx);
+            }
+            MenuAction::DumpDatabase(ns) => {
+                self.open_dump_panel_for(ns, window, cx);
+            }
+            MenuAction::RunSqlFile(ns) => {
+                self.open_sql_file_in(Some(ns), window, cx);
             }
             MenuAction::ImportTable(path) => {
                 self.start_import(path, window, cx);

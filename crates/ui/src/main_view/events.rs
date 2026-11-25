@@ -779,11 +779,22 @@ impl MainView {
                 self.status = format!("{} · 已加载 {} 个对象", namespace, objects.len());
                 self.status_kind = StatusKind::Ok;
                 // 截图钩子：挑第一张表把右键菜单摆出来。
+                if self.demo_ns_menu && self.ns_menu.is_none() {
+                    if let Some(ns) = self.namespaces.first().cloned() {
+                        self.tree_selection = Some(TreeSelection::Namespace(ns_key(&ns)));
+                        self.ns_menu = Some(NamespaceMenu {
+                            ns,
+                            at: gpui_kit::point(px(150.), px(300.)),
+                        });
+                    }
+                }
                 if self.demo_obj_menu && self.obj_menu.is_none() {
                     if let Some(object) = objects
                         .iter()
                         .find(|object| object.path.kind == ObjectKind::Table)
                     {
+                        self.tree_selection =
+                            Some(TreeSelection::Object(object_key(&object.path)));
                         self.obj_menu = Some(ObjectMenu {
                             path: object.path.clone(),
                             at: gpui_kit::point(px(150.), px(300.)),
