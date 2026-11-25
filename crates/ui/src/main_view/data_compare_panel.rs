@@ -405,10 +405,12 @@ impl MainView {
     /// F-78：数据对比与同步面板（居中模态）。
     pub(crate) fn render_data_compare_panel(
         &mut self,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> gpui_kit::AnyElement {
         let t = current(cx);
+        self.ensure_pick_table(pick_table::PickKind::Compare, window, cx);
+        self.sync_pick_table(pick_table::PickKind::Compare, cx);
         let Some(panel) = self.data_compare.clone() else {
             return div().into_any_element();
         };
@@ -653,77 +655,11 @@ impl MainView {
                 "表（{} / {}）",
                 panel.selected.len(),
                 panel.tables.len()
-            )))
-            .child(
-                div()
-                    .id("dc-toggle-all")
-                    .debug_selector(|| "dc-toggle-all".to_string())
-                    .text_size(px(crate::design::TS_CAPTION))
-                    .text_color(hex(t.accent))
-                    .cursor_pointer()
-                    .on_click(cx.listener(|view, _, _, cx| {
-                        if let Some(panel) = view.data_compare.as_mut() {
-                            if panel.all_selected() {
-                                panel.selected.clear();
-                            } else {
-                                panel.selected = panel.tables.iter().cloned().collect();
-                            }
-                            panel.reset_preview();
-                        }
-                        cx.notify();
-                    }))
-                    .child(if panel.all_selected() {
-                        "全不选"
-                    } else {
-                        "全选"
-                    }),
-            );
-        let mut table_list = v_flex()
-            .gap(px(1.))
-            .h(px((panel.tables.len() as f32 * 21.).min(92.)))
-            .flex_shrink_0()
-            .overflow_y_scrollbar()
-            .scroll_bounce(false);
-        for (index, table) in panel.tables.iter().enumerate() {
-            let on = panel.selected.contains(table);
-            let name = table.clone();
-            table_list = table_list.child(
-                h_flex()
-                    .id(("dc-table", index))
-                    .debug_selector(move || format!("dc-table-{index}"))
-                    .h(px(20.))
-                    .px_1()
-                    .gap_1()
-                    .items_center()
-                    .rounded(px(3.))
-                    .cursor_pointer()
-                    .hover(|style| style.bg(hex(t.bg_overlay)))
-                    .on_click(cx.listener(move |view, _, _, cx| {
-                        if let Some(panel) = view.data_compare.as_mut() {
-                            if !panel.selected.remove(&name) {
-                                panel.selected.insert(name.clone());
-                            }
-                            panel.reset_preview();
-                        }
-                        cx.notify();
-                    }))
-                    .child(
-                        div()
-                            .w(px(12.))
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_color(hex(if on { t.accent } else { t.border_subtle }))
-                            .child(if on { "✓" } else { "·" }),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .text_size(px(crate::design::TS_CAPTION))
-                            .text_ellipsis()
-                            .child(SharedString::from(table.clone())),
-                    ),
-            );
-        }
+            )));
+        let table_list: gpui_kit::AnyElement = match self.pick_table.clone() {
+            Some(table) => pick_table::pick_table_box(table, 120.),
+            None => div().into_any_element(),
+        };
         let config_row = h_flex()
             .gap_2()
             .items_center()

@@ -519,6 +519,7 @@ fn table_designer_edits_drafts(cx: &mut gpui_kit::TestAppContext) {
                 issues: Vec::new(),
                 failure: None,
                 inputs: DesignerInputs::default(),
+                table: None,
             });
             cx.notify();
         });
@@ -630,6 +631,7 @@ fn designer_rebuild_only_for_sqlite() {
         issues: Vec::new(),
         failure: None,
         inputs: DesignerInputs::default(),
+        table: None,
     };
     designer.draft.columns = vec![rustdb_core::ColumnDraft::new("id", "TEXT")];
     assert!(designer_needs_rebuild(DbKind::Sqlite, &designer));
@@ -1241,6 +1243,14 @@ fn tree_selection_moves_between_namespace_and_object(cx: &mut gpui_kit::TestAppC
     vcx.update(|_, app| {
         view.update(app, |view, cx| {
             view.panel = PanelKind::Connections;
+            // 其它用例会临时设置 RUSTDB_DEV_DB，导致本视图进入 demo 自动运行；
+            // 关掉它，避免异步 demo 事件覆盖手工布置的树。
+            view.demo_autorun = false;
+            view.demo_panel = None;
+            view.demo_sidebar = None;
+            // 另一个用例会落盘「orders 已置顶」的状态；并行跑时它会命中本视图，
+            // 把 orders 挪到「置顶」区（选择器变成 obj-pinned-orders）。这里清空。
+            view.object_state = Default::default();
             view.namespaces = vec![ns("main"), ns("shop")];
             view.current_ns = Some(ns("main"));
             view.session = Some(SessionId::new());
@@ -1269,21 +1279,27 @@ fn tree_selection_moves_between_namespace_and_object(cx: &mut gpui_kit::TestAppC
     });
     vcx.run_until_parked();
 
-    click(vcx, "obj-main-orders");
+    let orders = wait_bounds(vcx, "obj-main-orders");
+    vcx.simulate_click(orders.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
     assert_eq!(
         vcx.update(|_, app| view.read(app).tree_selection.clone()),
         Some(TreeSelection::Object("main|Table|orders".into())),
         "点表应选中该对象"
     );
 
-    click(vcx, "db-main");
+    let db = wait_bounds(vcx, "db-main");
+    vcx.simulate_click(db.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
     assert_eq!(
         vcx.update(|_, app| view.read(app).tree_selection.clone()),
         Some(TreeSelection::Namespace("main".into())),
         "点库应把选中转移到库行"
     );
 
-    click(vcx, "db-shop");
+    let shop = wait_bounds(vcx, "db-shop");
+    vcx.simulate_click(shop.center(), gpui_kit::Modifiers::default());
+    vcx.run_until_parked();
     assert_eq!(
         vcx.update(|_, app| view.read(app).tree_selection.clone()),
         Some(TreeSelection::Namespace("shop".into())),
@@ -1300,6 +1316,14 @@ fn namespace_menu_dump_opens_panel_for_that_namespace(cx: &mut gpui_kit::TestApp
     vcx.update(|_, app| {
         view.update(app, |view, cx| {
             view.panel = PanelKind::Connections;
+            // 其它用例会临时设置 RUSTDB_DEV_DB，导致本视图进入 demo 自动运行；
+            // 关掉它，避免异步 demo 事件覆盖手工布置的树。
+            view.demo_autorun = false;
+            view.demo_panel = None;
+            view.demo_sidebar = None;
+            // 另一个用例会落盘「orders 已置顶」的状态；并行跑时它会命中本视图，
+            // 把 orders 挪到「置顶」区（选择器变成 obj-pinned-orders）。这里清空。
+            view.object_state = Default::default();
             view.namespaces = vec![ns("main"), ns("shop")];
             view.current_ns = Some(ns("main"));
             view.session = Some(SessionId::new());
@@ -1348,4 +1372,28 @@ fn namespace_menu_dump_opens_panel_for_that_namespace(cx: &mut gpui_kit::TestApp
             .map(|panel| ns_label(&panel.namespace))
     });
     assert_eq!(target.as_deref(), Some("main"), "应针对右键的库打开导出面板");
+}
+
+/// 字段表格的复选框多选：勾两行后「删除字段」一次删两列。
+#[gpui_kit::test]
+fn designer_multi_select_delete_removes_checked_columns(cx: &mut gpui_kit::TestAppContext) {
+    let (vcx, holder) = open_designer(cx);
+    let view = holder.borrow().clone().expect("view 未创建");
+    assert!(vcx.debug_bounds("designer-select-0").is_some(), "缺少行复选框");
+
+    click(vcx, "designer-select-0");
+    click(vcx, "designer-select-1");
+    let checked = vcx.update(|_, app| view.read(app).designer_checked_rows(app));
+    assert_eq!(checked, vec![0, 1], "两行都应被勾选");
+
+    click(vcx, "designer-field-delete");
+    let left = vcx.update(|_, app| {
+        view.read(app)
+            .designer
+            .as_ref()
+            .map(|designer| designer.draft.columns.len())
+    });
+    assert_eq!(left, Some(0), "勾选的两列应一起删除");
+    let after = vcx.update(|_, app| view.read(app).designer_checked_rows(app));
+    assert!(after.is_empty(), "删除后勾选集合应清空");
 }

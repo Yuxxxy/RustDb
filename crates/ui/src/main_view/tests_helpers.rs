@@ -23,6 +23,20 @@ pub(crate) fn reset_layout(holder: &Holder, vcx: &mut gpui_kit::VisualTestContex
     });
     vcx.run_until_parked();
 }
+/// 等元素布局出来再返回边界：并行用例抢调度时首帧可能还没排到这一行。
+pub(crate) fn wait_bounds(
+    vcx: &mut gpui_kit::VisualTestContext,
+    selector: &'static str,
+) -> gpui_kit::Bounds<gpui_kit::Pixels> {
+    for _ in 0..20 {
+        if let Some(bounds) = vcx.debug_bounds(selector) {
+            return bounds;
+        }
+        vcx.run_until_parked();
+    }
+    panic!("找不到 {selector}");
+}
+
 pub(crate) fn click(vcx: &mut gpui_kit::VisualTestContext, selector: &'static str) {
     let bounds = vcx
         .debug_bounds(selector)
@@ -224,6 +238,7 @@ pub(crate) fn open_designer(
                 issues: Vec::new(),
                 failure: None,
                 inputs: DesignerInputs::default(),
+                table: None,
             });
             cx.notify();
         });

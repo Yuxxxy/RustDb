@@ -1166,6 +1166,7 @@ impl MainView {
                         issues: Vec::new(),
                         failure: None,
                         inputs: DesignerInputs::default(),
+                        table: None,
                     });
                 }
                 self.status = format!(

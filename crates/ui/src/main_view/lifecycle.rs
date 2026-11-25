@@ -250,6 +250,7 @@ impl MainView {
             compare: None,
             compare_config_path,
             dump: None,
+            pick_table: None,
             table_dump: None,
             transfer: None,
             data_compare: None,
@@ -785,6 +786,7 @@ impl MainView {
         .detach();
     }
 
+    #[allow(dead_code)] // 测试直接调用；生产链路走 load_sql_file_in
     pub(crate) fn load_sql_file(
         &mut self,
         path: PathBuf,

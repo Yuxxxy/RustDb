@@ -105,6 +105,10 @@ mod routine_panel;
 mod settings_panel;
 /// Navicat 兼容快捷键（键位表 / 分派 / 帮助浮层）。
 mod shortcuts;
+/// 表设计器字段表（DataTable + 行复选框多选）。
+mod designer_table;
+/// 转储 / 传输 / 对比面板的表清单（DataTable + 复选框）。
+mod pick_table;
 /// 侧栏与导航（连接树 / 历史 / 文件 / 帮助）。
 mod sidebar;
 /// 状态栏与标题栏。
@@ -333,6 +337,8 @@ struct DesignerState {
     failure: Option<DesignerFailure>,
     /// 各页签输入框（按当前页签懒创建）。
     inputs: DesignerInputs,
+    /// 字段页 DataTable 实体（首次渲染时懒创建）。
+    table: Option<gpui_kit::Entity<gpui_kit::component::table::TableState<designer_table::DesignerTable>>>,
 }
 
 /// 迁移失败后的现场信息。
@@ -1742,9 +1748,6 @@ impl DumpPanel {
             .collect()
     }
 
-    fn all_selected(&self) -> bool {
-        !self.tables.is_empty() && self.selected.len() == self.tables.len()
-    }
 }
 
 /// Navicat 式「转储 SQL 文件」：单表选项面板，导出结构与数据或仅结构，落盘为可回放 SQL。
@@ -1806,9 +1809,6 @@ impl TransferPanel {
             .collect()
     }
 
-    fn all_selected(&self) -> bool {
-        !self.tables.is_empty() && self.selected.len() == self.tables.len()
-    }
 
     fn target_label(&self) -> Option<&str> {
         let id = self.target.as_deref()?;
@@ -1874,9 +1874,6 @@ impl DataComparePanel {
             .collect()
     }
 
-    fn all_selected(&self) -> bool {
-        !self.tables.is_empty() && self.selected.len() == self.tables.len()
-    }
 
     fn target_label(&self) -> Option<&str> {
         let id = self.target.as_deref()?;
@@ -2366,6 +2363,9 @@ pub struct MainView {
     compare_config_path: PathBuf,
     /// F-76：整库逻辑导出面板。
     dump: Option<DumpPanel>,
+    /// 当前模态面板（转储 / 传输 / 对比）的表清单表格。
+    pick_table:
+        Option<gpui_kit::Entity<gpui_kit::component::table::TableState<pick_table::PickListTable>>>,
     /// Navicat 式单表「转储 SQL 文件」面板。
     table_dump: Option<TableDumpPanel>,
     /// F-75：跨库数据传输面板。

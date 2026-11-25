@@ -489,7 +489,7 @@ impl Render for MainView {
             })
             // F-76：逻辑导出面板（居中模态）。
             .when_some(self.dump.as_ref().map(|_| ()), |layout, _| {
-                let panel = self.render_dump_panel(cx);
+                let panel = self.render_dump_panel(window, cx);
                 layout
                     .child(
                         div()
@@ -568,7 +568,7 @@ impl Render for MainView {
                     )
             })
             // F-75：跨库传输面板（居中模态）。
-            .when_some(self.transfer.as_ref().map(|_| ()), |layout, _| {                let panel = self.render_transfer_panel(cx);
+            .when_some(self.transfer.as_ref().map(|_| ()), |layout, _| {                let panel = self.render_transfer_panel(window, cx);
                 layout
                     .child(
                         div()
